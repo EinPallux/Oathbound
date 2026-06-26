@@ -8,16 +8,16 @@ Entry point for **any coding agent or LLM** working in this repository (Claude C
 ## ▶ Current status — where to continue
 > **Keep this section up to date at the end of every phase.**
 
-- **Done & verified:** `0.0.1-INDEV` Blueprint (planning) · `0.0.2-INDEV` Scaffold · **`0.0.3-INDEV` Greybox Movement**.
-- **Last gate passed:** **Core Movement Gate** (see [docs/production/RELEASE_GATES.md](./docs/production/RELEASE_GATES.md)).
-- **▶ Next phase to build:** **`0.0.4-INDEV` "First Contact"** — a target dummy, soft tab-targeting, a basic attack + one ability on the global cooldown, the canonical damage formula, and floating damage numbers.
+- **Done & verified:** `0.0.1-INDEV` Blueprint (planning) · `0.0.2-INDEV` Scaffold · `0.0.3-INDEV` Greybox Movement · **`0.0.4-INDEV` First Contact**.
+- **Last gate passed:** **Core Movement Gate** (see [docs/production/RELEASE_GATES.md](./docs/production/RELEASE_GATES.md)). The **Combat Gate** is targeted at `0.1.0`; `0.0.4` lays its skeleton.
+- **▶ Next phase to build:** **`0.1.0-INDEV` "Vertical Slice"** — the Warrior early kit vs one Greenmarch enemy family with XP, loot, equip, and a v1 save (the first complete grinding loop). Targets the **Combat Gate + Core Loop Gate**.
 - **Live progress log:** [`CHANGELOG.md`](./CHANGELOG.md) (every phase, each ending with "Next phase →").
 - **The full plan:** [`docs/production/VERSION_ROADMAP.md`](./docs/production/VERSION_ROADMAP.md) (`0.0.1-INDEV` → `1.0-BETA`).
 
 ## ⚠️ Working agreement (the repo owner's workflow — IMPORTANT)
 - **Build ONE roadmap phase at a time.** Do **not** implement multiple phases in a single run — the owner tests each build.
 - **After finishing a phase:** update [`CHANGELOG.md`](./CHANGELOG.md) **and** the *Current status* section above → run all checks → commit → push → then **STOP and ask the owner before starting the next phase.**
-- Develop on the branch the owner specifies (currently `claude/game-design-docs-70dim2`). One commit per phase, including its verification results. Do **not** open a PR unless asked.
+- Develop on the branch the owner specifies (currently `claude/oathbound-phase-0-0-4-to8alw`). One commit per phase, including its verification results. Do **not** open a PR unless asked.
 
 ## How to run & verify
 ```bash
