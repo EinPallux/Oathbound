@@ -1,5 +1,6 @@
 // Component registry. Components are plain data keyed by a string name.
-// Phase 0.0.3 introduced movement; 0.0.4 "First Contact" adds combat components.
+// 0.0.3 added movement; 0.0.4 combat; 0.1.0 "Vertical Slice" adds the full grind
+// loop (resource, statuses, enemy AI, progression, loot, inventory/equipment).
 
 export const C = {
   Transform: 'transform',
@@ -14,7 +15,15 @@ export const C = {
   Target: 'target',
   Targetable: 'targetable',
   EnemyInfo: 'enemyInfo',
-  Dummy: 'dummy',
+  // Vertical slice (0.1.0)
+  Resource: 'resource',
+  Statuses: 'statuses',
+  Enemy: 'enemy',
+  Progression: 'progression',
+  Inventory: 'inventory',
+  Equipment: 'equipment',
+  LootDrop: 'lootDrop',
+  CombatState: 'combatState',
 } as const;
 
 /**
@@ -54,7 +63,7 @@ export interface Character {
 /** Marker component: this entity is driven by player input. */
 export type PlayerControlled = true;
 
-// ── Combat (0.0.4 "First Contact") ──────────────────────────────────────────
+// ── Combat ──────────────────────────────────────────────────────────────────
 
 /** Damage school. `physical` is mitigated by armor; the rest by typed resists. */
 export type DamageType = 'physical' | 'fire' | 'frost' | 'blight' | 'holy';
@@ -75,6 +84,10 @@ export interface Offense {
   critChance: number;
   /** Crit damage multiplier (base 1.5 `v1`). */
   critMult: number;
+  /** Fraction of damage dealt returned to the attacker as HP. */
+  leech: number;
+  /** GCD/cast reduction fraction in [0, ~0.3]. */
+  haste: number;
 }
 
 /** Defensive stats for the defender side of the canonical damage formula. */
@@ -114,9 +127,130 @@ export interface EnemyInfo {
   level: number;
 }
 
-/** Target-dummy behaviour: auto-resets to full HP a short time after dying. */
-export interface Dummy {
+/** A class resource pool (Warrior Fury in the slice). */
+export interface Resource {
+  current: number;
+  max: number;
+}
+
+/** A timed buff/debuff instance. `id` keys behaviour; `magnitude` is effect-specific. */
+export interface StatusInstance {
+  id: string;
+  remaining: number;
+  magnitude: number;
+}
+
+/** Active timed effects on an entity. */
+export interface Statuses {
+  list: StatusInstance[];
+}
+
+/** Combat engagement tracking, for recovery/sprint gating. */
+export interface CombatState {
+  inCombat: boolean;
+  /** Seconds since the last combat event (drives the in→out transition). */
+  sinceEventSec: number;
+}
+
+// ── Enemy AI (melee bruiser) ────────────────────────────────────────────────
+
+export type EnemyState = 'idle' | 'engage' | 'attack' | 'leash' | 'dead';
+
+export interface Enemy {
+  archetype: 'melee_bruiser';
+  family: string;
+  tier: 'standard';
+  state: EnemyState;
+  /** Spawn point — leash + reset returns here. */
+  homeX: number;
+  homeZ: number;
+  aggroRadius: number;
+  leashRange: number;
+  socialRange: number;
+  moveSpeed: number;
+  attackRange: number;
+  /** Seconds between swings. */
+  attackCooldown: number;
+  attackTimer: number;
+  /** Telegraph wind-up before a swing lands (s). */
+  windup: number;
+  /** Remaining wind-up; <0 means not currently winding up. */
+  windupTimer: number;
+  attackBase: number;
+  attackCoeff: number;
+  /** Same-level standard XP grant. */
+  xpBase: number;
+  goldMin: number;
+  goldMax: number;
+  lootTable: string;
   respawnDelay: number;
   deadFor: number;
-  dead: boolean;
+  /** Brief invulnerability while returning from a leash. */
+  invulnTimer: number;
+}
+
+// ── Progression ─────────────────────────────────────────────────────────────
+
+export interface Progression {
+  level: number;
+  xp: number;
+  xpToNext: number;
+}
+
+// ── Items, inventory & equipment ────────────────────────────────────────────
+
+export type EquipSlot =
+  | 'weapon'
+  | 'offhand'
+  | 'head'
+  | 'chest'
+  | 'hands'
+  | 'legs'
+  | 'feet'
+  | 'amulet'
+  | 'ring1'
+  | 'ring2';
+
+export type Rarity = 'common' | 'uncommon';
+
+export type PrimaryStatId = 'STR' | 'VIT';
+
+export type AffixId = 'crit' | 'leech' | 'haste' | 'armor' | 'vit';
+
+export interface Affix {
+  id: AffixId;
+  value: number;
+}
+
+export interface Item {
+  /** Unique instance id (save-stable). */
+  uid: string;
+  name: string;
+  slot: EquipSlot;
+  rarity: Rarity;
+  ilvl: number;
+  primary: { stat: PrimaryStatId; value: number };
+  /** Base armor contributed by armor/weapon slots. */
+  armor: number;
+  affixes: Affix[];
+  /** Rough comparison power (for inventory deltas). */
+  score: number;
+}
+
+export interface Inventory {
+  items: Item[];
+  gold: number;
+  capacity: number;
+}
+
+export interface Equipment {
+  slots: Partial<Record<EquipSlot, Item>>;
+}
+
+/** A loot drop in the world (corpse pickup). Owner-eligibility is modelled now so
+ *  the future multiplayer transition to instanced loot is a data change. */
+export interface LootDrop {
+  item: Item | null;
+  gold: number;
+  owner: number;
 }

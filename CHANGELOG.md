@@ -5,6 +5,39 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.1.0-INDEV — "Vertical Slice"
+**Goal:** the first **complete grinding loop** — as a Warrior, fight a Greenmarch camp, gain XP/levels, loot gear, equip upgrades, recover, repeat; the run persists. Targets the [Combat Gate](./docs/production/RELEASE_GATES.md#2-combat-gate) + [Core Loop Gate](./docs/production/RELEASE_GATES.md#3-core-loop-gate).
+
+**Added**
+- **Warrior early kit + Fury** (`src/sim/combat/abilities.ts`): Cleaving Strike (filler, builds Fury, frontal cleave), Sunder (spender + Armor Break), Whirl (self-AoE), Bulwark (off-GCD damage reduction). Resource cost/gain, Haste-scaled GCD, timed buffs/debuffs (`statuses.ts`), and leech — applied through one shared damage path (`src/sim/combat/apply.ts`).
+- **Melee enemy AI** (`src/sim/systems/enemy-ai.ts`): Bloomhusks (Greenmarch) with idle→engage→attack→leash/reset(heal)→dead/respawn, aggro radius, **social aggro**, leashing, a telegraphed wind-up, and cheap steering (move + ground-snap + prop collision).
+- **Progression** (`src/sim/stats.ts`, `progression.ts`): the canonical XP curve, the con (level-difference) system + anti-farm gray rule, level-up with stat recompute + refill.
+- **Loot → inventory → equip** (`src/sim/loot/*`, `inventory.ts`): data-driven item generation (Common/Uncommon, per-slot budget + affixes), drop tables (~10% uncommon from a standard), corpse drops, gold auto-pickup, `F` to loot, equip with derived-stat recompute and upgrade deltas.
+- **Recovery & death** (`src/sim/systems/recovery.ts`): out-of-combat HP ramp (≤8s) + Fury decay, in-combat Fury trickle, death → respawn at spawn with a **Shaken** debuff (no XP loss).
+- **Save v1** (`src/sim/save.ts`, `src/platform/save-store.ts`): versioned serialize/apply (character, gold, gear, inventory, position) persisted to **IndexedDB**, autosave on key events + timer + page-hide, loaded on boot. (Migration/corruption hardening with `idb`+`zod` is scheduled for the Technical Beta phase per ADR-005.)
+- **HUD & UI** (`src/render/hud.ts`, `inventory-panel.ts`, `loot-view.ts`, enemy con-colour nameplate): player frame (HP/Fury/XP/level + combat state), ability hotbar with cooldown/affordability, gold, loot prompt, toasts, an interactive inventory/equipment panel (`I`/`C`) with compare + equip, and rarity-coloured loot beams. Minimal procedural **audio** (`src/platform/audio.ts`).
+- An entity **factory** (`src/sim/factory.ts`) shared by the bootstrap and tests.
+- Tests: stats, items/loot, the warrior combat loop incl. a **TTK 3–6s** combat-sim, the enemy-AI FSM (aggro/social/leash), and a save round-trip → **72 unit tests**; Playwright now drives an attack/GCD sequence, targeting, and a **save/reload persistence** check (5 e2e).
+
+**Removed:** the 0.0.4 target dummies (replaced by real Bloomhusk enemies + AI).
+
+**Verified (automated):** `typecheck` ✓ · `npm test` → 72/72 ✓ · `build` ✓ (~149 KB gzip) · `test:e2e` → 5/5 ✓. Gate items checked by tests: damage = canonical formula; soft tab-target + range/LoS; GCD + cooldowns + resource costs; enemy aggro/social/leash/reset/respawn; TTK 3–6s; loot→inventory→equip; XP/level-up; save/reload restores state.
+
+**Pending owner playtest (subjective/long-running gate items):** the "20-minute grind is enjoyable" rating, the 60-minute no-leak session, "60 FPS with 20 active enemies" on reference HW, and final balance tuning (camp density/aggro, drop cadence, TTK spread) — these need a human playtest and are the focus of `0.1.1`.
+
+**Not included (by design):** other classes (Hunter/Priest), other zones/families, elites/rares, Rare+ rarity, salvage/Reinforcement, consumables, world bosses, class-select, full UI/map.
+
+**How to test**
+```bash
+npm install && npm run dev   # open http://localhost:5173
+# 1–4 abilities, Tab/click to target, walk over gold + F to loot, I/C for inventory.
+# Kill Bloomhusks → XP/level, loot drops, equip upgrades; progress saves automatically.
+```
+
+**Next phase →** `0.1.1-INDEV` "Loop Hardening": pooling/AI throttling/spatial grid, drop & inventory polish, salvage v1, telemetry counters, and the playtest-driven balance pass — making the slice robust and provably within the [SOLO_BALANCE_RULES](./docs/design/SOLO_BALANCE_RULES.md) bands.
+
+---
+
 ## 0.0.4-INDEV — "First Contact"
 **Goal:** a combat skeleton against a target dummy — select it, attack it, and watch damage numbers fly. First step toward the [Combat Gate](./docs/production/RELEASE_GATES.md#2-combat-gate).
 
