@@ -19,6 +19,14 @@ export interface ControlState {
   dist: number;
   /** Returns true once if a jump was requested since the last call. */
   consumeJump(): boolean;
+  /** Returns a queued ability index (0-based) requested since the last call, or null. */
+  consumeAbility(): number | null;
+  /** Returns true once if Tab (cycle target) was pressed since the last call. */
+  consumeTargetCycle(): boolean;
+  /** Returns true once if Esc (clear target) was pressed since the last call. */
+  consumeClearTarget(): boolean;
+  /** Returns a queued left-click in normalized device coords [-1, 1], or null. */
+  consumeClick(): { ndcX: number; ndcY: number } | null;
 }
 
 export class InputController implements ControlState {
@@ -33,6 +41,10 @@ export class InputController implements ControlState {
 
   private jumpQueued = false;
   private pauseQueued = false;
+  private abilityQueued: number | null = null;
+  private cycleQueued = false;
+  private clearQueued = false;
+  private clickQueued: { ndcX: number; ndcY: number } | null = null;
   private dragging = false;
   private readonly lookSensitivity = 0.0035;
 
@@ -40,7 +52,17 @@ export class InputController implements ControlState {
   private readonly onKeyUp = (e: KeyboardEvent): void => this.setKey(e, false);
   private readonly onContextMenu = (e: Event): void => e.preventDefault();
   private readonly onMouseDown = (e: MouseEvent): void => {
-    if (e.button === 2) this.dragging = true;
+    if (e.button === 2) {
+      this.dragging = true;
+    } else if (e.button === 0) {
+      // Left-click selects: stash the click in normalized device coords for the
+      // renderer to raycast against enemy meshes.
+      const rect = this.el.getBoundingClientRect();
+      this.clickQueued = {
+        ndcX: ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        ndcY: -(((e.clientY - rect.top) / rect.height) * 2 - 1),
+      };
+    }
   };
   private readonly onMouseUp = (e: MouseEvent): void => {
     if (e.button === 2) this.dragging = false;
@@ -97,6 +119,21 @@ export class InputController implements ControlState {
       case 'KeyP':
         if (down) this.pauseQueued = true;
         break;
+      case 'Digit1':
+      case 'Numpad1':
+        if (down) this.abilityQueued = 0;
+        break;
+      case 'Digit2':
+      case 'Numpad2':
+        if (down) this.abilityQueued = 1;
+        break;
+      case 'Tab':
+        if (down) this.cycleQueued = true;
+        e.preventDefault(); // keep keyboard focus on the game
+        break;
+      case 'Escape':
+        if (down) this.clearQueued = true;
+        break;
       default:
         return;
     }
@@ -112,6 +149,30 @@ export class InputController implements ControlState {
     const p = this.pauseQueued;
     this.pauseQueued = false;
     return p;
+  }
+
+  consumeAbility(): number | null {
+    const a = this.abilityQueued;
+    this.abilityQueued = null;
+    return a;
+  }
+
+  consumeTargetCycle(): boolean {
+    const c = this.cycleQueued;
+    this.cycleQueued = false;
+    return c;
+  }
+
+  consumeClearTarget(): boolean {
+    const c = this.clearQueued;
+    this.clearQueued = false;
+    return c;
+  }
+
+  consumeClick(): { ndcX: number; ndcY: number } | null {
+    const c = this.clickQueued;
+    this.clickQueued = null;
+    return c;
   }
 
   dispose(): void {
