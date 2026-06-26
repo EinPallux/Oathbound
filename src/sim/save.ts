@@ -9,6 +9,8 @@ import {
   C,
   type Item,
   type EquipSlot,
+  type ClassId,
+  type PlayerClass,
   type Progression,
   type Inventory,
   type Equipment,
@@ -24,6 +26,7 @@ export const SCHEMA_VERSION = 1;
 export interface SaveData {
   schemaVersion: number;
   updatedAt: number;
+  classId: ClassId;
   character: { level: number; xp: number; xpToNext: number };
   gold: number;
   materials: number;
@@ -46,6 +49,7 @@ export function serialize(world: World, player: Entity): SaveData {
   return {
     schemaVersion: SCHEMA_VERSION,
     updatedAt: Date.now(),
+    classId: world.get<PlayerClass>(player, C.PlayerClass)?.id ?? 'warrior',
     character: { level: prog.level, xp: prog.xp, xpToNext: prog.xpToNext },
     gold: inv.gold,
     materials: inv.materials,
@@ -57,6 +61,9 @@ export function serialize(world: World, player: Entity): SaveData {
 
 /** Apply a save snapshot onto the player's components, rebuilding derived stats. */
 export function applySave(world: World, player: Entity, data: SaveData): void {
+  const pc = world.get<PlayerClass>(player, C.PlayerClass);
+  if (pc) pc.id = data.classId ?? 'warrior';
+
   const prog = world.get<Progression>(player, C.Progression)!;
   prog.level = data.character.level;
   prog.xp = data.character.xp;

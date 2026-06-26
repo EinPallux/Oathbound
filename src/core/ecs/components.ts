@@ -24,6 +24,8 @@ export const C = {
   Equipment: 'equipment',
   LootDrop: 'lootDrop',
   CombatState: 'combatState',
+  PlayerClass: 'playerClass',
+  Trap: 'trap',
 } as const;
 
 /**
@@ -157,7 +159,7 @@ export interface CombatState {
 export type EnemyState = 'idle' | 'engage' | 'attack' | 'leash' | 'dead';
 
 export interface Enemy {
-  archetype: 'melee_bruiser';
+  archetype: 'melee_bruiser' | 'ranged_skirmisher';
   family: string;
   tier: 'standard';
   state: EnemyState;
@@ -213,7 +215,25 @@ export type EquipSlot =
 
 export type Rarity = 'common' | 'uncommon';
 
-export type PrimaryStatId = 'STR' | 'VIT';
+export type PrimaryStatId = 'STR' | 'DEX' | 'VIT';
+
+/** Playable classes (Warrior + Hunter in the slice; Priest follows in 0.2.1). */
+export type ClassId = 'warrior' | 'hunter';
+
+/** Which class the player is. Drives kit, resource, and primary stat. */
+export interface PlayerClass {
+  id: ClassId;
+}
+
+/** A placed trap (Hunter Snare Trap): roots the first enemy that enters, then expires. */
+export interface Trap {
+  source: number;
+  radius: number;
+  rootDuration: number;
+  ttl: number;
+  base: number;
+  coeff: number;
+}
 
 export type AffixId = 'crit' | 'leech' | 'haste' | 'armor' | 'vit';
 

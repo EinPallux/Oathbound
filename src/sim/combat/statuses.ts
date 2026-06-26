@@ -9,6 +9,10 @@ export const Status = {
   Bulwark: 'bulwark',
   /** On the player: outgoing damage reduced by `magnitude` (fraction) after death. */
   Shaken: 'shaken',
+  /** On an enemy: cannot move (Snare Trap). */
+  Root: 'root',
+  /** On the player: move-speed multiplier bonus (Disengage). */
+  Fleet: 'fleet',
 } as const;
 
 /** Add or refresh a status (keeps the longer remaining time). */

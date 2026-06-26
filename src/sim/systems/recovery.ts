@@ -11,17 +11,18 @@ import {
   type CombatState,
   type Statuses,
   type Target,
+  type PlayerClass,
 } from '../../core/ecs/components';
 import type { Heightfield } from '../../world/heightfield';
+import { clamp } from '../../core/math';
 import { addStatus, Status } from '../combat/statuses';
+import { getClass } from '../classes';
 import { CombatEvent, type PlayerRespawnEvent } from '../combat/events';
 
 /** Seconds of no combat events before leaving combat. */
 const T_OUT_OF_COMBAT = 5;
 /** Seconds to fully heal out of combat. */
 const HP_RAMP_SEC = 8;
-const FURY_DECAY_PER_SEC = 6;
-const FURY_REGEN_IN_COMBAT = 3;
 const RESPAWN_DELAY = 2;
 const SHAKEN_SEC = 30;
 const SHAKEN_MAGNITUDE = 0.1;
@@ -61,14 +62,15 @@ export function createRecoverySystem(deps: RecoveryDeps): System {
         cs.sinceEventSec += dt;
         if (cs.sinceEventSec >= T_OUT_OF_COMBAT) cs.inCombat = false;
 
-        // Regen.
-        if (cs.inCombat) {
-          if (res) res.current = Math.min(res.max, res.current + FURY_REGEN_IN_COMBAT * dt);
-        } else {
-          if (h.current < h.max) {
-            h.current = Math.min(h.max, h.current + (h.max * dt) / HP_RAMP_SEC);
-          }
-          if (res) res.current = Math.max(0, res.current - FURY_DECAY_PER_SEC * dt);
+        // Resource regen (class-driven; applies in and out of combat).
+        if (res) {
+          const rc = getClass(world.get<PlayerClass>(e, C.PlayerClass)?.id ?? 'warrior').resource;
+          const delta = rc.regenPerSec + (cs.inCombat ? rc.inCombatRegen : -rc.decayOocPerSec);
+          res.current = clamp(res.current + delta * dt, 0, res.max);
+        }
+        // HP regen ramps only out of combat.
+        if (!cs.inCombat && h.current < h.max) {
+          h.current = Math.min(h.max, h.current + (h.max * dt) / HP_RAMP_SEC);
         }
       }
     },

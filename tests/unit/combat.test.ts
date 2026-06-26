@@ -12,6 +12,7 @@ import {
 } from '../../src/core/ecs/components';
 import { createCombatSystem } from '../../src/sim/systems/combat';
 import { createPlayer, createBloomhusk } from '../../src/sim/factory';
+import { Projectiles } from '../../src/sim/projectiles';
 import { Rng } from '../../src/core/rng';
 import { GCD } from '../../src/sim/combat/abilities';
 import { Status, statusMagnitude } from '../../src/sim/combat/statuses';
@@ -24,7 +25,13 @@ function setup(seed = 1) {
   const world = new World();
   const { ctrl, state } = makeInput();
   const player = createPlayer(world, FIELD, 0, 0);
-  const sys = createCombatSystem({ input: ctrl, rng: new Rng(seed), colliders: [] });
+  const sys = createCombatSystem({
+    input: ctrl,
+    rng: new Rng(seed),
+    colliders: [],
+    field: FIELD,
+    projectiles: new Projectiles(),
+  });
   return { world, state, player, sys };
 }
 
@@ -123,7 +130,13 @@ describe('time-to-kill band (combat-sim)', () => {
     const enemy = createBloomhusk(world, FIELD, 0, 2.5, 1);
     // Remove crit variance for a deterministic centre of the band.
     world.get<Offense>(player, C.Offense)!.critChance = 0;
-    const sys = createCombatSystem({ input: ctrl, rng: new Rng(99), colliders: [] });
+    const sys = createCombatSystem({
+      input: ctrl,
+      rng: new Rng(99),
+      colliders: [],
+      field: FIELD,
+      projectiles: new Projectiles(),
+    });
     const h = world.get<Health>(enemy, C.Health)!;
     const res = world.get<Resource>(player, C.Resource)!;
 

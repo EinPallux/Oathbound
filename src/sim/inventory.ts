@@ -13,14 +13,17 @@ import {
   type Health,
   type Resource,
   type Progression,
+  type PlayerClass,
 } from '../core/ecs/components';
-import { deriveStats, FURY_MAX } from './stats';
+import { deriveStats } from './stats';
+import { getClass } from './classes';
 
-/** Recompute the player's combat stats from level + equipped gear. */
+/** Recompute the player's combat stats from level + class + equipped gear. */
 export function recomputeDerived(world: World, player: Entity): void {
   const prog = world.get<Progression>(player, C.Progression)!;
   const eq = world.get<Equipment>(player, C.Equipment)!;
-  const d = deriveStats(prog.level, eq);
+  const cls = getClass(world.get<PlayerClass>(player, C.PlayerClass)?.id ?? 'warrior');
+  const d = deriveStats(prog.level, eq, cls.primaryStatId);
 
   const off = world.get<Offense>(player, C.Offense)!;
   off.primaryStat = d.primaryStat;
@@ -38,7 +41,7 @@ export function recomputeDerived(world: World, player: Entity): void {
 
   const r = world.get<Resource>(player, C.Resource);
   if (r) {
-    r.max = FURY_MAX;
+    r.max = cls.resource.max;
     if (r.current > r.max) r.current = r.max;
   }
 }

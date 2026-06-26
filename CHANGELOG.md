@@ -5,6 +5,37 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.2.0-INDEV — "The Hunter"
+**Goal:** a second, fully distinct class — a ranged **Hunter** — plus the ranged combat tech to support it, proving the slice works for more than one playstyle. Toward the [Three-Class Gate](./docs/production/RELEASE_GATES.md#4-three-class-gate).
+
+**Added**
+- **Data-driven classes** (`src/sim/classes.ts`): a class registry (primary stat, resource behaviour, ability kit). The Warrior (melee/STR/Fury) is unchanged; the **Hunter** (ranged/DEX/Focus) is new. A `PlayerClass` component + `setPlayerClass` make the kit/resource/primary swappable; **save** persists the class.
+- **Hunter early kit**: Quick Shot (filler projectile), Piercing Arrow (Focus spender), Volley (cone of arrows), **Disengage** (off-GCD backflip + brief move-speed via a Fleet status), and **Snare Trap** (placed trap). Focus regenerates passively (vs Fury's build/decay).
+- **Pooled projectiles** (`src/sim/projectiles.ts`): plain structs in a reused pool — zero per-shot allocation — that home to their target and resolve damage via the shared applier. Used by Hunter shots **and** enemy shots. Rendered from a matching mesh pool (`src/render/projectile-view.ts`).
+- **Ranged-skirmisher enemy**: the Greenmarch **Reaver** — shoots and **kites** (back-pedals when you close), countered by closing the gap or breaking LoS. The camp is now mixed (Bloomhusks + Reavers). Any hit now aggros an idle enemy (ranged pulls work).
+- **Traps + root** (`src/sim/systems/trap.ts`): Snare Trap roots + lightly damages the first enemy to enter, then is consumed; a `Root` status stops enemy movement (kiting tool). Rendered as a ground ring (`src/render/trap-view.ts`).
+- **New ability targeting** in the combat system: `projectile`, `cone`, `dash`, and `trap`, alongside the existing melee/AoE/self.
+- **Class-select** overlay for new characters (`src/render/class-select.ts`); the HUD is class-aware (Fury/Focus label, kit-driven hotbar incl. key 5); DEX/STR smart-loot so drops favour your class.
+- Tests: class registry, Hunter projectile combat + a **Hunter TTK 3–6s** combat-sim, traps/root, the Reaver shooting the player, and class switching → **94 unit tests**; a new "play as the Hunter" e2e (7 e2e).
+
+**Verified (automated):** `typecheck` ✓ · `npm test` → 94/94 ✓ · `build` ✓ (~153 KB gzip) · `test:e2e` → 7/7 ✓ (incl. Hunter ranged shots + save/reload). The Warrior path and all 0.1.x systems remain green.
+
+**Tuning note:** Hunter single-target was tuned **down** into the TTK band and closer to the Warrior; the strict **inter-class ±20% TTK** balance is the job of the `0.2.1` Three-Class Gate (with the Priest), validated via the combat-sim + telemetry.
+
+**Pending owner playtest:** is the Hunter *fun* and solo-viable end-to-end? does kiting feel good without trivializing (leash still holds)? plus the standing 0.1.x perf/fun items.
+
+**Not included (by design):** the Priest (next), other zones/families, elites/rares, Reinforcement, consumables, full ability kits past the early game.
+
+**How to test**
+```bash
+npm install && npm run dev   # open http://localhost:5173 → pick Warrior or Hunter
+# Hunter: 1 Quick Shot · 2 Piercing Arrow · 3 Volley · 4 Disengage · 5 Snare Trap
+```
+
+**Next phase →** `0.2.1-INDEV` "The Priest" → **Three-Class Gate**: the third class (holy damage + Atonement self-sustain + shields), a caster enemy archetype (telegraph + interrupt), and the inter-class balance pass (all three solo the slice within ±20% TTK).
+
+---
+
 ## 0.1.1-INDEV — "Loop Hardening"
 **Goal:** make the vertical slice **robust, performant, and measurable** — the engineering pass behind the [Core Loop Gate](./docs/production/RELEASE_GATES.md#3-core-loop-gate) so the owner's playtest runs on solid ground.
 

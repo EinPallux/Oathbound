@@ -144,6 +144,10 @@ export class InputController implements ControlState {
       case 'Numpad4':
         if (down) this.abilityQueued = 3;
         break;
+      case 'Digit5':
+      case 'Numpad5':
+        if (down) this.abilityQueued = 4;
+        break;
       case 'KeyF':
         if (down) this.interactQueued = true;
         break;

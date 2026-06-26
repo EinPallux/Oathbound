@@ -2,7 +2,7 @@
 // Pure: no Three.js/DOM. Canonical numbers from docs/design/PROGRESSION_AND_XP.md
 // (all `v1` tuning targets).
 
-import type { Equipment } from '../core/ecs/components';
+import type { Equipment, PrimaryStatId } from '../core/ecs/components';
 
 export const LEVEL_CAP = 30;
 export const BASE_CRIT = 0.1;
@@ -66,9 +66,15 @@ export interface DerivedStats {
   haste: number;
 }
 
-/** Combine level base stats with equipment into the player's derived combat stats. */
-export function deriveStats(level: number, equipment: Equipment): DerivedStats {
-  let str = primaryStatForLevel(level);
+/** Combine level base stats with equipment into the player's derived combat stats.
+ *  `primaryStatId` is the class's main stat (STR Warrior / DEX Hunter); gear that
+ *  rolls the matching primary adds to it, VIT always adds HP. */
+export function deriveStats(
+  level: number,
+  equipment: Equipment,
+  primaryStatId: PrimaryStatId = 'STR',
+): DerivedStats {
+  let primary = primaryStatForLevel(level);
   let vit = 0;
   let armor = 0;
   let crit = BASE_CRIT;
@@ -77,8 +83,8 @@ export function deriveStats(level: number, equipment: Equipment): DerivedStats {
 
   for (const item of Object.values(equipment.slots)) {
     if (!item) continue;
-    if (item.primary.stat === 'STR') str += item.primary.value;
-    else if (item.primary.stat === 'VIT') vit += item.primary.value;
+    if (item.primary.stat === 'VIT') vit += item.primary.value;
+    else if (item.primary.stat === primaryStatId) primary += item.primary.value;
     armor += item.armor;
     for (const a of item.affixes) {
       switch (a.id) {
@@ -102,7 +108,7 @@ export function deriveStats(level: number, equipment: Equipment): DerivedStats {
   }
 
   return {
-    primaryStat: str,
+    primaryStat: primary,
     maxHp: maxHpForLevel(level) + vit * VIT_HP,
     armor,
     critChance: crit,
