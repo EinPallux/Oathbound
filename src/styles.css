@@ -90,6 +90,30 @@ body {
   color: #ffcc44;
 }
 
+.dmg-number.heal {
+  color: #7be08a;
+}
+
+/* Priest cast bar (above the hotbar). */
+.cast-bar {
+  position: fixed;
+  bottom: 78px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 10px;
+  background: #14171c;
+  border: 1px solid rgba(120, 200, 255, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.cast-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(#ffe08a, #e0b44c);
+}
+
 /* Current-target frame (top-centre). */
 .target-frame {
   position: fixed;

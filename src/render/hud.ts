@@ -15,6 +15,8 @@ import {
   type Statuses,
   type LootDrop,
   type PlayerClass,
+  type Shield,
+  type CastState,
 } from '../core/ecs/components';
 import { getClass } from '../sim/classes';
 import { hasStatus, Status } from '../sim/combat/statuses';
@@ -46,6 +48,8 @@ export class Hud {
   private readonly hotbar: HTMLDivElement;
   private slots: { wrap: HTMLDivElement; cd: HTMLDivElement }[] = [];
   private hotbarSig = '';
+  private readonly castBar: HTMLDivElement;
+  private readonly castFill: HTMLDivElement;
   private readonly goldEl: HTMLDivElement;
   private readonly promptEl: HTMLDivElement;
   private readonly toastWrap: HTMLDivElement;
@@ -66,6 +70,10 @@ export class Hud {
     this.resText = div('bar-text', resBar);
     const xp = div('bar xp', frame);
     this.xpFill = div('bar-fill', xp);
+
+    this.castBar = div('cast-bar', parent);
+    this.castFill = div('cast-fill', this.castBar);
+    this.castBar.style.display = 'none';
 
     this.hotbar = div('hotbar', parent);
     this.goldEl = div('gold', parent);
@@ -110,10 +118,12 @@ export class Hud {
     const cs = world.get<CombatState>(player, C.CombatState);
     const st = world.get<Statuses>(player, C.Statuses);
 
+    const shield = world.get<Shield>(player, C.Shield);
     if (h) {
       const r = h.max > 0 ? h.current / h.max : 0;
       this.hpFill.style.width = `${Math.max(0, r) * 100}%`;
-      this.hpText.textContent = `${Math.ceil(Math.max(0, h.current))} / ${h.max}`;
+      const shieldTxt = shield && shield.amount > 0 ? ` (+${Math.ceil(shield.amount)})` : '';
+      this.hpText.textContent = `${Math.ceil(Math.max(0, h.current))} / ${h.max}${shieldTxt}`;
     }
     if (res) {
       this.resFill.style.width = `${(res.current / res.max) * 100}%`;
@@ -152,6 +162,16 @@ export class Hud {
         }
         slot.wrap.classList.toggle('disabled', unaffordable || onGcd);
       }
+    }
+
+    // Cast bar (Searing Light etc.).
+    const castState = world.get<CastState>(player, C.CastState);
+    if (castState) {
+      const ct = abilities[castState.index]?.castTime ?? 1;
+      this.castBar.style.display = 'block';
+      this.castFill.style.width = `${Math.min(1, 1 - castState.remaining / ct) * 100}%`;
+    } else {
+      this.castBar.style.display = 'none';
     }
 
     if (inv) this.goldEl.textContent = `${inv.gold} g`;

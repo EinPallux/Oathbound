@@ -64,6 +64,8 @@ export interface DerivedStats {
   critChance: number;
   leech: number;
   haste: number;
+  /** Flat bonus to healing done (+Healing affix). */
+  healPower: number;
 }
 
 /** Combine level base stats with equipment into the player's derived combat stats.
@@ -80,6 +82,7 @@ export function deriveStats(
   let crit = BASE_CRIT;
   let leech = 0;
   let haste = 0;
+  let healPower = 0;
 
   for (const item of Object.values(equipment.slots)) {
     if (!item) continue;
@@ -103,6 +106,9 @@ export function deriveStats(
         case 'vit':
           vit += a.value;
           break;
+        case 'healing':
+          healPower += a.value;
+          break;
       }
     }
   }
@@ -114,5 +120,6 @@ export function deriveStats(
     critChance: crit,
     leech,
     haste: Math.min(haste, 0.3),
+    healPower,
   };
 }

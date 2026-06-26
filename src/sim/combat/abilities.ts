@@ -12,7 +12,10 @@ export type Targeting =
   | 'projectile' // single target, hit resolved by a travelling projectile
   | 'cone' // everything in a forward cone within range (instant)
   | 'dash' // self movement (leap) + optional buff
-  | 'trap'; // place a trap at the caster
+  | 'trap' // place a trap at the caster
+  | 'heal' // restore HP to the caster
+  | 'shield' // grant the caster an absorb shield
+  | 'toggle'; // flip a sustained self-status (Atonement)
 
 export interface AbilityDef extends AbilityHit {
   id: string;
@@ -42,6 +45,14 @@ export interface AbilityDef extends AbilityHit {
   trapRadius?: number;
   trapRootSec?: number;
   trapTtl?: number;
+  /** Cast time (s) — the ability channels a bar before it resolves; moving cancels. */
+  castTime?: number;
+  /** Self-heal for `heal` targeting (and the self-heal rider on Holy Nova). */
+  heal?: { base: number; coeff: number };
+  /** Absorb shield for `shield` targeting (amount = coeff*primaryStat). */
+  shield?: { coeff: number; durationSec: number };
+  /** Status to flip for `toggle` targeting (Atonement). */
+  toggle?: { id: string; magnitude: number };
 }
 
 /** Global cooldown (s). `v1` 1.0s; reduced by Haste toward a 0.7s floor. */

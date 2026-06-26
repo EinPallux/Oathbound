@@ -125,15 +125,18 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
 
         let vx = 0;
         let vz = 0;
-        const ranged = en.archetype === 'ranged_skirmisher';
+        // Ranged skirmishers + casters fire projectiles; only skirmishers kite.
+        const usesProjectile =
+          en.archetype === 'ranged_skirmisher' || en.archetype === 'caster';
+        const kites = en.archetype === 'ranged_skirmisher';
         const minRange = en.attackRange * 0.55;
 
         if (en.state === 'engage') {
-          if (ranged) {
+          if (usesProjectile) {
             if (distPlayer > en.attackRange && distPlayer > 1e-3) {
               vx = (dpx / distPlayer) * en.moveSpeed;
               vz = (dpz / distPlayer) * en.moveSpeed;
-            } else if (distPlayer < minRange && distPlayer > 1e-3) {
+            } else if (kites && distPlayer < minRange && distPlayer > 1e-3) {
               vx = -(dpx / distPlayer) * en.moveSpeed;
               vz = -(dpz / distPlayer) * en.moveSpeed;
             } else {
@@ -147,13 +150,13 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
           }
         } else if (en.state === 'attack') {
           en.attackTimer = Math.max(0, en.attackTimer - dt);
-          const loseRange = distPlayer > en.attackRange * (ranged ? 1.15 : 1.2);
+          const loseRange = distPlayer > en.attackRange * (usesProjectile ? 1.15 : 1.2);
           if (loseRange) {
             en.state = 'engage';
             en.windupTimer = -1;
           } else {
-            // Ranged skirmishers back-pedal when the player closes (kite) while firing.
-            if (ranged && distPlayer < minRange && distPlayer > 1e-3) {
+            // Skirmishers back-pedal when the player closes (kite); casters hold ground.
+            if (kites && distPlayer < minRange && distPlayer > 1e-3) {
               vx = -(dpx / distPlayer) * en.moveSpeed;
               vz = -(dpz / distPlayer) * en.moveSpeed;
             }
@@ -162,7 +165,8 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
               if (en.windupTimer <= 0) {
                 en.windupTimer = -1;
                 en.attackTimer = en.attackCooldown;
-                if (playerAlive) fireAttack(world, e, en, tr, player, distPlayer, ranged, projectiles, rng);
+                if (playerAlive)
+                  fireAttack(world, e, en, tr, player, distPlayer, usesProjectile, projectiles, rng);
               }
             } else if (en.attackTimer <= 0) {
               en.windupTimer = en.windup; // begin a new telegraph
@@ -220,11 +224,11 @@ function fireAttack(
   tr: Transform,
   player: Entity,
   distPlayer: number,
-  ranged: boolean,
+  projectile: boolean,
   projectiles: Projectiles | undefined,
   rng: Rng,
 ): void {
-  if (ranged) {
+  if (projectile) {
     projectiles?.spawn({
       x: tr.x,
       y: tr.y + 1,
@@ -234,7 +238,7 @@ function fireAttack(
       speed: ENEMY_PROJECTILE_SPEED,
       base: en.attackBase,
       coeff: en.attackCoeff,
-      damageType: 'physical',
+      damageType: en.attackType,
       fromPlayer: false,
     });
     return;
@@ -244,7 +248,7 @@ function fireAttack(
     world,
     e,
     player,
-    { base: en.attackBase, coeff: en.attackCoeff, damageType: 'physical' },
+    { base: en.attackBase, coeff: en.attackCoeff, damageType: en.attackType },
     rng,
     0,
   );

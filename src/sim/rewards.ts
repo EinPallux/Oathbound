@@ -37,7 +37,7 @@ export function rewardKill(world: World, killer: Entity, victim: Entity, rng: Rn
   const tr = world.get<Transform>(victim, C.Transform)!;
   const tier = enemy?.tier ?? 'standard';
   const primary = getClass(world.get<PlayerClass>(killer, C.PlayerClass)?.id ?? 'warrior').primaryStatId;
-  const lootPrimary = primary === 'DEX' ? 'DEX' : 'STR';
+  const lootPrimary = primary === 'VIT' ? 'STR' : primary;
   const roll = rollLoot(rng, enemyLevel, tier, 1, lootPrimary);
   const gold = enemy ? enemy.goldMin + rng.int(enemy.goldMax - enemy.goldMin + 1) : roll.gold;
 

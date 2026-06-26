@@ -21,7 +21,7 @@ import { createTrapSystem } from '../sim/systems/trap';
 import { SpatialGrid } from '../sim/spatial-grid';
 import { Projectiles } from '../sim/projectiles';
 import { Telemetry, createTelemetrySystem } from '../sim/telemetry';
-import { createPlayer, createBloomhusk, createReaver, setPlayerClass } from '../sim/factory';
+import { createPlayer, createBloomhusk, createReaver, createWisp, setPlayerClass } from '../sim/factory';
 import { equipItem } from '../sim/inventory';
 import { salvageItem, salvageAllBelow } from '../sim/salvage';
 import { grantXp } from '../sim/progression';
@@ -43,6 +43,7 @@ import {
 import {
   CombatEvent,
   type DamageEvent,
+  type HealEvent,
   type LevelUpEvent,
   type LootPickedEvent,
   type PlayerDiedEvent,
@@ -69,14 +70,14 @@ import { lerp, lerpAngle } from '../core/math';
 const WORLD_SIZE = 100;
 const WORLD_RES = 129;
 
-// A mixed Greenmarch camp ahead of spawn (+Z): melee Bloomhusks + ranged Reavers.
-const CAMP: { x: number; z: number; level: number; kind: 'bloomhusk' | 'reaver' }[] = [
+// A mixed Greenmarch camp ahead of spawn (+Z): melee Bloomhusks, ranged Reavers, a Wisp caster.
+const CAMP: { x: number; z: number; level: number; kind: 'bloomhusk' | 'reaver' | 'wisp' }[] = [
   { x: 0, z: 6, level: 1, kind: 'bloomhusk' },
   { x: 3, z: 9, level: 1, kind: 'bloomhusk' },
   { x: -3, z: 9, level: 1, kind: 'reaver' },
   { x: 6, z: 12, level: 2, kind: 'bloomhusk' },
-  { x: -6, z: 12, level: 2, kind: 'reaver' },
-  { x: 0, z: 14, level: 2, kind: 'bloomhusk' },
+  { x: -6, z: 12, level: 2, kind: 'wisp' },
+  { x: 0, z: 14, level: 2, kind: 'reaver' },
 ];
 
 export interface EnemySnapshot {
@@ -137,6 +138,7 @@ export function boot(): Game {
   const player = createPlayer(world, field, 0, 0);
   for (const c of CAMP) {
     if (c.kind === 'reaver') createReaver(world, field, c.x, c.z, c.level);
+    else if (c.kind === 'wisp') createWisp(world, field, c.x, c.z, c.level);
     else createBloomhusk(world, field, c.x, c.z, c.level);
   }
   telemetry.attach(world, player);
@@ -195,6 +197,9 @@ export function boot(): Game {
     } else {
       sfx.hurt();
     }
+  });
+  world.events.on<HealEvent>(CombatEvent.Heal, (ev) => {
+    damageNumbers.spawn(ev.x, ev.y + 1.2, ev.z, ev.amount, false, true);
   });
   world.events.on<LevelUpEvent>(CombatEvent.LevelUp, (ev) => {
     hud.toast(`Level ${ev.level}!`, 'good');

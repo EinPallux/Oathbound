@@ -31,7 +31,7 @@ export function rollLoot(
   enemyLevel: number,
   tier: keyof typeof TIERS | string = 'standard',
   conMult = 1,
-  primaryStat: 'STR' | 'DEX' = 'STR',
+  primaryStat: 'STR' | 'DEX' | 'SPR' = 'STR',
 ): LootRoll {
   const t = TIERS[tier] ?? TIERS.standard;
   const gold = Math.max(1, Math.round((1 + enemyLevel) * (0.8 + rng.next() * 0.8)));
