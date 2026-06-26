@@ -39,6 +39,7 @@ import {
 } from '../combat/targeting';
 import { applyDamage } from '../combat/apply';
 import { addStatus, tickStatuses } from '../combat/statuses';
+import type { SpatialGrid } from '../spatial-grid';
 import { CombatEvent, type DeathEvent, type LootDroppedEvent } from '../combat/events';
 import { grantXp } from '../progression';
 import { conXpMultiplier } from '../stats';
@@ -46,15 +47,22 @@ import { rollLoot } from '../loot/droptable';
 
 const CONE_HALF = ((TARGET_CONE_DEG / 2) * Math.PI) / 180;
 const LOS_PAD = 0.25;
+/** Grace period (s) before an uncollected drop despawns. */
+const LOOT_TTL = 120;
 
 export interface CombatDeps {
   input: ControlState;
   rng: Rng;
   colliders: readonly CylinderCollider[];
+  /** Optional broad-phase index; falls back to a full scan when absent. */
+  grid?: SpatialGrid;
 }
 
 export function createCombatSystem(deps: CombatDeps): System {
-  const { input, rng, colliders } = deps;
+  const { input, rng, colliders, grid } = deps;
+  // Reused per-tick scratch buffers (avoid steady allocation churn).
+  const idScratch: Entity[] = [];
+  const candidates: Candidate[] = [];
 
   return {
     name: 'combat',
@@ -62,14 +70,6 @@ export function createCombatSystem(deps: CombatDeps): System {
       // Advance every entity's statuses once per step.
       for (const e of world.query(C.Statuses)) {
         tickStatuses(world.get<Statuses>(e, C.Statuses)!, dt);
-      }
-
-      // Live, targetable hostiles.
-      const candidates: Candidate[] = [];
-      for (const e of world.query(C.Targetable, C.Transform, C.Health)) {
-        if (world.get<Health>(e, C.Health)!.current <= 0) continue;
-        const tr = world.get<Transform>(e, C.Transform)!;
-        candidates.push({ entity: e, x: tr.x, z: tr.z });
       }
 
       for (const e of world.query(
@@ -97,6 +97,9 @@ export function createCombatSystem(deps: CombatDeps): System {
         }
 
         if (tgt.entity != null && !isAlive(world, tgt.entity)) tgt.entity = null;
+
+        // Live, targetable hostiles near this player (broad-phase if available).
+        gatherCandidates(world, grid, t.x, t.z, TAB_RANGE, idScratch, candidates);
 
         // Targeting input.
         if (input.consumeTargetCycle()) {
@@ -192,6 +195,35 @@ export function createCombatSystem(deps: CombatDeps): System {
   };
 }
 
+/** Fill `out` with live, targetable hostiles near (ox, oz). Uses the grid when
+ *  present (broad-phase), else a full scan. Reuses the provided scratch buffers. */
+function gatherCandidates(
+  world: World,
+  grid: SpatialGrid | undefined,
+  ox: number,
+  oz: number,
+  radius: number,
+  idScratch: Entity[],
+  out: Candidate[],
+): void {
+  out.length = 0;
+  if (grid) {
+    grid.queryCircle(ox, oz, radius, idScratch);
+    for (const e of idScratch) {
+      const h = world.get<Health>(e, C.Health);
+      if (!h || h.current <= 0) continue;
+      const tr = world.get<Transform>(e, C.Transform)!;
+      out.push({ entity: e, x: tr.x, z: tr.z });
+    }
+  } else {
+    for (const e of world.query(C.Targetable, C.Transform, C.Health)) {
+      if (world.get<Health>(e, C.Health)!.current <= 0) continue;
+      const tr = world.get<Transform>(e, C.Transform)!;
+      out.push({ entity: e, x: tr.x, z: tr.z });
+    }
+  }
+}
+
 function isAlive(world: World, e: Entity): boolean {
   if (!world.has(e)) return false;
   const h = world.get<Health>(e, C.Health);
@@ -268,7 +300,7 @@ function handleKill(world: World, killer: Entity, victim: Entity, rng: Rng): voi
     prevZ: tr.z,
     prevYaw: 0,
   });
-  world.set<LootDrop>(drop, C.LootDrop, { item: roll.item, gold, owner: killer });
+  world.set<LootDrop>(drop, C.LootDrop, { item: roll.item, gold, owner: killer, ttl: LOOT_TTL });
   world.events.emit<LootDroppedEvent>(CombatEvent.LootDropped, {
     entity: drop,
     item: roll.item,

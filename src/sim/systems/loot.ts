@@ -29,7 +29,7 @@ export function createLootSystem(deps: LootDeps): System {
 
   return {
     name: 'loot',
-    update(world: World, _dt: number): void {
+    update(world: World, dt: number): void {
       let player: Entity | null = null;
       for (const p of world.query(C.PlayerControlled, C.Transform, C.Inventory)) {
         player = p;
@@ -45,6 +45,14 @@ export function createLootSystem(deps: LootDeps): System {
 
       for (const e of world.query(C.LootDrop, C.Transform)) {
         const ld = world.get<LootDrop>(e, C.LootDrop)!;
+
+        // Despawn after the grace period (keeps world-entity count bounded).
+        ld.ttl -= dt;
+        if (ld.ttl <= 0) {
+          world.destroyEntity(e);
+          continue;
+        }
+
         const lt = world.get<Transform>(e, C.Transform)!;
         const dist = Math.hypot(lt.x - pt.x, lt.z - pt.z);
 

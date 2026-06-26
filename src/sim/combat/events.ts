@@ -17,6 +17,7 @@ export const CombatEvent = {
   LootDropped: 'loot/dropped',
   LootPicked: 'loot/picked',
   GoldGained: 'loot/gold',
+  ItemSalvaged: 'item/salvaged',
 } as const;
 
 export interface DamageEvent {
@@ -86,4 +87,10 @@ export interface LootPickedEvent {
 export interface GoldGainedEvent {
   amount: number;
   total: number;
+}
+
+export interface ItemSalvagedEvent {
+  itemName: string;
+  whetstones: number;
+  gold: number;
 }

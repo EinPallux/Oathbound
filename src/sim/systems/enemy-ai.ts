@@ -20,24 +20,35 @@ import { resolveCircleVsCylinders } from '../collision';
 import { segmentBlockedByCylinders } from '../combat/targeting';
 import { applyDamage } from '../combat/apply';
 import { CombatEvent, type PlayerDiedEvent, type RespawnEvent } from '../combat/events';
+import type { SpatialGrid } from '../spatial-grid';
 
 const ENEMY_HALF = 0.9;
 const ENEMY_RADIUS = 0.45;
 const LEASH_RETURN_SPEED = 1.3;
+/** Idle enemies past this distance from the player update on a slow cadence. */
+const DEFAULT_SIM_RADIUS = 60;
+const THROTTLE_EVERY = 6;
 
 export interface EnemyAiDeps {
   field: Heightfield;
   colliders: readonly CylinderCollider[];
   rng: Rng;
+  grid?: SpatialGrid;
+  simRadius?: number;
 }
 
 export function createEnemyAiSystem(deps: EnemyAiDeps): System {
-  const { field, colliders, rng } = deps;
+  const { field, colliders, rng, grid } = deps;
+  const simRadius = deps.simRadius ?? DEFAULT_SIM_RADIUS;
   const bound = field.size / 2 - 1;
+  const enemies: Entity[] = [];
+  const socialScratch: Entity[] = [];
+  let tick = 0;
 
   return {
     name: 'enemy-ai',
     update(world: World, dt: number): void {
+      tick++;
       // Single player in the slice.
       let player: Entity | null = null;
       for (const p of world.query(C.PlayerControlled, C.Transform, C.Health)) {
@@ -48,13 +59,21 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
       const pt = world.get<Transform>(player, C.Transform)!;
       const playerAlive = world.get<Health>(player, C.Health)!.current > 0;
 
-      const enemies = [...world.query(C.Enemy, C.Transform, C.Velocity, C.Health)];
+      enemies.length = 0;
+      for (const e of world.query(C.Enemy, C.Transform, C.Velocity, C.Health)) enemies.push(e);
 
       for (const e of enemies) {
         const en = world.get<Enemy>(e, C.Enemy)!;
         const tr = world.get<Transform>(e, C.Transform)!;
         const v = world.get<Velocity>(e, C.Velocity)!;
         const h = world.get<Health>(e, C.Health)!;
+
+        // Throttle: distant idle enemies do nothing useful — update them rarely.
+        if (en.state === 'idle' && h.current > 0 && tick % THROTTLE_EVERY !== 0) {
+          const ddx = pt.x - tr.x;
+          const ddz = pt.z - tr.z;
+          if (ddx * ddx + ddz * ddz > simRadius * simRadius) continue;
+        }
 
         tr.prevX = tr.x;
         tr.prevY = tr.y;
@@ -97,7 +116,7 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
           !segmentBlockedByCylinders(tr.x, tr.z, pt.x, pt.z, colliders, 0.25)
         ) {
           en.state = 'engage';
-          rallyPack(world, enemies, e, en);
+          rallyPack(world, e, en, grid, enemies, socialScratch);
         }
 
         let vx = 0;
@@ -177,15 +196,23 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
   };
 }
 
-/** Nearby idle packmates join the fight (social aggro). */
-function rallyPack(world: World, enemies: Entity[], leader: Entity, leaderEn: Enemy): void {
+/** Nearby idle packmates join the fight (social aggro). Uses the grid when present. */
+function rallyPack(
+  world: World,
+  leader: Entity,
+  leaderEn: Enemy,
+  grid: SpatialGrid | undefined,
+  enemies: readonly Entity[],
+  scratch: Entity[],
+): void {
   const lt = world.get<Transform>(leader, C.Transform)!;
-  for (const other of enemies) {
+  const list = grid ? grid.queryCircle(lt.x, lt.z, leaderEn.socialRange, scratch) : enemies;
+  for (const other of list) {
     if (other === leader) continue;
-    const oe = world.get<Enemy>(other, C.Enemy)!;
-    if (oe.state !== 'idle') continue;
-    const oh = world.get<Health>(other, C.Health)!;
-    if (oh.current <= 0) continue;
+    const oe = world.get<Enemy>(other, C.Enemy);
+    if (!oe || oe.state !== 'idle') continue;
+    const oh = world.get<Health>(other, C.Health);
+    if (!oh || oh.current <= 0) continue;
     const ot = world.get<Transform>(other, C.Transform)!;
     if (Math.hypot(ot.x - lt.x, ot.z - lt.z) <= leaderEn.socialRange) oe.state = 'engage';
   }

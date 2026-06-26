@@ -8,9 +8,10 @@ Entry point for **any coding agent or LLM** working in this repository (Claude C
 ## ▶ Current status — where to continue
 > **Keep this section up to date at the end of every phase.**
 
-- **Done & verified:** `0.0.1` Blueprint · `0.0.2` Scaffold · `0.0.3` Greybox Movement · `0.0.4` First Contact · **`0.1.0-INDEV` Vertical Slice** (the first complete grinding loop).
-- **Last gate passed:** **Core Movement Gate**. `0.1.0` implements the **Combat + Core Loop** gates and passes their *automatable* checks (canonical damage, GCD/cooldowns/resource, soft-target + range/LoS, enemy aggro/social/leash/reset/respawn, **TTK 3–6s**, fight→XP→loot→equip→recover, save/reload). The **subjective/long-running** items (20-min "is it fun?" playtest, 60-min leak check, 60 FPS with 20 enemies, final balance) await the owner's playtest and are the focus of `0.1.1`.
-- **▶ Next phase to build:** **`0.1.1-INDEV` "Loop Hardening"** — pooling, AI throttling, spatial grid, drop/inventory polish, salvage v1, telemetry, and the playtest-driven balance pass. (Do **not** widen to more classes/zones until the loop is proven fun — the Core Loop Gate is the highest-leverage gate.)
+- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0` Vertical Slice · **`0.1.1-INDEV` Loop Hardening** (spatial grid, AI throttling, loot-TTL leak fix, salvage v1, telemetry).
+- **Last gate passed:** **Core Movement Gate**. `0.1.0`/`0.1.1` implement the **Combat + Core Loop** gates and pass their *automatable* checks (canonical damage, GCD/cooldowns/resource, soft-target + range/LoS, enemy aggro/social/leash/reset/respawn, **TTK 3–6s**, fight→XP→loot→equip→salvage→recover, save/reload, **bounded entity growth**, broad-phase/AI throttling). Telemetry now surfaces TTK/downtime/death-rate for tuning.
+- **⏳ Awaiting owner playtest (Core Loop Gate sign-off):** "is a 20-min grind fun?", the real 60-min memory-plateau session, and 60 FPS with 20 active enemies on reference HW. **Per the roadmap, this sign-off gates the move to breadth.**
+- **▶ Next phase to build:** **`0.2.0-INDEV` "The Hunter"** — second class (ranged/Focus/kiting) + ranged-skirmisher enemy archetype + projectile pooling — **only after** the Core Loop playtest sign-off above.
 - **Live progress log:** [`CHANGELOG.md`](./CHANGELOG.md) (every phase, each ending with "Next phase →").
 - **The full plan:** [`docs/production/VERSION_ROADMAP.md`](./docs/production/VERSION_ROADMAP.md) (`0.0.1-INDEV` → `1.0-BETA`).
 

@@ -52,7 +52,7 @@ export function createPlayer(world: World, field: Heightfield, x = 0, z = 0): En
   world.set(e, C.PlayerControlled, true);
   world.set<Progression>(e, C.Progression, { level: 1, xp: 0, xpToNext: xpToNext(1) });
   world.set<Equipment>(e, C.Equipment, { slots: {} });
-  world.set<Inventory>(e, C.Inventory, { items: [], gold: 0, capacity: 30 });
+  world.set<Inventory>(e, C.Inventory, { items: [], gold: 0, materials: 0, capacity: 30 });
   world.set<Health>(e, C.Health, { current: 1, max: 1 });
   world.set<Offense>(e, C.Offense, {
     primaryStat: 10,

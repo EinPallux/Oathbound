@@ -235,11 +235,15 @@ export interface Item {
   affixes: Affix[];
   /** Rough comparison power (for inventory deltas). */
   score: number;
+  /** Locked items can't be salvaged or sold. */
+  locked: boolean;
 }
 
 export interface Inventory {
   items: Item[];
   gold: number;
+  /** Whetstones (salvage material wallet — not an item, per ITEMS_AND_EQUIPMENT). */
+  materials: number;
   capacity: number;
 }
 
@@ -253,4 +257,6 @@ export interface LootDrop {
   item: Item | null;
   gold: number;
   owner: number;
+  /** Seconds before an uncollected drop despawns (grace period). */
+  ttl: number;
 }
