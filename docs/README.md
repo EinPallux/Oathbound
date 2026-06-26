@@ -2,20 +2,22 @@
 
 This is the **single source of truth** for the design, technical direction, production roadmap, and quality plan of **Oathbound**, a 3D browser-based solo-MMORPG planned from version `0.0.1-INDEV` to `1.0-BETA`.
 
-> ⚠️ **This is a planning repository.** As of this writing there is **no runtime code, no dependencies installed, and no assets downloaded**. Everything here is a blueprint. A later session may begin implementation by following the [Version Roadmap](./production/VERSION_ROADMAP.md) phase by phase.
+> 📍 **Current state lives elsewhere.** This `/docs` set is the **static plan/blueprint** (the single source of truth for *decisions*). For **where the build currently stands and what to implement next**, see [`AGENTS.md`](../AGENTS.md) and the live log in [`CHANGELOG.md`](../CHANGELOG.md). Implementation has begun and follows the [Version Roadmap](./production/VERSION_ROADMAP.md) one phase at a time.
 
-## Repository assessment (current state)
+## Repository assessment (at planning time — `0.0.1-INDEV`)
 
-| Item | State |
-|------|-------|
+The table below records the repository **at the start of planning**, when this documentation set was the first content added. Runtime code has since been scaffolded — see [`CHANGELOG.md`](../CHANGELOG.md) for current contents.
+
+| Item | State at planning time |
+|------|------------------------|
 | Git repository | Yes — branch `claude/game-design-docs-70dim2`, remote `EinPallux/Oathbound` |
 | Commits before planning | **None** (empty repository) |
-| Source code | None |
-| Dependencies / `package.json` | None |
+| Source code | None (scaffolded later, from `0.0.2-INDEV`) |
+| Dependencies / `package.json` | None (added from `0.0.2-INDEV`) |
 | Assets | None |
 | Documentation | This set (created by the planning task) |
 
-There was nothing to inspect or preserve; this documentation set is the first content added to the repository.
+There was nothing to inspect or preserve at planning time; this documentation set was the first content added to the repository.
 
 ## How to read these docs
 

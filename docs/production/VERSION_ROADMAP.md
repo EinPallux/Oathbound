@@ -4,6 +4,8 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 
 > **Roadmap philosophy (anti-scope-creep).** We do **not** build: a fake dungeon before combat is fun · a raid mockup before enemies work · a guild menu before networking · an auction house without an economy · ten empty zones · three one-ability classes · stat-less equipment · giant empty terrain. We **do** build one satisfying slice and deepen it.
 
+> 📍 **Live progress** (which phases are actually done) is tracked in [`AGENTS.md`](../../AGENTS.md) and [`CHANGELOG.md`](../../CHANGELOG.md), not here — this document is the **static plan**. As of the latest commit: `0.0.1`–`0.0.3` are ✅ done (Core Movement Gate passed); **next is `0.0.4`**.
+
 ## Milestone band overview
 | Band | Theme | Player-facing outcome | Exit gate |
 |---|---|---|---|
@@ -23,7 +25,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 
 ## 0.0.x — Foundations
 
-### 0.0.1-INDEV — "Blueprint" *(current state)*
+### 0.0.1-INDEV — "Blueprint" ✅ done
 - **Phase:** planning · **Outcome:** a complete, internally-consistent development blueprint. · **Why:** so implementation can proceed phase-by-phase without reinventing direction. · **Deps:** none. · **Effort:** M · **Complexity:** L · **Risk:** L.
 - **Included:** this entire `/docs` set (research, design, technical, production, qa, assets, decisions).
 - **Excluded:** *all runtime code, dependencies, and assets.*
@@ -31,7 +33,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 - **Validation:** doc cross-check for contradictions; confirm repo has no source.
 - **Deliverables:** the planning repository (this commit).
 
-### 0.0.2-INDEV — "Scaffold"
+### 0.0.2-INDEV — "Scaffold" ✅ done
 - **Phase:** foundations · **Outcome:** an empty Three.js scene renders in-browser with a stable game loop and perf overlay. · **Deps:** 0.0.1. · **Effort:** S · **Complexity:** S · **Risk:** L.
 - **Included:** Vite+TS project; `three`; fixed-timestep loop ([ARCHITECTURE_PLAN](../technical/ARCHITECTURE_PLAN.md#fixed-timestep-simulation-decoupled-rendering)); ECS-lite skeleton; perf overlay devtool; Vercel preview build; Vitest+Playwright wired.
 - **Excluded:** gameplay, content, art beyond primitives.
@@ -39,7 +41,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 - **Validation:** Playwright loads the page; build size baseline recorded.
 - **Deliverables:** runnable empty client; CI pipeline.
 
-### 0.0.3-INDEV — "Greybox Movement" → **Core Movement Gate**
+### 0.0.3-INDEV — "Greybox Movement" ✅ done → **Core Movement Gate**
 - **Outcome:** a player capsule moves (WASD) across a greyboxed Greenmarch chunk with a working chase camera and collision. · **Deps:** 0.0.2.
 - **Included:** kinematic character controller (capsule vs heightfield + box colliders); chunked terrain (one zone greybox); chase-cam rig + collision; input system; instanced props placeholder; distance/frustum culling.
 - **Excluded:** combat, enemies, UI beyond debug.
@@ -47,7 +49,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 - **Validation:** Playwright movement smoke; manual traversal; perf capture.
 - **Deliverables:** traversable greybox zone.
 
-### 0.0.4-INDEV — "First Contact"
+### 0.0.4-INDEV — "First Contact" ◀ NEXT
 - **Outcome:** a target dummy can be selected and hit; damage numbers appear; one ability + GCD work. · **Deps:** 0.0.3.
 - **Included:** soft tab-target ([COMBAT_DESIGN](../design/COMBAT_DESIGN.md#1-targeting-model--decision)); basic attack + one spender; GCD/cooldown; [canonical damage formula](../design/COMBAT_DESIGN.md#5-damage-calculation-canonical-formula) (first pass); hit feedback; object pooling for damage numbers.
 - **Excluded:** enemy AI, loot, progression.
