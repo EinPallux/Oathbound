@@ -1,6 +1,6 @@
-// The heads-up display (DOM overlay): player frame (HP/Fury/XP/level), the ability
-// hotbar with cooldown + affordability state, a gold counter, a loot prompt, and a
-// transient toast stack. Reads sim state each frame; never mutates it. ADR-002.
+// The heads-up display (DOM overlay): player frame (HP/resource/XP/level), the class
+// ability hotbar with cooldown + affordability state, a gold counter, a loot prompt,
+// and a transient toast stack. Reads sim state each frame; never mutates it. ADR-002.
 
 import type { World, Entity } from '../core/ecs/world';
 import {
@@ -14,11 +14,12 @@ import {
   type CombatState,
   type Statuses,
   type LootDrop,
+  type PlayerClass,
 } from '../core/ecs/components';
-import { ABILITIES } from '../sim/combat/abilities';
+import { getClass } from '../sim/classes';
 import { hasStatus, Status } from '../sim/combat/statuses';
 
-const KEYS = ['1', '2', '3', '4'];
+const KEYS = ['1', '2', '3', '4', '5', '6'];
 const PICKUP_RADIUS = 2.5;
 
 interface Toast {
@@ -37,12 +38,14 @@ function div(cls: string, parent: HTMLElement): HTMLDivElement {
 export class Hud {
   private readonly hpFill: HTMLDivElement;
   private readonly hpText: HTMLDivElement;
-  private readonly furyFill: HTMLDivElement;
-  private readonly furyText: HTMLDivElement;
+  private readonly resFill: HTMLDivElement;
+  private readonly resText: HTMLDivElement;
   private readonly xpFill: HTMLDivElement;
   private readonly nameEl: HTMLDivElement;
   private readonly stateEl: HTMLDivElement;
-  private readonly slots: { wrap: HTMLDivElement; cd: HTMLDivElement }[] = [];
+  private readonly hotbar: HTMLDivElement;
+  private slots: { wrap: HTMLDivElement; cd: HTMLDivElement }[] = [];
+  private hotbarSig = '';
   private readonly goldEl: HTMLDivElement;
   private readonly promptEl: HTMLDivElement;
   private readonly toastWrap: HTMLDivElement;
@@ -50,37 +53,23 @@ export class Hud {
   private lastMs = performance.now();
 
   constructor(parent: HTMLElement) {
-    // Player frame (bottom-left).
     const frame = div('player-frame', parent);
     const header = div('player-header', frame);
     this.nameEl = div('player-name', header);
-    this.nameEl.textContent = 'Warrior';
     this.stateEl = div('player-state', header);
 
     const hp = div('bar hp', frame);
     this.hpFill = div('bar-fill', hp);
     this.hpText = div('bar-text', hp);
-    const fury = div('bar fury', frame);
-    this.furyFill = div('bar-fill', fury);
-    this.furyText = div('bar-text', fury);
+    const resBar = div('bar fury', frame);
+    this.resFill = div('bar-fill', resBar);
+    this.resText = div('bar-text', resBar);
     const xp = div('bar xp', frame);
     this.xpFill = div('bar-fill', xp);
 
-    // Hotbar (bottom-centre).
-    const hotbar = div('hotbar', parent);
-    for (let i = 0; i < ABILITIES.length; i++) {
-      const wrap = div('slot', hotbar);
-      div('slot-key', wrap).textContent = KEYS[i] ?? '';
-      div('slot-name', wrap).textContent = ABILITIES[i].name;
-      const cd = div('slot-cd', wrap);
-      this.slots.push({ wrap, cd });
-    }
-
-    // Gold (top-right).
+    this.hotbar = div('hotbar', parent);
     this.goldEl = div('gold', parent);
     this.goldEl.textContent = '0 g';
-
-    // Loot prompt + toasts.
     this.promptEl = div('loot-prompt', parent);
     this.promptEl.style.display = 'none';
     this.toastWrap = div('toast-wrap', parent);
@@ -94,11 +83,25 @@ export class Hud {
     this.toasts.push({ el, life: 0, ttl: 2.6 });
   }
 
+  private rebuildHotbar(names: readonly string[]): void {
+    this.hotbar.replaceChildren();
+    this.slots = [];
+    for (let i = 0; i < names.length; i++) {
+      const wrap = div('slot', this.hotbar);
+      div('slot-key', wrap).textContent = KEYS[i] ?? '';
+      div('slot-name', wrap).textContent = names[i];
+      const cd = div('slot-cd', wrap);
+      this.slots.push({ wrap, cd });
+    }
+  }
+
   update(world: World, player: Entity): void {
     const now = performance.now();
     const dt = Math.min(0.1, (now - this.lastMs) / 1000);
     this.lastMs = now;
 
+    const cls = getClass(world.get<PlayerClass>(player, C.PlayerClass)?.id ?? 'warrior');
+    const abilities = cls.abilities;
     const h = world.get<Health>(player, C.Health);
     const res = world.get<Resource>(player, C.Resource);
     const prog = world.get<Progression>(player, C.Progression);
@@ -113,13 +116,13 @@ export class Hud {
       this.hpText.textContent = `${Math.ceil(Math.max(0, h.current))} / ${h.max}`;
     }
     if (res) {
-      this.furyFill.style.width = `${(res.current / res.max) * 100}%`;
-      this.furyText.textContent = `${Math.floor(res.current)} Fury`;
+      this.resFill.style.width = `${(res.current / res.max) * 100}%`;
+      this.resText.textContent = `${Math.floor(res.current)} ${cls.resource.name}`;
     }
     if (prog) {
       const r = prog.xpToNext === Infinity ? 1 : prog.xp / prog.xpToNext;
       this.xpFill.style.width = `${Math.min(1, r) * 100}%`;
-      this.nameEl.textContent = `Warrior · Lv ${prog.level}`;
+      this.nameEl.textContent = `${cls.name} · Lv ${prog.level}`;
     }
     if (cs) {
       const shaken = hasStatus(st, Status.Shaken);
@@ -127,10 +130,15 @@ export class Hud {
       this.stateEl.className = `player-state ${shaken ? 'shaken' : cs.inCombat ? 'combat' : 'rested'}`;
     }
 
-    // Hotbar state.
+    // Hotbar (rebuilt only when the kit changes, e.g. class switch).
+    const sig = abilities.map((a) => a.id).join(',');
+    if (sig !== this.hotbarSig) {
+      this.hotbarSig = sig;
+      this.rebuildHotbar(abilities.map((a) => a.name));
+    }
     if (ab && res) {
       for (let i = 0; i < this.slots.length; i++) {
-        const def = ABILITIES[i];
+        const def = abilities[i];
         const cd = ab.cooldowns[i] ?? 0;
         const onGcd = def.triggersGcd && ab.gcdRemaining > 0;
         const unaffordable = res.current < def.cost;
@@ -168,7 +176,6 @@ export class Hud {
       }
     }
 
-    // Toasts.
     for (let i = this.toasts.length - 1; i >= 0; i--) {
       const t = this.toasts[i];
       t.life += dt;

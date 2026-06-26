@@ -31,6 +31,7 @@ export function rollLoot(
   enemyLevel: number,
   tier: keyof typeof TIERS | string = 'standard',
   conMult = 1,
+  primaryStat: 'STR' | 'DEX' = 'STR',
 ): LootRoll {
   const t = TIERS[tier] ?? TIERS.standard;
   const gold = Math.max(1, Math.round((1 + enemyLevel) * (0.8 + rng.next() * 0.8)));
@@ -39,6 +40,6 @@ export function rollLoot(
 
   const uncommonChance = Math.min(0.6, t.uncommonShare * conMult);
   const rarity: Rarity = rng.next() < uncommonChance ? 'uncommon' : 'common';
-  const item = generateItem(rng, { ilvl: enemyLevel, rarity });
+  const item = generateItem(rng, { ilvl: enemyLevel, rarity, primaryStat });
   return { item, gold };
 }

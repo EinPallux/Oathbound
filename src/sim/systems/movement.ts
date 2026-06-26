@@ -3,11 +3,18 @@
 // state + heightfield data. See docs/technical/ARCHITECTURE_PLAN.md (ADR-008).
 
 import type { System } from '../../core/ecs/world';
-import { C, type Transform, type Velocity, type Character } from '../../core/ecs/components';
+import {
+  C,
+  type Transform,
+  type Velocity,
+  type Character,
+  type Statuses,
+} from '../../core/ecs/components';
 import { clamp } from '../../core/math';
 import type { ControlState } from '../../platform/input';
 import type { Heightfield, CylinderCollider } from '../../world/heightfield';
 import { resolveCircleVsCylinders } from '../collision';
+import { statusMagnitude, Status } from '../combat/statuses';
 
 const GRAVITY = 20;
 
@@ -51,7 +58,9 @@ export function createMovementSystem(deps: MovementDeps): System {
         const moveX = sy * fwd + cy * strafe;
         const moveZ = cy * fwd - sy * strafe;
 
-        const speed = input.sprint ? ch.sprintSpeed : ch.runSpeed;
+        // Fleet (Disengage) gives a brief move-speed bonus.
+        const fleet = statusMagnitude(world.get<Statuses>(e, C.Statuses), Status.Fleet);
+        const speed = (input.sprint ? ch.sprintSpeed : ch.runSpeed) * (1 + fleet);
         v.x = moveX * speed;
         v.z = moveZ * speed;
 

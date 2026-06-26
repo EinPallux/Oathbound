@@ -1,6 +1,6 @@
-// Composition root for Phase 0.1.0 "Vertical Slice": the first complete grinding loop.
-// A Warrior fights a Greenmarch camp of Bloomhusks (melee AI), gains XP/levels, loots
-// gear, equips upgrades, recovers, and the run persists to IndexedDB.
+// Composition root for Phase 0.2.0 "The Hunter": two classes (Warrior melee/Fury,
+// Hunter ranged/Focus), a mixed Greenmarch camp (melee Bloomhusks + ranged Reavers),
+// pooled projectiles, traps, class-select, XP/loot/equip/salvage, and a persisted run.
 
 import * as THREE from 'three';
 import { Renderer } from '../render/renderer';
@@ -16,9 +16,12 @@ import { createEnemyAiSystem } from '../sim/systems/enemy-ai';
 import { createLootSystem } from '../sim/systems/loot';
 import { createRecoverySystem } from '../sim/systems/recovery';
 import { createSpatialSystem } from '../sim/systems/spatial';
+import { createProjectileSystem } from '../sim/systems/projectile';
+import { createTrapSystem } from '../sim/systems/trap';
 import { SpatialGrid } from '../sim/spatial-grid';
+import { Projectiles } from '../sim/projectiles';
 import { Telemetry, createTelemetrySystem } from '../sim/telemetry';
-import { createPlayer, createBloomhusk } from '../sim/factory';
+import { createPlayer, createBloomhusk, createReaver, setPlayerClass } from '../sim/factory';
 import { equipItem } from '../sim/inventory';
 import { salvageItem, salvageAllBelow } from '../sim/salvage';
 import { grantXp } from '../sim/progression';
@@ -33,6 +36,9 @@ import {
   type EnemyInfo,
   type Progression,
   type Inventory,
+  type Resource,
+  type PlayerClass,
+  type ClassId,
 } from '../core/ecs/components';
 import {
   CombatEvent,
@@ -53,6 +59,9 @@ import { DamageNumbers } from '../render/damage-numbers';
 import { TargetFrame } from '../render/target-frame';
 import { Hud } from '../render/hud';
 import { InventoryPanel } from '../render/inventory-panel';
+import { ProjectileView } from '../render/projectile-view';
+import { TrapView } from '../render/trap-view';
+import { ClassSelect } from '../render/class-select';
 import { Sfx } from '../platform/audio';
 import { loadSave, writeSave } from '../platform/save-store';
 import { lerp, lerpAngle } from '../core/math';
@@ -60,14 +69,14 @@ import { lerp, lerpAngle } from '../core/math';
 const WORLD_SIZE = 100;
 const WORLD_RES = 129;
 
-// A small Greenmarch camp ahead of spawn (+Z). The first is nearest.
-const CAMP: { x: number; z: number; level: number }[] = [
-  { x: 0, z: 6, level: 1 },
-  { x: 3, z: 9, level: 1 },
-  { x: -3, z: 9, level: 1 },
-  { x: 6, z: 12, level: 2 },
-  { x: -6, z: 12, level: 2 },
-  { x: 0, z: 14, level: 2 },
+// A mixed Greenmarch camp ahead of spawn (+Z): melee Bloomhusks + ranged Reavers.
+const CAMP: { x: number; z: number; level: number; kind: 'bloomhusk' | 'reaver' }[] = [
+  { x: 0, z: 6, level: 1, kind: 'bloomhusk' },
+  { x: 3, z: 9, level: 1, kind: 'bloomhusk' },
+  { x: -3, z: 9, level: 1, kind: 'reaver' },
+  { x: 6, z: 12, level: 2, kind: 'bloomhusk' },
+  { x: -6, z: 12, level: 2, kind: 'reaver' },
+  { x: 0, z: 14, level: 2, kind: 'bloomhusk' },
 ];
 
 export interface EnemySnapshot {
@@ -90,8 +99,11 @@ export interface Game {
   gold(): number;
   materials(): number;
   bagCount(): number;
+  classId(): ClassId;
+  resource(): { current: number; max: number };
   telemetry(): TelemetrySnapshot;
   debugAddXp(n: number): void;
+  debugSetClass(id: ClassId): void;
   save(): Promise<boolean>;
   stop(): void;
 }
@@ -120,16 +132,22 @@ export function boot(): Game {
   const world = new World();
   const rng = new Rng(0xc0ffee);
   const grid = new SpatialGrid(8);
+  const projectiles = new Projectiles();
   const telemetry = new Telemetry();
   const player = createPlayer(world, field, 0, 0);
-  for (const c of CAMP) createBloomhusk(world, field, c.x, c.z, c.level);
+  for (const c of CAMP) {
+    if (c.kind === 'reaver') createReaver(world, field, c.x, c.z, c.level);
+    else createBloomhusk(world, field, c.x, c.z, c.level);
+  }
   telemetry.attach(world, player);
 
-  // Systems: spatial index → movement → combat → enemy AI → loot → recovery → telemetry.
+  // Systems: spatial → movement → combat → enemy AI → projectiles → traps → loot → recovery → telemetry.
   world.addSystem(createSpatialSystem(grid));
   world.addSystem(createMovementSystem({ input, field, colliders }));
-  world.addSystem(createCombatSystem({ input, rng, colliders, grid }));
-  world.addSystem(createEnemyAiSystem({ field, colliders, rng, grid }));
+  world.addSystem(createCombatSystem({ input, rng, colliders, field, projectiles, grid }));
+  world.addSystem(createEnemyAiSystem({ field, colliders, rng, grid, projectiles }));
+  world.addSystem(createProjectileSystem(projectiles, rng));
+  world.addSystem(createTrapSystem(rng));
   world.addSystem(createLootSystem({ input }));
   world.addSystem(createRecoverySystem({ field, spawnX: 0, spawnZ: 0 }));
   world.addSystem(createTelemetrySystem(telemetry));
@@ -139,10 +157,13 @@ export function boot(): Game {
   const cameraRig = new CameraRig(renderer.camera, input, [terrain, props]);
   const enemyView = new EnemyView(renderer.scene);
   const lootView = new LootView(renderer.scene);
+  const projectileView = new ProjectileView(renderer.scene, projectiles);
+  const trapView = new TrapView(renderer.scene);
   const damageNumbers = new DamageNumbers(uiRoot);
   const targetFrame = new TargetFrame(uiRoot);
   const hud = new Hud(uiRoot);
   const invPanel = new InventoryPanel(uiRoot);
+  const classSelect = new ClassSelect(uiRoot);
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
@@ -202,9 +223,14 @@ export function boot(): Game {
       saving = false;
     });
   }
+  classSelect.onChoose = (id) => {
+    setPlayerClass(world, player, id);
+    autosave();
+  };
   void loadSave()
     .then((data) => {
       if (data) applySave(world, player, data);
+      else classSelect.show(); // fresh character → pick a class
     })
     .catch(() => {});
   const saveTimer = window.setInterval(autosave, 30_000);
@@ -256,6 +282,8 @@ export function boot(): Game {
 
       enemyView.update(world, renderer.camera, alpha, rdt, playerTarget.entity);
       lootView.update(world);
+      projectileView.update();
+      trapView.update(world);
 
       // Target frame (with con colour).
       const te = playerTarget.entity;
@@ -313,8 +341,17 @@ export function boot(): Game {
     gold: () => world.get<Inventory>(player, C.Inventory)!.gold,
     materials: () => world.get<Inventory>(player, C.Inventory)!.materials,
     bagCount: () => world.get<Inventory>(player, C.Inventory)!.items.length,
+    classId: () => world.get<PlayerClass>(player, C.PlayerClass)!.id,
+    resource: () => {
+      const r = world.get<Resource>(player, C.Resource)!;
+      return { current: r.current, max: r.max };
+    },
     telemetry: () => telemetry.snapshot(),
     debugAddXp: (n) => grantXp(world, player, n),
+    debugSetClass: (id) => {
+      setPlayerClass(world, player, id);
+      classSelect.hide();
+    },
     save: () => writeSave(serialize(world, player)),
     stop: () => {
       loop.stop();

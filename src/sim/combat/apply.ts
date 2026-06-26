@@ -11,6 +11,7 @@ import {
   type Health,
   type Transform,
   type Statuses,
+  type Enemy,
 } from '../../core/ecs/components';
 import type { Rng } from '../../core/rng';
 import { computeDamage, rollDamage, type AbilityHit } from './damage';
@@ -61,6 +62,10 @@ export function applyDamage(
   const before = h.current;
   h.current = Math.max(0, h.current - amount);
   const killed = before > 0 && h.current <= 0;
+
+  // Taking a hit pulls an idle enemy into the fight (so ranged attacks aggro too).
+  const en = world.get<Enemy>(target, C.Enemy);
+  if (en && en.state === 'idle' && !killed) en.state = 'engage';
 
   const tr = world.get<Transform>(target, C.Transform)!;
   world.events.emit<DamageEvent>(CombatEvent.Damage, {

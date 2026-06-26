@@ -19,8 +19,11 @@ interface OathboundHandle {
   gold: () => number;
   materials: () => number;
   bagCount: () => number;
+  classId: () => string;
+  resource: () => { current: number; max: number };
   telemetry: () => { damageDealt: number; kills: number; sessionSeconds: number };
   debugAddXp: (n: number) => void;
+  debugSetClass: (id: 'warrior' | 'hunter') => void;
   save: () => Promise<boolean>;
 }
 declare global {
@@ -42,7 +45,7 @@ test('boots the vertical slice, renders, and runs the loop', async ({ page }) =>
   await page.goto('/');
 
   await expect(page.locator('#game')).toBeVisible();
-  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.1.1-INDEV');
+  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.2.0-INDEV');
 
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
   const running = await page.evaluate(() => window.__oathbound!.loop.isRunning);
@@ -115,6 +118,22 @@ test('telemetry counts damage dealt through the real event flow', async ({ page 
   await page.keyboard.press('Digit1');
   await page.waitForTimeout(200);
   expect(await page.evaluate(() => window.__oathbound!.telemetry().damageDealt)).toBeGreaterThan(0);
+});
+
+test('plays as the Hunter — ranged shots damage the camp', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
+
+  await page.evaluate(() => window.__oathbound!.debugSetClass('hunter'));
+  expect(await page.evaluate(() => window.__oathbound!.classId())).toBe('hunter');
+  expect(await page.evaluate(() => window.__oathbound!.resource().current)).toBeGreaterThan(0);
+
+  const before = await page.evaluate(totalEnemyHp);
+  // Quick Shot (slot 1): soft-acquires the camp ahead and fires a projectile.
+  await page.keyboard.press('Digit1');
+  await page.waitForTimeout(400); // let the projectile fly + land
+  const after = await page.evaluate(totalEnemyHp);
+  expect(after).toBeLessThan(before);
 });
 
 test('progress persists across a reload (save v1)', async ({ page }) => {

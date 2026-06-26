@@ -118,6 +118,8 @@ export interface GenerateOpts {
   ilvl: number;
   slot?: EquipSlot;
   rarity?: Rarity;
+  /** Primary stat for non-armour slots (smart-loot bias toward the class). */
+  primaryStat?: 'STR' | 'DEX';
 }
 
 let uidCounter = 0;
@@ -139,7 +141,7 @@ export function generateItem(rng: Rng, opts: GenerateOpts): Item {
     armor = Math.max(1, Math.round(budget * 0.6));
     primary = { stat: 'VIT', value: Math.max(1, Math.round(budget * 0.2)) };
   } else {
-    primary = { stat: 'STR', value: Math.max(1, Math.round(budget * 0.18)) };
+    primary = { stat: opts.primaryStat ?? 'STR', value: Math.max(1, Math.round(budget * 0.18)) };
   }
 
   const affixes: Affix[] = [];

@@ -19,12 +19,15 @@ import { clamp } from '../../core/math';
 import { resolveCircleVsCylinders } from '../collision';
 import { segmentBlockedByCylinders } from '../combat/targeting';
 import { applyDamage } from '../combat/apply';
+import { hasStatus, Status } from '../combat/statuses';
 import { CombatEvent, type PlayerDiedEvent, type RespawnEvent } from '../combat/events';
 import type { SpatialGrid } from '../spatial-grid';
+import type { Projectiles } from '../projectiles';
 
 const ENEMY_HALF = 0.9;
 const ENEMY_RADIUS = 0.45;
 const LEASH_RETURN_SPEED = 1.3;
+const ENEMY_PROJECTILE_SPEED = 22;
 /** Idle enemies past this distance from the player update on a slow cadence. */
 const DEFAULT_SIM_RADIUS = 60;
 const THROTTLE_EVERY = 6;
@@ -34,11 +37,12 @@ export interface EnemyAiDeps {
   colliders: readonly CylinderCollider[];
   rng: Rng;
   grid?: SpatialGrid;
+  projectiles?: Projectiles;
   simRadius?: number;
 }
 
 export function createEnemyAiSystem(deps: EnemyAiDeps): System {
-  const { field, colliders, rng, grid } = deps;
+  const { field, colliders, rng, grid, projectiles } = deps;
   const simRadius = deps.simRadius ?? DEFAULT_SIM_RADIUS;
   const bound = field.size / 2 - 1;
   const enemies: Entity[] = [];
@@ -121,9 +125,21 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
 
         let vx = 0;
         let vz = 0;
+        const ranged = en.archetype === 'ranged_skirmisher';
+        const minRange = en.attackRange * 0.55;
 
         if (en.state === 'engage') {
-          if (distPlayer <= en.attackRange) {
+          if (ranged) {
+            if (distPlayer > en.attackRange && distPlayer > 1e-3) {
+              vx = (dpx / distPlayer) * en.moveSpeed;
+              vz = (dpz / distPlayer) * en.moveSpeed;
+            } else if (distPlayer < minRange && distPlayer > 1e-3) {
+              vx = -(dpx / distPlayer) * en.moveSpeed;
+              vz = -(dpz / distPlayer) * en.moveSpeed;
+            } else {
+              en.state = 'attack';
+            }
+          } else if (distPlayer <= en.attackRange) {
             en.state = 'attack';
           } else if (distPlayer > 1e-3) {
             vx = (dpx / distPlayer) * en.moveSpeed;
@@ -131,32 +147,26 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
           }
         } else if (en.state === 'attack') {
           en.attackTimer = Math.max(0, en.attackTimer - dt);
-          if (distPlayer > en.attackRange * 1.2) {
+          const loseRange = distPlayer > en.attackRange * (ranged ? 1.15 : 1.2);
+          if (loseRange) {
             en.state = 'engage';
             en.windupTimer = -1;
-          } else if (en.windupTimer >= 0) {
-            // Telegraphed swing in progress.
-            en.windupTimer -= dt;
-            if (en.windupTimer <= 0) {
-              en.windupTimer = -1;
-              en.attackTimer = en.attackCooldown;
-              if (playerAlive && distPlayer <= en.attackRange * 1.1) {
-                const r = applyDamage(
-                  world,
-                  e,
-                  player,
-                  { base: en.attackBase, coeff: en.attackCoeff, damageType: 'physical' },
-                  rng,
-                  0,
-                );
-                markCombat(world, player);
-                if (r.killed) {
-                  world.events.emit<PlayerDiedEvent>(CombatEvent.PlayerDied, { entity: player });
-                }
-              }
+          } else {
+            // Ranged skirmishers back-pedal when the player closes (kite) while firing.
+            if (ranged && distPlayer < minRange && distPlayer > 1e-3) {
+              vx = -(dpx / distPlayer) * en.moveSpeed;
+              vz = -(dpz / distPlayer) * en.moveSpeed;
             }
-          } else if (en.attackTimer <= 0) {
-            en.windupTimer = en.windup; // begin a new telegraph
+            if (en.windupTimer >= 0) {
+              en.windupTimer -= dt;
+              if (en.windupTimer <= 0) {
+                en.windupTimer = -1;
+                en.attackTimer = en.attackCooldown;
+                if (playerAlive) fireAttack(world, e, en, tr, player, distPlayer, ranged, projectiles, rng);
+              }
+            } else if (en.attackTimer <= 0) {
+              en.windupTimer = en.windup; // begin a new telegraph
+            }
           }
         } else if (en.state === 'leash') {
           const dhx = en.homeX - tr.x;
@@ -173,6 +183,12 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
             vx = (dhx / distHome) * en.moveSpeed * LEASH_RETURN_SPEED;
             vz = (dhz / distHome) * en.moveSpeed * LEASH_RETURN_SPEED;
           }
+        }
+
+        // A snared (rooted) enemy can't move.
+        if (hasStatus(world.get<Statuses>(e, C.Statuses), Status.Root)) {
+          vx = 0;
+          vz = 0;
         }
 
         // Integrate + resolve.
@@ -194,6 +210,46 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
       }
     },
   };
+}
+
+/** Land an enemy attack: a ranged shot (projectile) or a melee swing (instant). */
+function fireAttack(
+  world: World,
+  e: Entity,
+  en: Enemy,
+  tr: Transform,
+  player: Entity,
+  distPlayer: number,
+  ranged: boolean,
+  projectiles: Projectiles | undefined,
+  rng: Rng,
+): void {
+  if (ranged) {
+    projectiles?.spawn({
+      x: tr.x,
+      y: tr.y + 1,
+      z: tr.z,
+      source: e,
+      target: player,
+      speed: ENEMY_PROJECTILE_SPEED,
+      base: en.attackBase,
+      coeff: en.attackCoeff,
+      damageType: 'physical',
+      fromPlayer: false,
+    });
+    return;
+  }
+  if (distPlayer > en.attackRange * 1.1) return;
+  const r = applyDamage(
+    world,
+    e,
+    player,
+    { base: en.attackBase, coeff: en.attackCoeff, damageType: 'physical' },
+    rng,
+    0,
+  );
+  markCombat(world, player);
+  if (r.killed) world.events.emit<PlayerDiedEvent>(CombatEvent.PlayerDied, { entity: player });
 }
 
 /** Nearby idle packmates join the fight (social aggro). Uses the grid when present. */
