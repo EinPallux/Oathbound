@@ -1,0 +1,127 @@
+// Keyboard + mouse input, exposed as plain control state the simulation can read.
+// Owns the camera-orbit angles (yaw/pitch/distance) since movement is camera-relative;
+// the camera rig is a pure consumer of these. See docs/design/COMBAT_DESIGN.md (controls).
+
+import { clamp } from '../core/math';
+
+/** The subset of control state the simulation reads (no DOM concepts). */
+export interface ControlState {
+  forward: boolean;
+  back: boolean;
+  left: boolean;
+  right: boolean;
+  sprint: boolean;
+  /** Camera/movement yaw (radians). */
+  yaw: number;
+  /** Camera pitch (radians). */
+  pitch: number;
+  /** Camera follow distance (m). */
+  dist: number;
+  /** Returns true once if a jump was requested since the last call. */
+  consumeJump(): boolean;
+}
+
+export class InputController implements ControlState {
+  forward = false;
+  back = false;
+  left = false;
+  right = false;
+  sprint = false;
+  yaw = 0;
+  pitch = 0.5;
+  dist = 10;
+
+  private jumpQueued = false;
+  private pauseQueued = false;
+  private dragging = false;
+  private readonly lookSensitivity = 0.0035;
+
+  private readonly onKeyDown = (e: KeyboardEvent): void => this.setKey(e, true);
+  private readonly onKeyUp = (e: KeyboardEvent): void => this.setKey(e, false);
+  private readonly onContextMenu = (e: Event): void => e.preventDefault();
+  private readonly onMouseDown = (e: MouseEvent): void => {
+    if (e.button === 2) this.dragging = true;
+  };
+  private readonly onMouseUp = (e: MouseEvent): void => {
+    if (e.button === 2) this.dragging = false;
+  };
+  private readonly onMouseLeave = (): void => {
+    this.dragging = false;
+  };
+  private readonly onMouseMove = (e: MouseEvent): void => {
+    if (!this.dragging) return;
+    this.yaw -= e.movementX * this.lookSensitivity;
+    this.pitch = clamp(this.pitch + e.movementY * this.lookSensitivity, 0.15, 1.3);
+  };
+  private readonly onWheel = (e: WheelEvent): void => {
+    this.dist = clamp(this.dist + Math.sign(e.deltaY) * 1, 4, 22);
+  };
+
+  constructor(private readonly el: HTMLElement) {
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
+    el.addEventListener('contextmenu', this.onContextMenu);
+    el.addEventListener('mousedown', this.onMouseDown);
+    window.addEventListener('mouseup', this.onMouseUp);
+    el.addEventListener('mouseleave', this.onMouseLeave);
+    window.addEventListener('mousemove', this.onMouseMove);
+    el.addEventListener('wheel', this.onWheel, { passive: true });
+  }
+
+  private setKey(e: KeyboardEvent, down: boolean): void {
+    switch (e.code) {
+      case 'KeyW':
+      case 'ArrowUp':
+        this.forward = down;
+        break;
+      case 'KeyS':
+      case 'ArrowDown':
+        this.back = down;
+        break;
+      case 'KeyA':
+      case 'ArrowLeft':
+        this.left = down;
+        break;
+      case 'KeyD':
+      case 'ArrowRight':
+        this.right = down;
+        break;
+      case 'ShiftLeft':
+      case 'ShiftRight':
+        this.sprint = down;
+        break;
+      case 'Space':
+        if (down) this.jumpQueued = true;
+        e.preventDefault();
+        break;
+      case 'KeyP':
+        if (down) this.pauseQueued = true;
+        break;
+      default:
+        return;
+    }
+  }
+
+  consumeJump(): boolean {
+    const j = this.jumpQueued;
+    this.jumpQueued = false;
+    return j;
+  }
+
+  consumePauseToggle(): boolean {
+    const p = this.pauseQueued;
+    this.pauseQueued = false;
+    return p;
+  }
+
+  dispose(): void {
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    this.el.removeEventListener('contextmenu', this.onContextMenu);
+    this.el.removeEventListener('mousedown', this.onMouseDown);
+    window.removeEventListener('mouseup', this.onMouseUp);
+    this.el.removeEventListener('mouseleave', this.onMouseLeave);
+    window.removeEventListener('mousemove', this.onMouseMove);
+    this.el.removeEventListener('wheel', this.onWheel);
+  }
+}

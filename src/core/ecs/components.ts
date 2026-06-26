@@ -1,23 +1,46 @@
 // Component registry. Components are plain data keyed by a string name.
-// Phase 0.0.2 only needs the demonstration `Spinner` component; gameplay components
-// (Health, Resource, CombatStats, AIState, …) arrive in later phases per the roadmap.
+// Phase 0.0.3 introduces the first real gameplay components for movement.
 
 export const C = {
-  Spinner: 'spinner',
+  Transform: 'transform',
+  Velocity: 'velocity',
+  Character: 'character',
+  PlayerControlled: 'playerControlled',
 } as const;
 
 /**
- * Demo component: a cube that rotates about Y at a fixed placement.
- * Stores both the current and previous sim angle so the renderer can interpolate
- * between fixed simulation steps (proves the fixed-timestep + render-interpolation
- * architecture without any gameplay).
+ * Position + yaw, with the previous sim values retained so the renderer can
+ * interpolate between fixed simulation steps.
  */
-export interface Spinner {
-  px: number;
-  py: number;
-  pz: number;
-  angle: number;
-  prevAngle: number;
-  /** Radians per second. */
-  speed: number;
+export interface Transform {
+  x: number;
+  y: number;
+  z: number;
+  /** Facing angle in radians (rotation about +Y). */
+  yaw: number;
+  prevX: number;
+  prevY: number;
+  prevZ: number;
+  prevYaw: number;
 }
+
+export interface Velocity {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** Kinematic capsule controller parameters and runtime state. */
+export interface Character {
+  /** Horizontal collision radius (m). */
+  radius: number;
+  /** Half the capsule height (m); the Transform.y is the capsule centre. */
+  halfHeight: number;
+  runSpeed: number;
+  sprintSpeed: number;
+  jumpSpeed: number;
+  grounded: boolean;
+}
+
+/** Marker component: this entity is driven by player input. */
+export type PlayerControlled = true;

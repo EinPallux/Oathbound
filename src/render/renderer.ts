@@ -25,15 +25,6 @@ export class Renderer {
     this.scene.add(sun);
     this.scene.add(new THREE.HemisphereLight(0x88aaff, 0x202820, 0.7));
 
-    // A simple ground plane so the scene reads as a place, not floating cubes.
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(200, 200),
-      new THREE.MeshStandardMaterial({ color: 0x1a2230, roughness: 1 }),
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.5;
-    this.scene.add(ground);
-
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }

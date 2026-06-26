@@ -50,3 +50,17 @@ body {
   font-size: 11px;
   pointer-events: none;
 }
+
+.controls-hint {
+  position: fixed;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #7e8ea0;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 5px 12px;
+  border-radius: 6px;
+  pointer-events: none;
+  white-space: nowrap;
+}

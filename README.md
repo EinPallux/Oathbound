@@ -24,10 +24,11 @@ npm run test:e2e   # browser smoke test (Playwright)
 npm run build      # typecheck + production build (outputs dist/)
 ```
 
-**Current build (`0.0.2-INDEV`):** opens to a lit 3D scene of 144 instanced spinning
-cubes (one draw call) driven by an ECS-lite world on a fixed-timestep loop, with a live
-performance overlay (FPS, frame time, draw calls, entities, sim steps). This validates
-the rendering + loop + ECS foundation; movement and gameplay arrive in later phases.
+**Current build (`0.0.3-INDEV`):** walk a character around a greyboxed hilly world.
+WASD movement (camera-relative), a third-person chase camera with mouselook/zoom and
+collision (it won't clip terrain), gravity + jump, terrain ground-snap, and collision
+against rock props — all on the fixed-timestep ECS with a live performance overlay.
+This reaches the **Core Movement Gate**; combat arrives next (`0.0.4`).
 
 ## Guardrails (read before any coding session)
 

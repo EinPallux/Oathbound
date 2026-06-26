@@ -5,6 +5,36 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.0.3-INDEV — "Greybox Movement"
+**Goal:** walk a character around a greyboxed world with a third-person camera, collision, and ground-snap. Reaches the **Core Movement Gate**.
+
+**Added**
+- Procedural greybox **terrain**: a deterministic heightfield with a flattened spawn and gentle hills, rendered as a vertex-coloured mesh (`src/world/heightfield.ts`, `src/render/terrain-mesh.ts`).
+- **Kinematic character controller**: camera-relative WASD, gravity + jump, terrain ground-snap, static-collider push-out, world bounds (`src/sim/systems/movement.ts`, `src/sim/collision.ts`).
+- **Third-person chase camera** with mouselook (hold right-mouse), wheel zoom, follow smoothing, and **collision spring** (raycasts terrain/props so the view never clips) (`src/render/camera-rig.ts`).
+- **Input** controller (keyboard + mouse) exposing plain control state to the sim; **P** toggles pause (`src/platform/input.ts`).
+- Player capsule with a facing indicator (`src/render/player-view.ts`); instanced rock props (one draw call).
+- Render interpolation between fixed sim steps (`lerp`/`lerpAngle` in `src/core/math.ts`).
+- Tests: heightfield sampling, collision push-out, math helpers (+ existing) = **29 unit tests**; Playwright now drives **WASD movement** and asserts the player moves and stays grounded.
+
+**Removed:** the 0.0.2 spinning-cube demo (its instancing lesson now lives in the real terrain/props).
+
+**Verified:** `typecheck` ✓ · `npm test` → 29/29 ✓ · `build` ✓ (~136 KB gzip) · `test:e2e` ✓ (boot + movement).
+
+**Acceptance (Core Movement Gate):** smooth WASD movement; chase camera that doesn't clip terrain; no fall-through (ground-snap) and prop collision; a traversable terrain chunk; input working; loop stable. ✓
+
+**Not included (by design):** combat, targeting, enemies, abilities, loot, UI panels.
+
+**How to test**
+```bash
+npm install && npm run dev   # open http://localhost:5173
+# WASD to move, hold right-mouse to look, wheel to zoom, Shift sprint, Space jump, P pause
+```
+
+**Next phase →** `0.0.4-INDEV` "First Contact": a target dummy, soft tab-targeting, a basic attack + one ability on the global cooldown, the canonical damage formula, and floating damage numbers.
+
+---
+
 ## 0.0.2-INDEV — "Scaffold"
 **Goal:** an empty Three.js scene renders in-browser with a stable fixed-timestep game loop, an ECS-lite skeleton, and a performance overlay. Establishes the technical foundation before any gameplay.
 
