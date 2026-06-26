@@ -12,6 +12,7 @@ import {
   type Transform,
   type Statuses,
   type Enemy,
+  type Shield,
 } from '../../core/ecs/components';
 import type { Rng } from '../../core/rng';
 import { computeDamage, rollDamage, type AbilityHit } from './damage';
@@ -58,6 +59,14 @@ export function applyDamage(
   amount *= 1 - statusMagnitude(sourceStatuses, Status.Shaken);
   amount *= 1 - statusMagnitude(targetStatuses, Status.Bulwark);
   amount = Math.max(0, Math.round(amount));
+
+  // A shield (Aegis) soaks damage before HP.
+  const shield = world.get<Shield>(target, C.Shield);
+  if (shield && shield.amount > 0 && amount > 0) {
+    const soak = Math.min(shield.amount, amount);
+    shield.amount -= soak;
+    amount -= soak;
+  }
 
   const before = h.current;
   h.current = Math.max(0, h.current - amount);

@@ -12,6 +12,7 @@ interface ClassCard {
 const CARDS: ClassCard[] = [
   { id: 'warrior', name: 'Warrior', blurb: 'Melee brawler · Fury · cleave & survive' },
   { id: 'hunter', name: 'Hunter', blurb: 'Ranged marksman · Focus · kite & trap' },
+  { id: 'priest', name: 'Priest', blurb: 'Holy caster · Mana · heal, shield & Atonement' },
 ];
 
 export class ClassSelect {

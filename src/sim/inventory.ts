@@ -30,6 +30,7 @@ export function recomputeDerived(world: World, player: Entity): void {
   off.critChance = d.critChance;
   off.leech = d.leech;
   off.haste = d.haste;
+  off.healPower = d.healPower;
   off.level = prog.level;
 
   const def = world.get<Defense>(player, C.Defense)!;

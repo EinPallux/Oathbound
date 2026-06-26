@@ -12,6 +12,7 @@ import {
   type Statuses,
   type Target,
   type PlayerClass,
+  type Shield,
 } from '../../core/ecs/components';
 import type { Heightfield } from '../../world/heightfield';
 import { clamp } from '../../core/math';
@@ -71,6 +72,13 @@ export function createRecoverySystem(deps: RecoveryDeps): System {
         // HP regen ramps only out of combat.
         if (!cs.inCombat && h.current < h.max) {
           h.current = Math.min(h.max, h.current + (h.max * dt) / HP_RAMP_SEC);
+        }
+
+        // Shields (Aegis) decay over their duration.
+        const shield = world.get<Shield>(e, C.Shield);
+        if (shield && shield.amount > 0) {
+          shield.remaining -= dt;
+          if (shield.remaining <= 0) shield.amount = 0;
         }
       }
     },

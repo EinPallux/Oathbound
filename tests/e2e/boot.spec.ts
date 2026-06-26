@@ -23,7 +23,7 @@ interface OathboundHandle {
   resource: () => { current: number; max: number };
   telemetry: () => { damageDealt: number; kills: number; sessionSeconds: number };
   debugAddXp: (n: number) => void;
-  debugSetClass: (id: 'warrior' | 'hunter') => void;
+  debugSetClass: (id: 'warrior' | 'hunter' | 'priest') => void;
   save: () => Promise<boolean>;
 }
 declare global {
@@ -45,7 +45,7 @@ test('boots the vertical slice, renders, and runs the loop', async ({ page }) =>
   await page.goto('/');
 
   await expect(page.locator('#game')).toBeVisible();
-  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.2.0-INDEV');
+  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.2.1-INDEV');
 
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
   const running = await page.evaluate(() => window.__oathbound!.loop.isRunning);
@@ -132,6 +132,20 @@ test('plays as the Hunter — ranged shots damage the camp', async ({ page }) =>
   // Quick Shot (slot 1): soft-acquires the camp ahead and fires a projectile.
   await page.keyboard.press('Digit1');
   await page.waitForTimeout(400); // let the projectile fly + land
+  const after = await page.evaluate(totalEnemyHp);
+  expect(after).toBeLessThan(before);
+});
+
+test('plays as the Priest — holy Smite damages the camp', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
+
+  await page.evaluate(() => window.__oathbound!.debugSetClass('priest'));
+  expect(await page.evaluate(() => window.__oathbound!.classId())).toBe('priest');
+
+  const before = await page.evaluate(totalEnemyHp);
+  await page.keyboard.press('Digit1'); // Smite (holy projectile)
+  await page.waitForTimeout(400);
   const after = await page.evaluate(totalEnemyHp);
   expect(after).toBeLessThan(before);
 });

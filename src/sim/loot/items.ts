@@ -86,6 +86,8 @@ function rollAffix(rng: Rng, slot: EquipSlot, ilvl: number): Affix {
       return { id, value: Math.round(4 + 0.8 * ilvl) };
     case 'vit':
       return { id, value: Math.round(3 + 0.5 * ilvl) };
+    case 'healing':
+      return { id, value: Math.round(3 + 0.5 * ilvl) };
   }
 }
 
@@ -119,7 +121,7 @@ export interface GenerateOpts {
   slot?: EquipSlot;
   rarity?: Rarity;
   /** Primary stat for non-armour slots (smart-loot bias toward the class). */
-  primaryStat?: 'STR' | 'DEX';
+  primaryStat?: 'STR' | 'DEX' | 'SPR';
 }
 
 let uidCounter = 0;

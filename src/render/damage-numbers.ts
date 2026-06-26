@@ -39,11 +39,11 @@ export class DamageNumbers {
   }
 
   /** Spawn a number at a world position. Reuses a pooled span (drops if all busy). */
-  spawn(x: number, y: number, z: number, amount: number, isCrit: boolean): void {
+  spawn(x: number, y: number, z: number, amount: number, isCrit: boolean, heal = false): void {
     const el = this.pool.pop();
     if (!el) return; // pool exhausted — drop rather than allocate
-    el.textContent = isCrit ? `${amount}!` : String(amount);
-    el.className = isCrit ? 'dmg-number crit' : 'dmg-number';
+    el.textContent = heal ? `+${amount}` : isCrit ? `${amount}!` : String(amount);
+    el.className = heal ? 'dmg-number heal' : isCrit ? 'dmg-number crit' : 'dmg-number';
     el.style.display = 'block';
     el.style.opacity = '1';
     this.active.push({ el, x, y, z, life: 0, ttl: isCrit ? CRIT_TTL : TTL });

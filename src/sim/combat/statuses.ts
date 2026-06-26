@@ -13,6 +13,8 @@ export const Status = {
   Root: 'root',
   /** On the player: move-speed multiplier bonus (Disengage). */
   Fleet: 'fleet',
+  /** On the Priest: a fraction of spell damage dealt heals the caster. */
+  Atonement: 'atonement',
 } as const;
 
 /** Add or refresh a status (keeps the longer remaining time). */
@@ -28,6 +30,12 @@ export function addStatus(s: Statuses, id: string, durationSec: number, magnitud
 
 export function hasStatus(s: Statuses | undefined, id: string): boolean {
   return !!s && s.list.some((e) => e.id === id);
+}
+
+/** Remove a status by id (e.g. toggling Atonement off). */
+export function removeStatus(s: Statuses, id: string): void {
+  const i = s.list.findIndex((e) => e.id === id);
+  if (i >= 0) s.list.splice(i, 1);
 }
 
 /** Magnitude of an active status, or 0 if absent. */

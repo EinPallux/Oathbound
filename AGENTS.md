@@ -8,10 +8,10 @@ Entry point for **any coding agent or LLM** working in this repository (Claude C
 ## ▶ Current status — where to continue
 > **Keep this section up to date at the end of every phase.**
 
-- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0` Vertical Slice · `0.1.1` Loop Hardening · **`0.2.0-INDEV` The Hunter** (data-driven classes, ranged combat, pooled projectiles, ranged enemy, traps).
-- **Last gate passed:** **Core Movement Gate**. The **Combat + Core Loop** gates pass their *automatable* checks. `0.2.0` adds the **Hunter** as a second class and the ranged tech (projectiles/traps/kiting); the camp is mixed (Bloomhusks + Reavers). Combat-sim TTK is in band for both classes.
-- **⏳ Awaiting owner playtest:** Core Loop fun/perf sign-off (20-min grind, 60-min plateau, 60 FPS w/ 20 enemies) **and** whether the Hunter is fun + solo-viable and kiting feels right (leash still holds).
-- **▶ Next phase to build:** **`0.2.1-INDEV` "The Priest"** → **Three-Class Gate**: third class (holy + Atonement + shields), a caster enemy archetype (telegraph/interrupt), and the **inter-class ±20% TTK** balance pass. Do not start breadth (zones) until the Three-Class Gate passes.
+- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0` Vertical Slice · `0.1.1` Loop Hardening · `0.2.0` The Hunter · **`0.2.1-INDEV` The Priest** (third class, healing/shields/cast-time, caster enemy).
+- **Last gate passed:** **Core Movement Gate** + the *automatable* parts of **Combat/Core Loop/Three-Class** gates. Three operational classes (Warrior/Hunter/Priest) each solo a same-level standard within the **3–6s TTK band** and within the inter-class tolerance (combat-sim gate test). Camp spans all three enemy archetypes (melee/ranged/caster).
+- **⏳ Awaiting owner playtest:** the *subjective* gate items — each class *feels* fun + solo-viable end-to-end; a same-level **elite** is soloable with correct play (elites arrive in `0.3.0`); plus the standing Core Loop perf/fun checks.
+- **▶ Next phase to build:** **`0.3.0` "First Ten Levels"** → **Level 1–10 Gate** — full Lv 1–10 ability unlocks, **Thornwood Vale** (zone 2) + families, first **elite** + **rare-named**, full equipment slots up to **Rare**, vendors/Oathstones/fast-travel, onboarding, HUD/map v1. This opens the **breadth** band (now that the Three-Class Gate is met).
 - **Live progress log:** [`CHANGELOG.md`](./CHANGELOG.md) (every phase, each ending with "Next phase →").
 - **The full plan:** [`docs/production/VERSION_ROADMAP.md`](./docs/production/VERSION_ROADMAP.md) (`0.0.1-INDEV` → `1.0-BETA`).
 

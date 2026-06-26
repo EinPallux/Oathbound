@@ -16,6 +16,8 @@ import {
   type CombatState,
   type PlayerClass,
   type Trap,
+  type CastState,
+  type Shield,
 } from '../../core/ecs/components';
 import type { ControlState } from '../../platform/input';
 import type { Heightfield, CylinderCollider } from '../../world/heightfield';
@@ -37,7 +39,8 @@ import {
   type Candidate,
 } from '../combat/targeting';
 import { applyDamage } from '../combat/apply';
-import { addStatus, tickStatuses } from '../combat/statuses';
+import { applyHeal } from '../combat/heal';
+import { addStatus, hasStatus, removeStatus, tickStatuses, Status } from '../combat/statuses';
 import { rewardKill } from '../rewards';
 import type { SpatialGrid } from '../spatial-grid';
 import type { Projectiles } from '../projectiles';
@@ -46,6 +49,8 @@ const CONE_HALF = ((TARGET_CONE_DEG / 2) * Math.PI) / 180;
 const LOS_PAD = 0.25;
 const PLAYER_HALF = 0.9;
 const PLAYER_RADIUS = 0.4;
+/** Fraction of spell damage Atonement returns to the Priest as healing. */
+const ATONEMENT_LEECH = 0.3;
 
 export interface CombatDeps {
   input: ControlState;
@@ -92,6 +97,21 @@ export function createCombatSystem(deps: CombatDeps): System {
         if (ab.bufferedIndex >= 0) {
           ab.bufferRemaining -= dt;
           if (ab.bufferRemaining <= 0) ab.bufferedIndex = -1;
+        }
+
+        // An in-progress cast finishes (or is cancelled by moving). Locks actions.
+        const cast = world.get<CastState>(e, C.CastState);
+        if (cast) {
+          if (input.forward || input.back || input.left || input.right) {
+            world.remove(e, C.CastState);
+          } else {
+            cast.remaining -= dt;
+            if (cast.remaining <= 0) {
+              finishCast(world, e, abilities[cast.index], cast.target, off, rng);
+              world.remove(e, C.CastState);
+            }
+            continue;
+          }
         }
 
         if (tgt.entity != null && !isAlive(world, tgt.entity)) tgt.entity = null;
@@ -151,28 +171,56 @@ export function createCombatSystem(deps: CombatDeps): System {
         // 'self', 'dash', 'trap' need no target.
 
         // Pay costs + timers.
+        const firedIndex = ab.bufferedIndex;
         res.current = clamp(res.current - def.cost + def.furyGain, 0, res.max);
         if (def.triggersGcd) ab.gcdRemaining = effectiveGcd(off.haste);
-        ab.cooldowns[ab.bufferedIndex] = def.cooldown;
+        ab.cooldowns[firedIndex] = def.cooldown;
         ab.bufferedIndex = -1;
-        markCombat(world, e);
 
         if (def.selfBuff) {
           const ss = world.get<Statuses>(e, C.Statuses);
           if (ss) addStatus(ss, def.selfBuff.id, def.selfBuff.durationSec, def.selfBuff.magnitude);
         }
-
         if (primary != null) {
           tgt.entity = primary;
           const ptr = world.get<Transform>(primary, C.Transform)!;
           t.yaw = Math.atan2(ptr.x - t.x, ptr.z - t.z);
         }
 
+        // Atonement (Priest toggle) returns a fraction of spell damage as healing.
+        const atonement = hasStatus(world.get<Statuses>(e, C.Statuses), Status.Atonement)
+          ? ATONEMENT_LEECH
+          : 0;
+        const leech = off.leech + atonement;
+
         // Execute.
-        if (def.targeting === 'dash') {
+        if (def.castTime && def.castTime > 0 && primary != null) {
+          // Begin a cast; it resolves later and locks the GCD for its duration.
+          ab.gcdRemaining = Math.max(ab.gcdRemaining, def.castTime);
+          world.set<CastState>(e, C.CastState, {
+            index: firedIndex,
+            remaining: def.castTime,
+            target: primary,
+          });
+          markCombat(world, e);
+        } else if (def.targeting === 'dash') {
           doDash(t, def, colliders, field, bound, input.yaw);
         } else if (def.targeting === 'trap') {
           placeTrap(world, e, t, def);
+          markCombat(world, e);
+        } else if (def.targeting === 'heal' && def.heal) {
+          applyHeal(world, e, e, def.heal.base, def.heal.coeff, rng);
+        } else if (def.targeting === 'shield' && def.shield) {
+          world.set<Shield>(e, C.Shield, {
+            amount: Math.round(def.shield.coeff * off.primaryStat),
+            remaining: def.shield.durationSec,
+          });
+        } else if (def.targeting === 'toggle' && def.toggle) {
+          const ss = world.get<Statuses>(e, C.Statuses);
+          if (ss) {
+            if (hasStatus(ss, def.toggle.id)) removeStatus(ss, def.toggle.id);
+            else addStatus(ss, def.toggle.id, Infinity, def.toggle.magnitude);
+          }
         } else if (def.targeting === 'projectile' && primary != null) {
           projectiles.spawn({
             x: t.x,
@@ -184,9 +232,10 @@ export function createCombatSystem(deps: CombatDeps): System {
             base: def.base,
             coeff: def.coeff,
             damageType: def.damageType,
-            leech: off.leech,
+            leech,
             fromPlayer: true,
           });
+          markCombat(world, e);
         } else if (def.base > 0 || def.coeff > 0) {
           for (const victim of hitList) {
             const r = applyDamage(
@@ -195,7 +244,7 @@ export function createCombatSystem(deps: CombatDeps): System {
               victim,
               { base: def.base, coeff: def.coeff, damageType: def.damageType },
               rng,
-              off.leech,
+              leech,
             );
             if (victim === primary && def.debuff) {
               const vs = world.get<Statuses>(victim, C.Statuses);
@@ -203,6 +252,8 @@ export function createCombatSystem(deps: CombatDeps): System {
             }
             if (r.killed) rewardKill(world, e, victim, rng);
           }
+          if (def.heal) applyHeal(world, e, e, def.heal.base, def.heal.coeff, rng); // Holy Nova rider
+          markCombat(world, e);
         }
       }
     },
@@ -240,6 +291,34 @@ function isAlive(world: World, e: Entity): boolean {
   if (!world.has(e)) return false;
   const h = world.get<Health>(e, C.Health);
   return !!h && h.current > 0;
+}
+
+/** Resolve a finished cast (Searing Light): damage the stored target if still valid. */
+function finishCast(
+  world: World,
+  e: Entity,
+  def: AbilityDef,
+  target: Entity | null,
+  off: Offense,
+  rng: Rng,
+): void {
+  if (target == null || !isAlive(world, target)) return;
+  const tr = world.get<Transform>(target, C.Transform);
+  const pt = world.get<Transform>(e, C.Transform);
+  if (!tr || !pt) return;
+  if (Math.hypot(tr.x - pt.x, tr.z - pt.z) > def.range) return; // walked out of range
+  const atonement = hasStatus(world.get<Statuses>(e, C.Statuses), Status.Atonement)
+    ? ATONEMENT_LEECH
+    : 0;
+  const r = applyDamage(
+    world,
+    e,
+    target,
+    { base: def.base, coeff: def.coeff, damageType: def.damageType },
+    rng,
+    off.leech + atonement,
+  );
+  if (r.killed) rewardKill(world, e, target, rng);
 }
 
 function resolvePrimary(

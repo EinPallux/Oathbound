@@ -71,6 +71,7 @@ export function createPlayer(
     critMult: CRIT_MULT,
     leech: 0,
     haste: 0,
+    healPower: 0,
   });
   world.set<Defense>(e, C.Defense, {
     armor: 0,
@@ -143,6 +144,7 @@ export function createBloomhusk(world: World, field: Heightfield, x: number, z: 
     critMult: CRIT_MULT,
     leech: 0,
     haste: 0,
+    healPower: 0,
   });
   world.set<Defense>(e, C.Defense, {
     armor: bloomhuskArmor(level),
@@ -170,6 +172,7 @@ export function createBloomhusk(world: World, field: Heightfield, x: number, z: 
     windupTimer: -1,
     attackBase: 6,
     attackCoeff: 0.6,
+    attackType: 'physical',
     xpBase: xpPerKill(level),
     goldMin: 2,
     goldMax: 6,
@@ -202,6 +205,7 @@ export function createReaver(world: World, field: Heightfield, x: number, z: num
     critMult: CRIT_MULT,
     leech: 0,
     haste: 0,
+    healPower: 0,
   });
   world.set<Defense>(e, C.Defense, {
     armor: 8 + 4 * level,
@@ -229,6 +233,68 @@ export function createReaver(world: World, field: Heightfield, x: number, z: num
     windupTimer: -1,
     attackBase: 5,
     attackCoeff: 0.5,
+    attackType: 'physical',
+    xpBase: xpPerKill(level),
+    goldMin: 2,
+    goldMax: 6,
+    lootTable: 'greenmarch_standard',
+    respawnDelay: 30,
+    deadFor: 0,
+    invulnTimer: 0,
+  });
+  return e;
+}
+
+// Greenmarch Wisp (caster) — stands and casts a telegraphed blight bolt (armor-piercing).
+function wispHp(level: number): number {
+  return 24 + 9 * level;
+}
+
+/** Create one Greenmarch Wisp at (x, z). */
+export function createWisp(world: World, field: Heightfield, x: number, z: number, level = 1): Entity {
+  const e = world.createEntity();
+  const y = field.sample(x, z) + ENEMY_HALF;
+  const hp = wispHp(level);
+
+  world.set<Transform>(e, C.Transform, transformAt(x, z, y));
+  world.set(e, C.Velocity, { x: 0, y: 0, z: 0 });
+  world.set<Health>(e, C.Health, { current: hp, max: hp });
+  world.set<Offense>(e, C.Offense, {
+    primaryStat: 6 + 2 * level,
+    level,
+    critChance: 0.05,
+    critMult: CRIT_MULT,
+    leech: 0,
+    haste: 0,
+    healPower: 0,
+  });
+  world.set<Defense>(e, C.Defense, {
+    armor: 6 + 3 * level,
+    resist: { fire: 0, frost: 0, blight: 0 },
+    weakness: {},
+  });
+  world.set<Statuses>(e, C.Statuses, { list: [] });
+  world.set<Targetable>(e, C.Targetable, true);
+  world.set<EnemyInfo>(e, C.EnemyInfo, { name: 'Greenmarch Wisp', level });
+  world.set<Enemy>(e, C.Enemy, {
+    archetype: 'caster',
+    family: 'Wisps',
+    tier: 'standard',
+    state: 'idle',
+    homeX: x,
+    homeZ: z,
+    aggroRadius: 13,
+    leashRange: 35,
+    socialRange: 6,
+    moveSpeed: 2.6,
+    attackRange: 12,
+    attackCooldown: 3.0,
+    attackTimer: 0,
+    windup: 1.2,
+    windupTimer: -1,
+    attackBase: 7,
+    attackCoeff: 0.7,
+    attackType: 'blight',
     xpBase: xpPerKill(level),
     goldMin: 2,
     goldMax: 6,

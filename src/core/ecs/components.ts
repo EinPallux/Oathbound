@@ -26,6 +26,8 @@ export const C = {
   CombatState: 'combatState',
   PlayerClass: 'playerClass',
   Trap: 'trap',
+  Shield: 'shield',
+  CastState: 'castState',
 } as const;
 
 /**
@@ -90,6 +92,8 @@ export interface Offense {
   leech: number;
   /** GCD/cast reduction fraction in [0, ~0.3]. */
   haste: number;
+  /** Flat bonus to healing done (+Healing affix). */
+  healPower: number;
 }
 
 /** Defensive stats for the defender side of the canonical damage formula. */
@@ -159,7 +163,7 @@ export interface CombatState {
 export type EnemyState = 'idle' | 'engage' | 'attack' | 'leash' | 'dead';
 
 export interface Enemy {
-  archetype: 'melee_bruiser' | 'ranged_skirmisher';
+  archetype: 'melee_bruiser' | 'ranged_skirmisher' | 'caster';
   family: string;
   tier: 'standard';
   state: EnemyState;
@@ -180,6 +184,8 @@ export interface Enemy {
   windupTimer: number;
   attackBase: number;
   attackCoeff: number;
+  /** Damage school of the enemy's attack (casters use typed damage). */
+  attackType: DamageType;
   /** Same-level standard XP grant. */
   xpBase: number;
   goldMin: number;
@@ -215,10 +221,10 @@ export type EquipSlot =
 
 export type Rarity = 'common' | 'uncommon';
 
-export type PrimaryStatId = 'STR' | 'DEX' | 'VIT';
+export type PrimaryStatId = 'STR' | 'DEX' | 'SPR' | 'VIT';
 
-/** Playable classes (Warrior + Hunter in the slice; Priest follows in 0.2.1). */
-export type ClassId = 'warrior' | 'hunter';
+/** Playable classes. */
+export type ClassId = 'warrior' | 'hunter' | 'priest';
 
 /** Which class the player is. Drives kit, resource, and primary stat. */
 export interface PlayerClass {
@@ -235,7 +241,21 @@ export interface Trap {
   coeff: number;
 }
 
-export type AffixId = 'crit' | 'leech' | 'haste' | 'armor' | 'vit';
+export type AffixId = 'crit' | 'leech' | 'haste' | 'armor' | 'vit' | 'healing';
+
+/** A temporary absorb pool that soaks damage before HP (Priest Aegis). */
+export interface Shield {
+  amount: number;
+  remaining: number;
+}
+
+/** An in-progress cast (cast-time abilities). Cleared on finish, move, or interrupt. */
+export interface CastState {
+  /** Index into the caster's class ability list. */
+  index: number;
+  remaining: number;
+  target: number | null;
+}
 
 export interface Affix {
   id: AffixId;

@@ -5,6 +5,36 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.2.1-INDEV — "The Priest" → Three-Class Gate
+**Goal:** the third class — a **Priest** who fights with holy power and survives by weaving heals, shields, and Atonement — completing the three operational classes. Targets the [Three-Class Gate](./docs/production/RELEASE_GATES.md#4-three-class-gate).
+
+**Added**
+- **Priest** (holy/SPR/Mana) in the class registry. Early kit: **Smite** (holy projectile filler), **Searing Light** (cast-time nuke), **Holy Nova** (PBAoE + self-heal), **Mend** (self-heal), **Aegis** (absorb shield), and **Atonement** (toggle: a share of spell damage heals the caster). Class-select now offers all three.
+- **Healing system** (`src/sim/combat/heal.ts`): same shape as damage (base + coeff·SPR + **+Healing** affix), can crit; green floating numbers.
+- **Shields** (`Shield` component): an absorb pool that soaks damage before HP (Aegis), decaying over its duration; shown on the HP bar.
+- **Cast-time mechanic** (`CastState`): Searing Light channels a bar (HUD cast bar), resolves on completion, and **cancels if you move**.
+- **Caster enemy** — the Greenmarch **Wisp**: stands and casts a telegraphed **blight** bolt that **bypasses armor** (typed `Enemy.attackType`), countered by LoS/burst. The camp is now Bloomhusks + Reavers + a Wisp.
+- **Three-Class balance pass**: a combat-sim gate test runs all three classes vs a same-level standard and asserts each lands in the **3–6s TTK band** with the inter-class spread within tolerance; Priest holy damage (armor-ignoring) and Atonement sustain are tuned so it is **not** a weak healer.
+- Tests: Priest mechanics (Smite/Mend/Aegis-soak/Atonement-leech/cast resolve+cancel), the **Three-Class Gate TTK** sim, class registry → **100 unit tests**; a "play as the Priest" e2e (8 e2e).
+
+**Verified (automated):** `typecheck` ✓ · `npm test` → 100/100 ✓ · `build` ✓ (~154 KB gzip) · `test:e2e` → 8/8 ✓ (all three classes deal damage; save/reload). Warrior + Hunter + all prior systems remain green.
+
+**Three-Class Gate (automatable parts) ✓:** all three solo a same-level standard; each TTK in band; inter-class spread within tolerance; Priest deals real holy damage (not a weak healer); Warrior is a bruiser (not a slow tank); Hunter uses no pet. The **subjective** parts (each class *feels* solo-viable end-to-end; elite soloable with correct play) remain owner-playtest — the camp now spans all three enemy archetypes to exercise it.
+
+**Tuning note:** balance numbers are `v1` targets; precise inter-class parity is telemetry-tuned over many seeded matchups (per [TEST_STRATEGY](./docs/qa/TEST_STRATEGY.md)). The unit gate guards the band + gross imbalance.
+
+**Not included (by design):** zones beyond Greenmarch, other families, elites/rares, interrupts (L12 kit), full kits past the early game, Reinforcement, consumables.
+
+**How to test**
+```bash
+npm install && npm run dev   # pick Warrior / Hunter / Priest
+# Priest: 1 Smite · 2 Searing Light (cast) · 3 Holy Nova · 4 Mend · 5 Aegis · 6 Atonement
+```
+
+**Next phase →** `0.3.0` "First Ten Levels" → **Level 1–10 Gate**: full Lv 1–10 ability unlocks for all classes, **Thornwood Vale** (zone 2) + its families, the first **elite** and **rare-named**, the full equipment slot set up to **Rare**, vendors/Oathstones/fast-travel, and onboarding. (This begins the **breadth** band — appropriate now that the Three-Class Gate is met.)
+
+---
+
 ## 0.2.0-INDEV — "The Hunter"
 **Goal:** a second, fully distinct class — a ranged **Hunter** — plus the ranged combat tech to support it, proving the slice works for more than one playstyle. Toward the [Three-Class Gate](./docs/production/RELEASE_GATES.md#4-three-class-gate).
 
