@@ -15,8 +15,12 @@ import { createCombatSystem } from '../sim/systems/combat';
 import { createEnemyAiSystem } from '../sim/systems/enemy-ai';
 import { createLootSystem } from '../sim/systems/loot';
 import { createRecoverySystem } from '../sim/systems/recovery';
+import { createSpatialSystem } from '../sim/systems/spatial';
+import { SpatialGrid } from '../sim/spatial-grid';
+import { Telemetry, createTelemetrySystem } from '../sim/telemetry';
 import { createPlayer, createBloomhusk } from '../sim/factory';
 import { equipItem } from '../sim/inventory';
+import { salvageItem, salvageAllBelow } from '../sim/salvage';
 import { grantXp } from '../sim/progression';
 import { serialize, applySave } from '../sim/save';
 import { conColor } from '../sim/stats';
@@ -36,7 +40,9 @@ import {
   type LevelUpEvent,
   type LootPickedEvent,
   type PlayerDiedEvent,
+  type ItemSalvagedEvent,
 } from '../sim/combat/events';
+import type { TelemetrySnapshot } from '../sim/telemetry';
 import { Rng } from '../core/rng';
 import { buildTerrainMesh, buildProps } from '../render/terrain-mesh';
 import { PlayerView } from '../render/player-view';
@@ -82,7 +88,9 @@ export interface Game {
   level(): number;
   xp(): number;
   gold(): number;
+  materials(): number;
   bagCount(): number;
+  telemetry(): TelemetrySnapshot;
   debugAddXp(n: number): void;
   save(): Promise<boolean>;
   stop(): void;
@@ -111,15 +119,20 @@ export function boot(): Game {
   // Entities.
   const world = new World();
   const rng = new Rng(0xc0ffee);
+  const grid = new SpatialGrid(8);
+  const telemetry = new Telemetry();
   const player = createPlayer(world, field, 0, 0);
   for (const c of CAMP) createBloomhusk(world, field, c.x, c.z, c.level);
+  telemetry.attach(world, player);
 
-  // Systems: movement → combat → enemy AI → loot pickup → recovery.
+  // Systems: spatial index → movement → combat → enemy AI → loot → recovery → telemetry.
+  world.addSystem(createSpatialSystem(grid));
   world.addSystem(createMovementSystem({ input, field, colliders }));
-  world.addSystem(createCombatSystem({ input, rng, colliders }));
-  world.addSystem(createEnemyAiSystem({ field, colliders, rng }));
+  world.addSystem(createCombatSystem({ input, rng, colliders, grid }));
+  world.addSystem(createEnemyAiSystem({ field, colliders, rng, grid }));
   world.addSystem(createLootSystem({ input }));
   world.addSystem(createRecoverySystem({ field, spawnX: 0, spawnZ: 0 }));
+  world.addSystem(createTelemetrySystem(telemetry));
 
   // Render / UI.
   const playerView = new PlayerView(renderer.scene);
@@ -138,6 +151,16 @@ export function boot(): Game {
 
   invPanel.onEquip = (item) => {
     equipItem(world, player, item);
+    autosave();
+  };
+  invPanel.onSalvage = (item) => {
+    if (salvageItem(world, player, item.uid)) autosave();
+  };
+  invPanel.onSalvageCommons = () => {
+    if (salvageAllBelow(world, player, 'common') > 0) autosave();
+  };
+  invPanel.onToggleLock = (item) => {
+    item.locked = !item.locked;
     autosave();
   };
 
@@ -165,6 +188,9 @@ export function boot(): Game {
   world.events.on<PlayerDiedEvent>(CombatEvent.PlayerDied, () => {
     hud.toast('You were defeated — respawning…');
     sfx.hurt();
+  });
+  world.events.on<ItemSalvagedEvent>(CombatEvent.ItemSalvaged, (ev) => {
+    hud.toast(`Salvaged ${ev.itemName} (+${ev.whetstones} whetstones)`);
   });
 
   // Persistence: load the saved run, then autosave on key events + a timer + unload.
@@ -256,9 +282,11 @@ export function boot(): Game {
       const state = paused ? GameState.Paused : GameState.Playing;
       const prog = world.get<Progression>(player, C.Progression)!;
       const h = world.get<Health>(player, C.Health)!;
+      const tel = telemetry.snapshot();
       const extra =
-        `Lv ${prog.level}  HP ${Math.ceil(h.current)}/${h.max}  ` +
-        `pos ${playerTransform.x.toFixed(0)},${playerTransform.z.toFixed(0)}   [${state}]`;
+        `Lv ${prog.level}  HP ${Math.ceil(h.current)}/${h.max}  [${state}]\n` +
+        `kills ${tel.kills}  ttk ${tel.avgTtk.toFixed(1)}s  ` +
+        `down ${tel.avgDowntime.toFixed(1)}s  deaths ${tel.deaths}`;
       overlay.update(frameMs, renderer.drawCalls, world.entityCount, steps, extra);
     },
   });
@@ -283,12 +311,15 @@ export function boot(): Game {
     level: () => world.get<Progression>(player, C.Progression)!.level,
     xp: () => world.get<Progression>(player, C.Progression)!.xp,
     gold: () => world.get<Inventory>(player, C.Inventory)!.gold,
+    materials: () => world.get<Inventory>(player, C.Inventory)!.materials,
     bagCount: () => world.get<Inventory>(player, C.Inventory)!.items.length,
+    telemetry: () => telemetry.snapshot(),
     debugAddXp: (n) => grantXp(world, player, n),
     save: () => writeSave(serialize(world, player)),
     stop: () => {
       loop.stop();
       input.dispose();
+      telemetry.detach();
       window.clearInterval(saveTimer);
       window.removeEventListener('beforeunload', onHide);
       document.removeEventListener('visibilitychange', onVisibility);

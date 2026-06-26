@@ -17,7 +17,9 @@ interface OathboundHandle {
   level: () => number;
   xp: () => number;
   gold: () => number;
+  materials: () => number;
   bagCount: () => number;
+  telemetry: () => { damageDealt: number; kills: number; sessionSeconds: number };
   debugAddXp: (n: number) => void;
   save: () => Promise<boolean>;
 }
@@ -40,7 +42,7 @@ test('boots the vertical slice, renders, and runs the loop', async ({ page }) =>
   await page.goto('/');
 
   await expect(page.locator('#game')).toBeVisible();
-  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.1.0-INDEV');
+  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.1.1-INDEV');
 
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
   const running = await page.evaluate(() => window.__oathbound!.loop.isRunning);
@@ -103,6 +105,16 @@ test('Tab locks onto an enemy and Esc clears it', async ({ page }) => {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(120);
   expect(await page.evaluate(() => window.__oathbound!.target())).toBeNull();
+});
+
+test('telemetry counts damage dealt through the real event flow', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
+
+  expect(await page.evaluate(() => window.__oathbound!.telemetry().damageDealt)).toBe(0);
+  await page.keyboard.press('Digit1');
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.__oathbound!.telemetry().damageDealt)).toBeGreaterThan(0);
 });
 
 test('progress persists across a reload (save v1)', async ({ page }) => {

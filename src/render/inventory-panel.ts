@@ -1,7 +1,7 @@
 // Inventory + equipment panel (DOM, interactive — toggled with I/C). Lists equipped
-// gear and bagged items with an upgrade delta vs. the equipped piece and an Equip
-// action. Rebuilds only when the contents change. Reads sim state; equipping goes
-// through a callback so the sim stays the source of truth.
+// gear and bagged items (sorted by power) with upgrade deltas, equip / lock / salvage
+// actions, a salvage-commons button, and the gold + whetstone wallet. Rebuilds only
+// when contents change. Mutations go through callbacks so the sim stays authoritative.
 
 import type { World, Entity } from '../core/ecs/world';
 import {
@@ -10,8 +10,10 @@ import {
   type EquipSlot,
   type Inventory,
   type Equipment,
+  type Progression,
 } from '../core/ecs/components';
 import { EQUIP_SLOTS } from '../sim/loot/items';
+import { SALVAGE_LEVEL } from '../sim/salvage';
 
 const SLOT_LABEL: Record<EquipSlot, string> = {
   weapon: 'Weapon',
@@ -28,11 +30,17 @@ const SLOT_LABEL: Record<EquipSlot, string> = {
 
 export class InventoryPanel {
   private readonly root: HTMLDivElement;
+  private readonly wallet: HTMLDivElement;
+  private readonly actions: HTMLDivElement;
   private readonly equipList: HTMLDivElement;
   private readonly invList: HTMLDivElement;
   private visible = false;
   private lastSig = '';
+
   onEquip: (item: Item) => void = () => {};
+  onSalvage: (item: Item) => void = () => {};
+  onSalvageCommons: () => void = () => {};
+  onToggleLock: (item: Item) => void = () => {};
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
@@ -43,6 +51,14 @@ export class InventoryPanel {
     title.className = 'inv-title';
     title.textContent = 'Inventory — I/C to close';
     this.root.appendChild(title);
+
+    this.wallet = document.createElement('div');
+    this.wallet.className = 'inv-wallet';
+    this.root.appendChild(this.wallet);
+
+    this.actions = document.createElement('div');
+    this.actions.className = 'inv-actions';
+    this.root.appendChild(this.actions);
 
     const cols = document.createElement('div');
     cols.className = 'inv-cols';
@@ -70,7 +86,7 @@ export class InventoryPanel {
   toggle(): void {
     this.visible = !this.visible;
     this.root.style.display = this.visible ? 'block' : 'none';
-    this.lastSig = ''; // force a rebuild on next update
+    this.lastSig = '';
   }
 
   get isOpen(): boolean {
@@ -81,16 +97,34 @@ export class InventoryPanel {
     if (!this.visible) return;
     const inv = world.get<Inventory>(player, C.Inventory);
     const eq = world.get<Equipment>(player, C.Equipment);
-    if (!inv || !eq) return;
+    const prog = world.get<Progression>(player, C.Progression);
+    if (!inv || !eq || !prog) return;
 
     const sig =
       EQUIP_SLOTS.map((s) => eq.slots[s]?.uid ?? '-').join(',') +
       '|' +
-      inv.items.map((i) => i.uid).join(',') +
-      '|' +
-      inv.gold;
+      inv.items.map((i) => `${i.uid}${i.locked ? 'L' : ''}`).join(',') +
+      `|${inv.gold}|${inv.materials}|${prog.level}`;
     if (sig === this.lastSig) return;
     this.lastSig = sig;
+
+    const canSalvage = prog.level >= SALVAGE_LEVEL;
+
+    this.wallet.textContent = `${inv.gold} gold   ·   ${inv.materials} whetstones`;
+
+    this.actions.replaceChildren();
+    const salvageBtn = document.createElement('button');
+    salvageBtn.className = 'inv-btn';
+    salvageBtn.textContent = 'Salvage all Common';
+    salvageBtn.disabled = !canSalvage;
+    salvageBtn.onclick = () => this.onSalvageCommons();
+    this.actions.appendChild(salvageBtn);
+    if (!canSalvage) {
+      const hint = document.createElement('span');
+      hint.className = 'inv-hint';
+      hint.textContent = `Salvage unlocks at Lv ${SALVAGE_LEVEL}`;
+      this.actions.appendChild(hint);
+    }
 
     this.equipList.replaceChildren();
     for (const slot of EQUIP_SLOTS) {
@@ -112,7 +146,8 @@ export class InventoryPanel {
       empty.textContent = 'Empty — kill Bloomhusks and press F on drops.';
       this.invList.appendChild(empty);
     }
-    for (const item of inv.items) {
+    const sorted = [...inv.items].sort((a, b) => b.score - a.score);
+    for (const item of sorted) {
       const equipped = eq.slots[item.slot];
       const delta = item.score - (equipped?.score ?? 0);
       const row = document.createElement('div');
@@ -120,7 +155,7 @@ export class InventoryPanel {
 
       const name = document.createElement('span');
       name.className = `inv-name ${item.rarity}`;
-      name.textContent = `${item.name} · ${SLOT_LABEL[item.slot]}`;
+      name.textContent = `${item.locked ? '🔒 ' : ''}${item.name} · ${SLOT_LABEL[item.slot]}`;
       row.appendChild(name);
 
       const d = document.createElement('span');
@@ -128,13 +163,23 @@ export class InventoryPanel {
       d.textContent = delta > 0 ? `+${delta}` : `${delta}`;
       row.appendChild(d);
 
-      const btn = document.createElement('button');
-      btn.className = 'inv-equip';
-      btn.textContent = 'Equip';
-      btn.onclick = () => this.onEquip(item);
-      row.appendChild(btn);
+      row.appendChild(this.button('Equip', 'inv-equip', () => this.onEquip(item)));
+      row.appendChild(
+        this.button(item.locked ? 'Unlock' : 'Lock', 'inv-btn small', () => this.onToggleLock(item)),
+      );
+      const salv = this.button('Salvage', 'inv-btn small danger', () => this.onSalvage(item));
+      salv.disabled = !canSalvage || item.locked;
+      row.appendChild(salv);
 
       this.invList.appendChild(row);
     }
+  }
+
+  private button(label: string, cls: string, onclick: () => void): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.className = cls;
+    b.textContent = label;
+    b.onclick = onclick;
+    return b;
   }
 }

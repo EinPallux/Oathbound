@@ -70,6 +70,7 @@ describe('deriveStats', () => {
           armor: 0,
           affixes: [{ id: 'crit', value: 0.05 }],
           score: 1,
+          locked: false,
         },
         chest: {
           uid: 'c',
@@ -81,6 +82,7 @@ describe('deriveStats', () => {
           armor: 10,
           affixes: [],
           score: 1,
+          locked: false,
         },
       },
     };
@@ -104,6 +106,7 @@ describe('deriveStats', () => {
           armor: 0,
           affixes: [{ id: 'haste', value: 0.5 }],
           score: 1,
+          locked: false,
         },
       },
     };

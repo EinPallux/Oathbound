@@ -155,6 +155,7 @@ export function generateItem(rng: Rng, opts: GenerateOpts): Item {
     armor,
     affixes,
     score: 0,
+    locked: false,
   };
   item.score = scoreItem(item);
   return item;

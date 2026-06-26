@@ -5,6 +5,35 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.1.1-INDEV — "Loop Hardening"
+**Goal:** make the vertical slice **robust, performant, and measurable** — the engineering pass behind the [Core Loop Gate](./docs/production/RELEASE_GATES.md#3-core-loop-gate) so the owner's playtest runs on solid ground.
+
+**Added**
+- **Spatial grid broad-phase** (`src/sim/spatial-grid.ts` + `systems/spatial.ts`): a uniform-cell index rebuilt each tick, used for targeting candidate gathering and social aggro so neighbour queries stay near-O(1) as enemy counts climb toward the ≤40-active-AI budget. Integrated as an optional dependency (full-scan fallback preserved for tests).
+- **AI throttling**: distant **idle** enemies update on a slow cadence (sim-radius gated) — they cost almost nothing until the player is near.
+- **Leak hardening**: uncollected loot now **despawns after a grace period** (`LootDrop.ttl`), keeping world-entity count bounded over long sessions; per-tick **scratch arrays are reused** in the combat/AI systems to cut steady allocation churn.
+- **Salvage v1** (`src/sim/salvage.ts`, unlocked Lv 3): convert unwanted gear into **Whetstones** + gold; **item lock**, per-item salvage, and **salvage-all-Common**. Materials are a wallet (not items), persisted in the save.
+- **Inventory polish**: backpack **sorted by power**, gold + whetstone wallet, equip / lock / salvage actions, and the salvage-all button (Lv-3 gated with a hint).
+- **Telemetry** (`src/sim/telemetry.ts`): kills, deaths, damage dealt/taken, XP, gold, loot, salvage, session time, and **avg TTK + downtime** — fed by sim events, shown on the perf overlay and exposed on the handle to validate the [SOLO_BALANCE_RULES](./docs/design/SOLO_BALANCE_RULES.md) bands during playtests.
+- Tests: spatial grid, salvage (gating/yield/lock/salvage-all), telemetry, and a **loot-TTL leak proof** (entity count returns to baseline) → **85 unit tests**; a new telemetry e2e (6 e2e).
+
+**Verified (automated):** `typecheck` ✓ · `npm test` → 85/85 ✓ · `build` ✓ (~150 KB gzip) · `test:e2e` → 6/6 ✓. New gate-relevant proofs: bounded entity growth (loot TTL); broad-phase + AI throttling bound per-tick work; telemetry surfaces TTK/downtime/death-rate.
+
+**Pending owner playtest (unchanged from 0.1.0):** the "20-minute grind is enjoyable" rating, the real 60-minute memory-plateau session, and "60 FPS with 20 active enemies" on reference hardware — the structures are now in place to make those pass; telemetry gives the numbers to tune against.
+
+**Not included (by design):** other classes (Hunter/Priest), other zones/families, elites/rares, Reinforcement upgrade, consumables — all later phases.
+
+**How to test**
+```bash
+npm install && npm run dev   # open http://localhost:5173
+# Grind the camp; open I/C → sort/lock/salvage gear (salvage unlocks at Lv 3).
+# The perf overlay now shows kills / avg TTK / downtime / deaths.
+```
+
+**Next phase →** `0.2.0-INDEV` "The Hunter" — the second class (ranged/Focus/kiting) + a ranged-skirmisher enemy archetype. **Gated on the owner's Core Loop playtest sign-off**: per the roadmap, do not widen to more classes until the loop is confirmed fun.
+
+---
+
 ## 0.1.0-INDEV — "Vertical Slice"
 **Goal:** the first **complete grinding loop** — as a Warrior, fight a Greenmarch camp, gain XP/levels, loot gear, equip upgrades, recover, repeat; the run persists. Targets the [Combat Gate](./docs/production/RELEASE_GATES.md#2-combat-gate) + [Core Loop Gate](./docs/production/RELEASE_GATES.md#3-core-loop-gate).
 

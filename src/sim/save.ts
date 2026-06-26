@@ -26,6 +26,7 @@ export interface SaveData {
   updatedAt: number;
   character: { level: number; xp: number; xpToNext: number };
   gold: number;
+  materials: number;
   position: { x: number; z: number };
   inventory: Item[];
   equipment: Partial<Record<EquipSlot, Item>>;
@@ -47,6 +48,7 @@ export function serialize(world: World, player: Entity): SaveData {
     updatedAt: Date.now(),
     character: { level: prog.level, xp: prog.xp, xpToNext: prog.xpToNext },
     gold: inv.gold,
+    materials: inv.materials,
     position: { x: tr.x, z: tr.z },
     inventory: clone(inv.items),
     equipment: clone(eq.slots),
@@ -63,6 +65,7 @@ export function applySave(world: World, player: Entity, data: SaveData): void {
   const inv = world.get<Inventory>(player, C.Inventory)!;
   inv.items = clone(data.inventory);
   inv.gold = data.gold;
+  inv.materials = data.materials ?? 0;
 
   const eq = world.get<Equipment>(player, C.Equipment)!;
   eq.slots = clone(data.equipment);
