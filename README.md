@@ -2,7 +2,7 @@
 
 A planned **3D browser-based, solo-friendly fantasy MMORPG** built with TypeScript + Three.js, deployable to Vercel with no account, no backend, and no database required for its first public milestone (**1.0-BETA**).
 
-> **Status: PLANNING ONLY.** No runtime/game code exists yet. This repository currently contains only the design, technical, production, and QA blueprint that a future implementation session will follow. See [`/docs`](./docs/README.md).
+> **Status: early scaffold (`0.0.2-INDEV`).** The full game blueprint lives in [`/docs`](./docs/README.md). Implementation is proceeding **one phase at a time** (see [`CHANGELOG.md`](./CHANGELOG.md) and the [Version Roadmap](./docs/production/VERSION_ROADMAP.md)); each phase is an independently testable build.
 
 ## What is Oathbound?
 
@@ -13,6 +13,21 @@ It is intentionally a **chill, solo-first** experience that *feels* like a small
 ## Start here
 
 👉 **[docs/README.md](./docs/README.md)** — the documentation index and reading order.
+
+## Development
+
+```bash
+npm install        # install dependencies
+npm run dev        # start the dev server (http://localhost:5173)
+npm test           # unit tests (Vitest)
+npm run test:e2e   # browser smoke test (Playwright)
+npm run build      # typecheck + production build (outputs dist/)
+```
+
+**Current build (`0.0.2-INDEV`):** opens to a lit 3D scene of 144 instanced spinning
+cubes (one draw call) driven by an ECS-lite world on a fixed-timestep loop, with a live
+performance overlay (FPS, frame time, draw calls, entities, sim steps). This validates
+the rendering + loop + ECS foundation; movement and gameplay arrive in later phases.
 
 ## Guardrails (read before any coding session)
 
