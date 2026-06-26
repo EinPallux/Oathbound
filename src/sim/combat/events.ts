@@ -1,12 +1,22 @@
-// Combat event names + payloads. The sim emits these; render/UI subscribe (the
-// event bus is what keeps rendering decoupled from sim). Payloads are plain data.
+// Sim → render/UI event names + payloads. The sim emits these; render/UI/audio
+// subscribe (the event bus keeps rendering decoupled from sim). Plain data only.
 
-import type { DamageType } from '../../core/ecs/components';
+import type { DamageType, Item } from '../../core/ecs/components';
 
 export const CombatEvent = {
   Damage: 'combat/damage',
+  Heal: 'combat/heal',
+  /** An enemy died. */
   Death: 'combat/death',
+  /** An enemy respawned. */
   Respawn: 'combat/respawn',
+  PlayerDied: 'combat/playerDied',
+  PlayerRespawn: 'combat/playerRespawn',
+  LevelUp: 'progress/levelUp',
+  XpGained: 'progress/xp',
+  LootDropped: 'loot/dropped',
+  LootPicked: 'loot/picked',
+  GoldGained: 'loot/gold',
 } as const;
 
 export interface DamageEvent {
@@ -22,10 +32,58 @@ export interface DamageEvent {
   z: number;
 }
 
+export interface HealEvent {
+  entity: number;
+  amount: number;
+  x: number;
+  y: number;
+  z: number;
+}
+
 export interface DeathEvent {
   entity: number;
+  killer: number;
 }
 
 export interface RespawnEvent {
   entity: number;
+}
+
+export interface PlayerDiedEvent {
+  entity: number;
+}
+
+export interface PlayerRespawnEvent {
+  entity: number;
+}
+
+export interface LevelUpEvent {
+  entity: number;
+  level: number;
+}
+
+export interface XpGainedEvent {
+  entity: number;
+  amount: number;
+  xp: number;
+  xpToNext: number;
+  level: number;
+}
+
+export interface LootDroppedEvent {
+  entity: number;
+  item: Item | null;
+  gold: number;
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface LootPickedEvent {
+  item: Item;
+}
+
+export interface GoldGainedEvent {
+  amount: number;
+  total: number;
 }

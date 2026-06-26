@@ -1,7 +1,6 @@
-// Composition root for Phase 0.0.4 "First Contact": terrain + a player capsule
-// (WASD, chase camera, collision) plus combat — target dummies, soft tab-targeting,
-// a basic attack + one ability on the GCD, the canonical damage formula, and pooled
-// floating damage numbers.
+// Composition root for Phase 0.1.0 "Vertical Slice": the first complete grinding loop.
+// A Warrior fights a Greenmarch camp of Bloomhusks (melee AI), gains XP/levels, loots
+// gear, equips upgrades, recovers, and the run persists to IndexedDB.
 
 import * as THREE from 'three';
 import { Renderer } from '../render/renderer';
@@ -13,45 +12,56 @@ import { InputController } from '../platform/input';
 import { generateHeightfield, generateColliders } from '../world/heightfield';
 import { createMovementSystem } from '../sim/systems/movement';
 import { createCombatSystem } from '../sim/systems/combat';
-import { createDummySystem } from '../sim/systems/dummy';
+import { createEnemyAiSystem } from '../sim/systems/enemy-ai';
+import { createLootSystem } from '../sim/systems/loot';
+import { createRecoverySystem } from '../sim/systems/recovery';
+import { createPlayer, createBloomhusk } from '../sim/factory';
+import { equipItem } from '../sim/inventory';
+import { grantXp } from '../sim/progression';
+import { serialize, applySave } from '../sim/save';
+import { conColor } from '../sim/stats';
 import {
   C,
   type Transform,
-  type Character,
-  type Offense,
-  type Defense,
   type Health,
-  type AbilityState,
   type Target,
-  type Targetable,
+  type Enemy,
   type EnemyInfo,
-  type Dummy,
+  type Progression,
+  type Inventory,
 } from '../core/ecs/components';
-import { ABILITIES } from '../sim/combat/abilities';
 import {
   CombatEvent,
   type DamageEvent,
-  type DeathEvent,
-  type RespawnEvent,
+  type LevelUpEvent,
+  type LootPickedEvent,
+  type PlayerDiedEvent,
 } from '../sim/combat/events';
 import { Rng } from '../core/rng';
 import { buildTerrainMesh, buildProps } from '../render/terrain-mesh';
 import { PlayerView } from '../render/player-view';
 import { CameraRig } from '../render/camera-rig';
 import { EnemyView } from '../render/enemy-view';
+import { LootView } from '../render/loot-view';
 import { DamageNumbers } from '../render/damage-numbers';
 import { TargetFrame } from '../render/target-frame';
+import { Hud } from '../render/hud';
+import { InventoryPanel } from '../render/inventory-panel';
+import { Sfx } from '../platform/audio';
+import { loadSave, writeSave } from '../platform/save-store';
 import { lerp, lerpAngle } from '../core/math';
 
 const WORLD_SIZE = 100;
 const WORLD_RES = 129;
 
-const DUMMY_HALF = 0.9;
-const DUMMY_HP = 120;
-const DUMMY_SPOTS = [
-  { x: 0, z: 5, name: 'Training Dummy' },
-  { x: 4, z: 5, name: 'Training Dummy' },
-  { x: -4, z: 5, name: 'Battered Dummy' },
+// A small Greenmarch camp ahead of spawn (+Z). The first is nearest.
+const CAMP: { x: number; z: number; level: number }[] = [
+  { x: 0, z: 6, level: 1 },
+  { x: 3, z: 9, level: 1 },
+  { x: -3, z: 9, level: 1 },
+  { x: 6, z: 12, level: 2 },
+  { x: -6, z: 12, level: 2 },
+  { x: 0, z: 14, level: 2 },
 ];
 
 export interface EnemySnapshot {
@@ -59,6 +69,7 @@ export interface EnemySnapshot {
   name: string;
   hp: number;
   max: number;
+  state: string;
 }
 
 export interface Game {
@@ -68,6 +79,12 @@ export interface Game {
   player(): { x: number; y: number; z: number; yaw: number };
   target(): number | null;
   enemies(): EnemySnapshot[];
+  level(): number;
+  xp(): number;
+  gold(): number;
+  bagCount(): number;
+  debugAddXp(n: number): void;
+  save(): Promise<boolean>;
   stop(): void;
 }
 
@@ -81,6 +98,7 @@ export function boot(): Game {
   const renderer = new Renderer(canvas);
   const input = new InputController(canvas);
   const overlay = new PerfOverlay(uiRoot);
+  const sfx = new Sfx();
 
   // World data (pure) + meshes (render).
   const field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337);
@@ -90,104 +108,87 @@ export function boot(): Game {
   renderer.scene.add(props);
   const terrain = renderer.scene.getObjectByName('terrain')!;
 
+  // Entities.
   const world = new World();
+  const rng = new Rng(0xc0ffee);
+  const player = createPlayer(world, field, 0, 0);
+  for (const c of CAMP) createBloomhusk(world, field, c.x, c.z, c.level);
 
-  // Player entity.
-  const halfHeight = 0.9;
-  const startY = field.sample(0, 0) + halfHeight;
-  const player = world.createEntity();
-  world.set<Transform>(player, C.Transform, {
-    x: 0,
-    y: startY,
-    z: 0,
-    yaw: 0,
-    prevX: 0,
-    prevY: startY,
-    prevZ: 0,
-    prevYaw: 0,
-  });
-  world.set(player, C.Velocity, { x: 0, y: 0, z: 0 });
-  world.set<Character>(player, C.Character, {
-    radius: 0.4,
-    halfHeight,
-    runSpeed: 6,
-    sprintSpeed: 9.5,
-    jumpSpeed: 7,
-    grounded: true,
-  });
-  world.set(player, C.PlayerControlled, true);
-  world.set<Health>(player, C.Health, { current: 200, max: 200 });
-  world.set<Offense>(player, C.Offense, {
-    primaryStat: 10,
-    level: 1,
-    critChance: 0.15,
-    critMult: 1.5,
-  });
-  world.set<AbilityState>(player, C.AbilityState, {
-    gcdRemaining: 0,
-    cooldowns: ABILITIES.map(() => 0),
-    bufferedIndex: -1,
-    bufferRemaining: 0,
-  });
-  const playerTarget = world.set<Target>(player, C.Target, { entity: null });
-
-  // Target dummies.
-  const enemyView = new EnemyView(renderer.scene);
-  const dummyIds: number[] = [];
-  for (const spot of DUMMY_SPOTS) {
-    const y = field.sample(spot.x, spot.z) + DUMMY_HALF;
-    const e = world.createEntity();
-    world.set<Transform>(e, C.Transform, {
-      x: spot.x,
-      y,
-      z: spot.z,
-      yaw: Math.atan2(-spot.x, -spot.z), // face the spawn point
-      prevX: spot.x,
-      prevY: y,
-      prevZ: spot.z,
-      prevYaw: 0,
-    });
-    world.set<Health>(e, C.Health, { current: DUMMY_HP, max: DUMMY_HP });
-    world.set<Defense>(e, C.Defense, {
-      armor: 40,
-      resist: { fire: 0, frost: 0, blight: 0 },
-      weakness: {},
-    });
-    world.set<Targetable>(e, C.Targetable, true);
-    world.set<EnemyInfo>(e, C.EnemyInfo, { name: spot.name, level: 1 });
-    world.set<Dummy>(e, C.Dummy, { respawnDelay: 3, deadFor: 0, dead: false });
-    enemyView.add(e, spot.x, y, spot.z, DUMMY_HALF);
-    dummyIds.push(e);
-  }
-
-  // Systems run in order: movement → combat → dummy upkeep.
+  // Systems: movement → combat → enemy AI → loot pickup → recovery.
   world.addSystem(createMovementSystem({ input, field, colliders }));
-  world.addSystem(createCombatSystem({ input, rng: new Rng(0xc0ffee), colliders }));
-  world.addSystem(createDummySystem());
+  world.addSystem(createCombatSystem({ input, rng, colliders }));
+  world.addSystem(createEnemyAiSystem({ field, colliders, rng }));
+  world.addSystem(createLootSystem({ input }));
+  world.addSystem(createRecoverySystem({ field, spawnX: 0, spawnZ: 0 }));
 
-  // Combat feedback (render/UI subscribes to sim events).
-  const damageNumbers = new DamageNumbers(uiRoot);
-  const targetFrame = new TargetFrame(uiRoot);
-  world.events.on<DamageEvent>(CombatEvent.Damage, (ev) => {
-    damageNumbers.spawn(ev.x, ev.y + 1.2, ev.z, ev.amount, ev.isCrit);
-    enemyView.onHit(ev.target);
-    const h = world.get<Health>(ev.target, C.Health);
-    if (h) enemyView.setHealthRatio(ev.target, h.current / h.max);
-  });
-  world.events.on<DeathEvent>(CombatEvent.Death, (ev) => {
-    enemyView.setDead(ev.entity, true);
-  });
-  world.events.on<RespawnEvent>(CombatEvent.Respawn, (ev) => {
-    enemyView.setDead(ev.entity, false);
-    enemyView.setHealthRatio(ev.entity, 1);
-  });
-
+  // Render / UI.
   const playerView = new PlayerView(renderer.scene);
   const cameraRig = new CameraRig(renderer.camera, input, [terrain, props]);
+  const enemyView = new EnemyView(renderer.scene);
+  const lootView = new LootView(renderer.scene);
+  const damageNumbers = new DamageNumbers(uiRoot);
+  const targetFrame = new TargetFrame(uiRoot);
+  const hud = new Hud(uiRoot);
+  const invPanel = new InventoryPanel(uiRoot);
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
-  const t = world.get<Transform>(player, C.Transform)!;
+  const playerTarget = world.get<Target>(player, C.Target)!;
+  const playerTransform = world.get<Transform>(player, C.Transform)!;
+
+  invPanel.onEquip = (item) => {
+    equipItem(world, player, item);
+    autosave();
+  };
+
+  // Combat/loot feedback.
+  world.events.on<DamageEvent>(CombatEvent.Damage, (ev) => {
+    damageNumbers.spawn(ev.x, ev.y + 1.2, ev.z, ev.amount, ev.isCrit);
+    if (world.get<Enemy>(ev.target, C.Enemy)) {
+      enemyView.onHit(ev.target);
+      if (ev.isCrit) sfx.crit();
+      else sfx.hit();
+    } else {
+      sfx.hurt();
+    }
+  });
+  world.events.on<LevelUpEvent>(CombatEvent.LevelUp, (ev) => {
+    hud.toast(`Level ${ev.level}!`, 'good');
+    sfx.levelUp();
+    autosave();
+  });
+  world.events.on<LootPickedEvent>(CombatEvent.LootPicked, (ev) => {
+    hud.toast(`Looted ${ev.item.name}`, ev.item.rarity === 'uncommon' ? 'rare' : 'info');
+    sfx.loot();
+    autosave();
+  });
+  world.events.on<PlayerDiedEvent>(CombatEvent.PlayerDied, () => {
+    hud.toast('You were defeated — respawning…');
+    sfx.hurt();
+  });
+
+  // Persistence: load the saved run, then autosave on key events + a timer + unload.
+  let saving = false;
+  function autosave(): void {
+    if (saving) return;
+    saving = true;
+    void writeSave(serialize(world, player)).finally(() => {
+      saving = false;
+    });
+  }
+  void loadSave()
+    .then((data) => {
+      if (data) applySave(world, player, data);
+    })
+    .catch(() => {});
+  const saveTimer = window.setInterval(autosave, 30_000);
+  const onHide = (): void => autosave();
+  const onVisibility = (): void => {
+    if (document.visibilityState === 'hidden') autosave();
+  };
+  window.addEventListener('beforeunload', onHide);
+  document.addEventListener('visibilitychange', onVisibility);
+
   let paused = false;
   let lastRender = performance.now();
 
@@ -201,7 +202,10 @@ export function boot(): Game {
       const rdt = Math.min(0.1, (now - lastRender) / 1000);
       lastRender = now;
 
-      // Left-click select: raycast against living dummy meshes.
+      // Toggle the inventory/character panel.
+      if (input.consumeToggleInventory() || input.consumeToggleCharacter()) invPanel.toggle();
+
+      // Left-click select.
       const click = input.consumeClick();
       if (click) {
         pointer.set(click.ndcX, click.ndcY);
@@ -209,13 +213,14 @@ export function boot(): Game {
         const hits = raycaster.intersectObjects(enemyView.pickables(), false);
         if (hits.length > 0) {
           const ent = hits[0].object.userData.entity as number | undefined;
-          if (ent != null) {
+          if (ent != null && world.has(ent)) {
             const h = world.get<Health>(ent, C.Health);
             if (h && h.current > 0) playerTarget.entity = ent;
           }
         }
       }
 
+      const t = playerTransform;
       const x = lerp(t.prevX, t.x, alpha);
       const y = lerp(t.prevY, t.y, alpha);
       const z = lerp(t.prevZ, t.z, alpha);
@@ -223,26 +228,37 @@ export function boot(): Game {
       playerView.update(x, y, z, yaw);
       cameraRig.update(x, y, z);
 
-      enemyView.setTarget(playerTarget.entity);
-      enemyView.update(renderer.camera, rdt);
+      enemyView.update(world, renderer.camera, alpha, rdt, playerTarget.entity);
+      lootView.update(world);
 
+      // Target frame (with con colour).
       const te = playerTarget.entity;
       if (te != null && world.has(te)) {
         const info = world.get<EnemyInfo>(te, C.EnemyInfo);
         const h = world.get<Health>(te, C.Health);
-        if (info && h) targetFrame.set(info.name, info.level, h.current, h.max);
-        else targetFrame.clear();
+        const prog = world.get<Progression>(player, C.Progression);
+        if (info && h && prog) {
+          targetFrame.set(info.name, info.level, h.current, h.max, conColor(prog.level, info.level));
+        } else {
+          targetFrame.clear();
+        }
       } else {
         targetFrame.clear();
       }
+
+      hud.update(world, player);
+      invPanel.update(world, player);
 
       renderer.render();
       damageNumbers.update(renderer.camera, window.innerWidth, window.innerHeight);
     },
     onFrame: (frameMs, steps) => {
       const state = paused ? GameState.Paused : GameState.Playing;
-      const tgt = playerTarget.entity != null ? `→${playerTarget.entity}` : '—';
-      const extra = `pos ${t.x.toFixed(1)}, ${t.z.toFixed(1)}   target ${tgt}   [${state}]`;
+      const prog = world.get<Progression>(player, C.Progression)!;
+      const h = world.get<Health>(player, C.Health)!;
+      const extra =
+        `Lv ${prog.level}  HP ${Math.ceil(h.current)}/${h.max}  ` +
+        `pos ${playerTransform.x.toFixed(0)},${playerTransform.z.toFixed(0)}   [${state}]`;
       overlay.update(frameMs, renderer.drawCalls, world.entityCount, steps, extra);
     },
   });
@@ -252,17 +268,30 @@ export function boot(): Game {
     world,
     renderer,
     loop,
-    player: () => ({ x: t.x, y: t.y, z: t.z, yaw: t.yaw }),
+    player: () => ({ x: playerTransform.x, y: playerTransform.y, z: playerTransform.z, yaw: playerTransform.yaw }),
     target: () => playerTarget.entity,
-    enemies: () =>
-      dummyIds.map((id) => {
-        const h = world.get<Health>(id, C.Health)!;
-        const info = world.get<EnemyInfo>(id, C.EnemyInfo)!;
-        return { id, name: info.name, hp: h.current, max: h.max };
-      }),
+    enemies: () => {
+      const out: EnemySnapshot[] = [];
+      for (const e of world.query(C.Enemy, C.Health, C.EnemyInfo)) {
+        const h = world.get<Health>(e, C.Health)!;
+        const info = world.get<EnemyInfo>(e, C.EnemyInfo)!;
+        const en = world.get<Enemy>(e, C.Enemy)!;
+        out.push({ id: e, name: info.name, hp: h.current, max: h.max, state: en.state });
+      }
+      return out;
+    },
+    level: () => world.get<Progression>(player, C.Progression)!.level,
+    xp: () => world.get<Progression>(player, C.Progression)!.xp,
+    gold: () => world.get<Inventory>(player, C.Inventory)!.gold,
+    bagCount: () => world.get<Inventory>(player, C.Inventory)!.items.length,
+    debugAddXp: (n) => grantXp(world, player, n),
+    save: () => writeSave(serialize(world, player)),
     stop: () => {
       loop.stop();
       input.dispose();
+      window.clearInterval(saveTimer);
+      window.removeEventListener('beforeunload', onHide);
+      document.removeEventListener('visibilitychange', onVisibility);
     },
   };
 

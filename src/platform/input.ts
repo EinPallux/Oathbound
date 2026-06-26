@@ -27,6 +27,12 @@ export interface ControlState {
   consumeClearTarget(): boolean;
   /** Returns a queued left-click in normalized device coords [-1, 1], or null. */
   consumeClick(): { ndcX: number; ndcY: number } | null;
+  /** Returns true once if the interact key (F) was pressed since the last call. */
+  consumeInteract(): boolean;
+  /** Returns true once if the inventory toggle (I) was pressed. */
+  consumeToggleInventory(): boolean;
+  /** Returns true once if the character toggle (C) was pressed. */
+  consumeToggleCharacter(): boolean;
 }
 
 export class InputController implements ControlState {
@@ -45,6 +51,9 @@ export class InputController implements ControlState {
   private cycleQueued = false;
   private clearQueued = false;
   private clickQueued: { ndcX: number; ndcY: number } | null = null;
+  private interactQueued = false;
+  private toggleInvQueued = false;
+  private toggleCharQueued = false;
   private dragging = false;
   private readonly lookSensitivity = 0.0035;
 
@@ -127,6 +136,23 @@ export class InputController implements ControlState {
       case 'Numpad2':
         if (down) this.abilityQueued = 1;
         break;
+      case 'Digit3':
+      case 'Numpad3':
+        if (down) this.abilityQueued = 2;
+        break;
+      case 'Digit4':
+      case 'Numpad4':
+        if (down) this.abilityQueued = 3;
+        break;
+      case 'KeyF':
+        if (down) this.interactQueued = true;
+        break;
+      case 'KeyI':
+        if (down) this.toggleInvQueued = true;
+        break;
+      case 'KeyC':
+        if (down) this.toggleCharQueued = true;
+        break;
       case 'Tab':
         if (down) this.cycleQueued = true;
         e.preventDefault(); // keep keyboard focus on the game
@@ -173,6 +199,24 @@ export class InputController implements ControlState {
     const c = this.clickQueued;
     this.clickQueued = null;
     return c;
+  }
+
+  consumeInteract(): boolean {
+    const v = this.interactQueued;
+    this.interactQueued = false;
+    return v;
+  }
+
+  consumeToggleInventory(): boolean {
+    const v = this.toggleInvQueued;
+    this.toggleInvQueued = false;
+    return v;
+  }
+
+  consumeToggleCharacter(): boolean {
+    const v = this.toggleCharQueued;
+    this.toggleCharQueued = false;
+    return v;
   }
 
   dispose(): void {

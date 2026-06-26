@@ -1,8 +1,11 @@
-// Visuals for enemies (target dummies): a capsule body, a billboarded HP bar, a hit
-// flash on damage, and a spinning reticle ring under the current target. Reads sim
-// state only; positions come from the (static) dummy transforms.
+// Visuals for enemies, driven from sim state each frame: an interpolated capsule
+// body, a billboarded HP bar, a hit flash, a telegraph tint during a wind-up, and a
+// spinning reticle ring under the current target. Reads the world; never mutates it.
 
 import * as THREE from 'three';
+import type { World, Entity } from '../core/ecs/world';
+import { C, type Transform, type Health, type Enemy } from '../core/ecs/components';
+import { lerp, lerpAngle } from '../core/math';
 
 interface EnemyVisual {
   body: THREE.Mesh;
@@ -10,18 +13,18 @@ interface EnemyVisual {
   bar: THREE.Group;
   fill: THREE.Mesh;
   barWidth: number;
-  height: number;
-  baseY: number;
+  half: number;
   flash: number;
 }
 
-const BODY_COLOR = 0xc06a4a;
-const FLASH_COLOR = new THREE.Color(0xff4030);
+const BODY_COLOR = 0x9c6b4a;
+const HALF = 0.9;
+const FLASH = new THREE.Color(0xff4030);
+const TELEGRAPH = new THREE.Color(0xffa030);
 
 export class EnemyView {
-  private readonly visuals = new Map<number, EnemyVisual>();
+  private readonly visuals = new Map<Entity, EnemyVisual>();
   private readonly reticle: THREE.Mesh;
-  private targetEntity: number | null = null;
 
   constructor(private readonly scene: THREE.Scene) {
     this.reticle = new THREE.Mesh(
@@ -34,17 +37,17 @@ export class EnemyView {
         depthWrite: false,
       }),
     );
-    this.reticle.rotation.x = -Math.PI / 2; // lie flat on the ground
+    this.reticle.rotation.x = -Math.PI / 2;
     this.reticle.visible = false;
     this.scene.add(this.reticle);
   }
 
-  /** Create the visual for a dummy. `y` is the capsule centre; `half` its half-height. */
-  add(entity: number, x: number, y: number, z: number, half: number): void {
+  private ensure(e: Entity): EnemyVisual {
+    let v = this.visuals.get(e);
+    if (v) return v;
     const material = new THREE.MeshStandardMaterial({ color: BODY_COLOR, roughness: 0.7 });
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, half * 2 - 0.9, 6, 12), material);
-    body.position.set(x, y, z);
-    body.userData.entity = entity;
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, HALF * 2 - 0.9, 6, 12), material);
+    body.userData.entity = e;
     this.scene.add(body);
 
     const barWidth = 1.3;
@@ -59,76 +62,85 @@ export class EnemyView {
     );
     fill.position.z = 0.001;
     bar.add(back, fill);
-    bar.position.set(x, y + half + 0.5, z);
     this.scene.add(bar);
 
-    this.visuals.set(entity, {
-      body,
-      material,
-      bar,
-      fill,
-      barWidth,
-      height: half,
-      baseY: y - half,
-      flash: 0,
-    });
+    v = { body, material, bar, fill, barWidth, half: HALF, flash: 0 };
+    this.visuals.set(e, v);
+    return v;
   }
 
-  /** Update the HP fill (ratio in [0, 1]); the bar shrinks from the right. */
-  setHealthRatio(entity: number, ratio: number): void {
-    const v = this.visuals.get(entity);
-    if (!v) return;
-    const r = THREE.MathUtils.clamp(ratio, 0, 1);
-    v.fill.scale.x = Math.max(1e-3, r);
-    v.fill.position.x = -(v.barWidth * (1 - r)) / 2;
-    (v.fill.material as THREE.MeshBasicMaterial).color.setRGB(
-      r > 0.5 ? 1 - (r - 0.5) * 1.2 : 1,
-      r > 0.5 ? 0.87 : 0.2 + r * 1.3,
-      0.2,
-    );
-  }
-
-  /** Trigger a hit flash on the body. */
-  onHit(entity: number): void {
-    const v = this.visuals.get(entity);
+  /** Trigger a hit flash. */
+  onHit(e: Entity): void {
+    const v = this.visuals.get(e);
     if (v) v.flash = 1;
   }
 
-  /** Show/hide a dummy (death/respawn). */
-  setDead(entity: number, dead: boolean): void {
-    const v = this.visuals.get(entity);
-    if (!v) return;
-    v.body.visible = !dead;
-    v.bar.visible = !dead;
-    if (dead && this.targetEntity === entity) this.reticle.visible = false;
-  }
-
-  setTarget(entity: number | null): void {
-    this.targetEntity = entity;
-  }
-
-  /** Meshes eligible for click-selection (alive dummies). */
   pickables(): THREE.Object3D[] {
     const out: THREE.Object3D[] = [];
     for (const v of this.visuals.values()) if (v.body.visible) out.push(v.body);
     return out;
   }
 
-  update(camera: THREE.Camera, dt: number): void {
-    for (const v of this.visuals.values()) {
-      // Billboard the HP bar.
+  update(world: World, camera: THREE.Camera, alpha: number, dt: number, target: Entity | null): void {
+    const seen = new Set<Entity>();
+
+    for (const e of world.query(C.Enemy, C.Transform, C.Health)) {
+      seen.add(e);
+      const v = this.ensure(e);
+      const en = world.get<Enemy>(e, C.Enemy)!;
+      const tr = world.get<Transform>(e, C.Transform)!;
+      const h = world.get<Health>(e, C.Health)!;
+
+      const dead = h.current <= 0;
+      v.body.visible = !dead;
+      v.bar.visible = !dead;
+      if (dead) continue;
+
+      const x = lerp(tr.prevX, tr.x, alpha);
+      const y = lerp(tr.prevY, tr.y, alpha);
+      const z = lerp(tr.prevZ, tr.z, alpha);
+      v.body.position.set(x, y, z);
+      v.body.rotation.y = lerpAngle(tr.prevYaw, tr.yaw, alpha);
+
+      const ratio = THREE.MathUtils.clamp(h.current / h.max, 0, 1);
+      v.fill.scale.x = Math.max(1e-3, ratio);
+      v.fill.position.x = -(v.barWidth * (1 - ratio)) / 2;
+      (v.fill.material as THREE.MeshBasicMaterial).color.setRGB(
+        ratio > 0.5 ? 1 - (ratio - 0.5) * 1.2 : 1,
+        ratio > 0.5 ? 0.87 : 0.2 + ratio * 1.3,
+        0.2,
+      );
+      v.bar.position.set(x, y + v.half + 0.5, z);
       v.bar.quaternion.copy(camera.quaternion);
-      // Decay the hit flash.
-      if (v.flash > 0) {
+
+      // Telegraph tint while winding up; otherwise decay the hit flash.
+      if (en.windupTimer >= 0) {
+        const pulse = 0.4 + 0.4 * Math.sin(performance.now() * 0.02);
+        v.material.emissive.copy(TELEGRAPH).multiplyScalar(pulse);
+      } else if (v.flash > 0) {
         v.flash = Math.max(0, v.flash - dt * 4);
-        v.material.emissive.copy(FLASH_COLOR).multiplyScalar(v.flash);
+        v.material.emissive.copy(FLASH).multiplyScalar(v.flash);
+      } else {
+        v.material.emissive.setRGB(0, 0, 0);
       }
     }
 
-    const t = this.targetEntity != null ? this.visuals.get(this.targetEntity) : undefined;
-    if (t && t.body.visible) {
+    // Dispose visuals for entities that vanished.
+    for (const [e, v] of this.visuals) {
+      if (seen.has(e)) continue;
+      this.scene.remove(v.body, v.bar);
+      this.visuals.delete(e);
+    }
+
+    // Reticle on the current target.
+    const tv = target != null ? this.visuals.get(target) : undefined;
+    if (tv && tv.body.visible) {
       this.reticle.visible = true;
-      this.reticle.position.set(t.body.position.x, t.baseY + 0.05, t.body.position.z);
+      this.reticle.position.set(
+        tv.body.position.x,
+        tv.body.position.y - tv.half + 0.05,
+        tv.body.position.z,
+      );
       this.reticle.rotation.z += dt * 1.5;
     } else {
       this.reticle.visible = false;

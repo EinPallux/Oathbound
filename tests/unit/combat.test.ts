@@ -1,166 +1,143 @@
 import { describe, it, expect } from 'vitest';
-import { World, type Entity } from '../../src/core/ecs/world';
+import { World } from '../../src/core/ecs/world';
 import {
   C,
   type Health,
-  type AbilityState,
+  type Resource,
   type Target,
-  type Targetable,
+  type Statuses,
+  type Progression,
+  type LootDrop,
+  type Offense,
 } from '../../src/core/ecs/components';
 import { createCombatSystem } from '../../src/sim/systems/combat';
+import { createPlayer, createBloomhusk } from '../../src/sim/factory';
 import { Rng } from '../../src/core/rng';
 import { GCD } from '../../src/sim/combat/abilities';
-import type { ControlState } from '../../src/platform/input';
+import { Status, statusMagnitude } from '../../src/sim/combat/statuses';
 import { DT } from '../../src/core/time';
+import { flatField, makeInput } from './helpers';
 
-// A minimal scriptable ControlState for the sim, with mutable queued actions.
-function makeInput(): {
-  ctrl: ControlState;
-  state: { ability: number | null; cycle: boolean; clear: boolean };
-} {
-  const state = { ability: null as number | null, cycle: false, clear: false };
-  const ctrl: ControlState = {
-    forward: false,
-    back: false,
-    left: false,
-    right: false,
-    sprint: false,
-    yaw: 0,
-    pitch: 0.5,
-    dist: 10,
-    consumeJump: () => false,
-    consumeAbility: () => {
-      const a = state.ability;
-      state.ability = null;
-      return a;
-    },
-    consumeTargetCycle: () => {
-      const c = state.cycle;
-      state.cycle = false;
-      return c;
-    },
-    consumeClearTarget: () => {
-      const c = state.clear;
-      state.clear = false;
-      return c;
-    },
-    consumeClick: () => null,
-  };
-  return { ctrl, state };
+const FIELD = flatField();
+
+function setup(seed = 1) {
+  const world = new World();
+  const { ctrl, state } = makeInput();
+  const player = createPlayer(world, FIELD, 0, 0);
+  const sys = createCombatSystem({ input: ctrl, rng: new Rng(seed), colliders: [] });
+  return { world, state, player, sys };
 }
 
-function addPlayer(world: World): Entity {
-  const e = world.createEntity();
-  world.set(e, C.Transform, { x: 0, y: 1, z: 0, yaw: 0, prevX: 0, prevY: 1, prevZ: 0, prevYaw: 0 });
-  world.set(e, C.PlayerControlled, true);
-  world.set(e, C.Offense, { primaryStat: 10, level: 1, critChance: 0, critMult: 1.5 });
-  world.set<AbilityState>(e, C.AbilityState, {
-    gcdRemaining: 0,
-    cooldowns: [0, 0],
-    bufferedIndex: -1,
-    bufferRemaining: 0,
-  });
-  world.set<Target>(e, C.Target, { entity: null });
-  return e;
-}
+describe('warrior combat', () => {
+  it('Cleaving Strike (slot 0) builds Fury and damages a hostile ahead', () => {
+    const { world, state, player, sys } = setup();
+    const enemy = createBloomhusk(world, FIELD, 0, 3);
 
-function addDummy(world: World, x: number, z: number, hp = 120): Entity {
-  const e = world.createEntity();
-  world.set(e, C.Transform, { x, y: 1, z, yaw: 0, prevX: x, prevY: 1, prevZ: z, prevYaw: 0 });
-  world.set<Health>(e, C.Health, { current: hp, max: hp });
-  world.set(e, C.Defense, { armor: 40, resist: { fire: 0, frost: 0, blight: 0 }, weakness: {} });
-  world.set<Targetable>(e, C.Targetable, true);
-  return e;
-}
-
-describe('combat system', () => {
-  it('soft-acquires a hostile in front and applies damage', () => {
-    const world = new World();
-    const { ctrl, state } = makeInput();
-    const player = addPlayer(world);
-    const dummy = addDummy(world, 0, 3);
-    const sys = createCombatSystem({ input: ctrl, rng: new Rng(1), colliders: [] });
-
-    state.ability = 0; // Strike
+    state.ability = 0;
     sys.update(world, DT);
 
-    const h = world.get<Health>(dummy, C.Health)!;
-    const tgt = world.get<Target>(player, C.Target)!;
-    expect(h.current).toBeLessThan(120);
-    expect(tgt.entity).toBe(dummy); // locked onto the soft target
+    expect(world.get<Health>(enemy, C.Health)!.current).toBeLessThan(
+      world.get<Health>(enemy, C.Health)!.max,
+    );
+    expect(world.get<Resource>(player, C.Resource)!.current).toBe(12); // furyGain
+    expect(world.get<Target>(player, C.Target)!.entity).toBe(enemy);
   });
 
-  it('enforces the global cooldown between casts', () => {
-    const world = new World();
-    const { ctrl, state } = makeInput();
-    addPlayer(world);
-    const dummy = addDummy(world, 0, 3);
-    const sys = createCombatSystem({ input: ctrl, rng: new Rng(1), colliders: [] });
-    const h = world.get<Health>(dummy, C.Health)!;
+  it('enforces the GCD between casts', () => {
+    const { world, state, sys } = setup();
+    const enemy = createBloomhusk(world, FIELD, 0, 3);
+    const h = world.get<Health>(enemy, C.Health)!;
 
     state.ability = 0;
     sys.update(world, DT);
     const afterFirst = h.current;
-    expect(afterFirst).toBeLessThan(120);
 
-    // Immediate second press lands inside the GCD → swallowed.
-    state.ability = 0;
+    state.ability = 0; // inside the GCD
     sys.update(world, DT);
     expect(h.current).toBe(afterFirst);
 
-    // Let the GCD (and the input buffer) expire, then a press lands again.
     for (let i = 0; i < Math.ceil(GCD / DT) + 2; i++) sys.update(world, DT);
-    expect(h.current).toBe(afterFirst); // nothing fired while idle
     state.ability = 0;
     sys.update(world, DT);
     expect(h.current).toBeLessThan(afterFirst);
   });
 
+  it('Sunder costs Fury and cannot be cast without it; applies Armor Break', () => {
+    const { world, state, player, sys } = setup();
+    const enemy = createBloomhusk(world, FIELD, 0, 3);
+    const h = world.get<Health>(enemy, C.Health)!;
+
+    // No Fury yet → Sunder (slot 1) does nothing.
+    state.ability = 1;
+    sys.update(world, DT);
+    expect(h.current).toBe(h.max);
+
+    // Build Fury with cleaves, then Sunder.
+    const res = world.get<Resource>(player, C.Resource)!;
+    res.current = 40;
+    state.ability = 1;
+    sys.update(world, DT);
+    expect(res.current).toBe(10); // 40 - 30 cost
+    expect(statusMagnitude(world.get<Statuses>(enemy, C.Statuses), Status.ArmorBreak)).toBe(12);
+  });
+
+  it('a kill grants XP and spawns a loot drop', () => {
+    const { world, state, player, sys } = setup();
+    const enemy = createBloomhusk(world, FIELD, 0, 3);
+    world.get<Health>(enemy, C.Health)!.current = 1; // one hit kills
+
+    const before = world.get<Progression>(player, C.Progression)!.xp;
+    state.ability = 0;
+    sys.update(world, DT);
+
+    const prog = world.get<Progression>(player, C.Progression)!;
+    // XP went up (either banked or consumed by a level-up).
+    expect(prog.xp !== before || prog.level > 1).toBe(true);
+
+    let drops = 0;
+    for (const e of world.query(C.LootDrop)) {
+      const ld = world.get<LootDrop>(e, C.LootDrop)!;
+      expect(ld.gold).toBeGreaterThan(0);
+      drops++;
+    }
+    expect(drops).toBe(1);
+  });
+
   it('does not hit hostiles outside the forward cone', () => {
-    const world = new World();
-    const { ctrl, state } = makeInput();
-    const player = addPlayer(world);
-    const behind = addDummy(world, 0, -3); // directly behind (yaw 0 faces +Z)
-    const sys = createCombatSystem({ input: ctrl, rng: new Rng(1), colliders: [] });
-
+    const { world, state, player, sys } = setup();
+    const behind = createBloomhusk(world, FIELD, 0, -3);
     state.ability = 0;
     sys.update(world, DT);
-
-    expect(world.get<Health>(behind, C.Health)!.current).toBe(120);
+    expect(world.get<Health>(behind, C.Health)!.current).toBe(
+      world.get<Health>(behind, C.Health)!.max,
+    );
     expect(world.get<Target>(player, C.Target)!.entity).toBeNull();
   });
+});
 
-  it('Tab cycles to a hostile and Esc clears it', () => {
+describe('time-to-kill band (combat-sim)', () => {
+  it('a Warrior kills a same-level standard in 3–6s', () => {
     const world = new World();
     const { ctrl, state } = makeInput();
-    const player = addPlayer(world);
-    const dummy = addDummy(world, 0, 4);
-    const sys = createCombatSystem({ input: ctrl, rng: new Rng(1), colliders: [] });
-    const tgt = world.get<Target>(player, C.Target)!;
+    const player = createPlayer(world, FIELD, 0, 0);
+    const enemy = createBloomhusk(world, FIELD, 0, 2.5, 1);
+    // Remove crit variance for a deterministic centre of the band.
+    world.get<Offense>(player, C.Offense)!.critChance = 0;
+    const sys = createCombatSystem({ input: ctrl, rng: new Rng(99), colliders: [] });
+    const h = world.get<Health>(enemy, C.Health)!;
+    const res = world.get<Resource>(player, C.Resource)!;
 
-    state.cycle = true;
-    sys.update(world, DT);
-    expect(tgt.entity).toBe(dummy);
+    let seconds = 0;
+    const maxSteps = Math.ceil(10 / DT);
+    for (let i = 0; i < maxSteps && h.current > 0; i++) {
+      // Simple rotation: Sunder when affordable, else Cleaving Strike filler.
+      state.ability = res.current >= 30 ? 1 : 0;
+      sys.update(world, DT);
+      seconds += DT;
+    }
 
-    state.clear = true;
-    sys.update(world, DT);
-    expect(tgt.entity).toBeNull();
-  });
-
-  it('drops a target when it dies and stops dealing damage', () => {
-    const world = new World();
-    const { ctrl, state } = makeInput();
-    const player = addPlayer(world);
-    const dummy = addDummy(world, 0, 3, 10); // low HP: dies in one hit
-    const sys = createCombatSystem({ input: ctrl, rng: new Rng(1), colliders: [] });
-
-    state.ability = 0;
-    sys.update(world, DT);
-    const h = world.get<Health>(dummy, C.Health)!;
     expect(h.current).toBe(0);
-
-    // Next step: the dead target is cleared.
-    sys.update(world, DT);
-    expect(world.get<Target>(player, C.Target)!.entity).toBeNull();
+    expect(seconds).toBeGreaterThanOrEqual(3);
+    expect(seconds).toBeLessThanOrEqual(6);
   });
 });

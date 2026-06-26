@@ -1,39 +1,50 @@
-// Player combat: ticks the GCD/cooldowns, resolves soft tab-targeting, buffers the
-// next ability press, and applies the canonical damage formula to the target. Pure
-// simulation (no Three.js/DOM); emits combat events for rendering/UI to consume.
-// See docs/design/COMBAT_DESIGN.md.
+// Player combat: ticks GCD/cooldowns/statuses, resolves soft tab-targeting, buffers
+// input, spends/builds Fury, and executes the Warrior kit (single-target, cleave,
+// self-AoE, self-buff) via the shared damage applier. Grants XP + spawns loot on a
+// kill. Pure simulation (no Three.js/DOM).
 
 import type { System, World, Entity } from '../../core/ecs/world';
 import {
   C,
   type Transform,
   type Offense,
-  type Defense,
   type Health,
   type AbilityState,
   type Target,
+  type Resource,
+  type Statuses,
+  type CombatState,
+  type Enemy,
+  type EnemyInfo,
+  type Progression,
+  type LootDrop,
 } from '../../core/ecs/components';
 import type { ControlState } from '../../platform/input';
 import type { CylinderCollider } from '../../world/heightfield';
 import type { Rng } from '../../core/rng';
+import { clamp } from '../../core/math';
 import {
   ABILITIES,
-  GCD,
   INPUT_BUFFER,
   TARGET_CONE_DEG,
   TAB_RANGE,
+  effectiveGcd,
+  type AbilityDef,
 } from '../combat/abilities';
-import { computeDamage, rollDamage } from '../combat/damage';
 import {
   hostilesInCone,
   cycleTarget,
   segmentBlockedByCylinders,
   type Candidate,
 } from '../combat/targeting';
-import { CombatEvent, type DamageEvent, type DeathEvent } from '../combat/events';
+import { applyDamage } from '../combat/apply';
+import { addStatus, tickStatuses } from '../combat/statuses';
+import { CombatEvent, type DeathEvent, type LootDroppedEvent } from '../combat/events';
+import { grantXp } from '../progression';
+import { conXpMultiplier } from '../stats';
+import { rollLoot } from '../loot/droptable';
 
 const CONE_HALF = ((TARGET_CONE_DEG / 2) * Math.PI) / 180;
-/** LoS shrink so grazing a rock's edge doesn't block a shot. */
 const LOS_PAD = 0.25;
 
 export interface CombatDeps {
@@ -48,11 +59,15 @@ export function createCombatSystem(deps: CombatDeps): System {
   return {
     name: 'combat',
     update(world: World, dt: number): void {
-      // Gather all live, targetable hostiles once per step.
+      // Advance every entity's statuses once per step.
+      for (const e of world.query(C.Statuses)) {
+        tickStatuses(world.get<Statuses>(e, C.Statuses)!, dt);
+      }
+
+      // Live, targetable hostiles.
       const candidates: Candidate[] = [];
       for (const e of world.query(C.Targetable, C.Transform, C.Health)) {
-        const h = world.get<Health>(e, C.Health)!;
-        if (h.current <= 0) continue;
+        if (world.get<Health>(e, C.Health)!.current <= 0) continue;
         const tr = world.get<Transform>(e, C.Transform)!;
         candidates.push({ entity: e, x: tr.x, z: tr.z });
       }
@@ -63,13 +78,15 @@ export function createCombatSystem(deps: CombatDeps): System {
         C.Offense,
         C.AbilityState,
         C.Target,
+        C.Resource,
       )) {
         const t = world.get<Transform>(e, C.Transform)!;
         const off = world.get<Offense>(e, C.Offense)!;
         const ab = world.get<AbilityState>(e, C.AbilityState)!;
         const tgt = world.get<Target>(e, C.Target)!;
+        const res = world.get<Resource>(e, C.Resource)!;
 
-        // 1) Advance timers.
+        // Timers.
         ab.gcdRemaining = Math.max(0, ab.gcdRemaining - dt);
         for (let i = 0; i < ab.cooldowns.length; i++) {
           ab.cooldowns[i] = Math.max(0, ab.cooldowns[i] - dt);
@@ -79,10 +96,9 @@ export function createCombatSystem(deps: CombatDeps): System {
           if (ab.bufferRemaining <= 0) ab.bufferedIndex = -1;
         }
 
-        // 2) Drop an invalid locked target (gone or dead).
         if (tgt.entity != null && !isAlive(world, tgt.entity)) tgt.entity = null;
 
-        // 3) Targeting input.
+        // Targeting input.
         if (input.consumeTargetCycle()) {
           const inCone = hostilesInCone(
             t.x,
@@ -96,58 +112,81 @@ export function createCombatSystem(deps: CombatDeps): System {
         }
         if (input.consumeClearTarget()) tgt.entity = null;
 
-        // 4) Buffer an ability press.
+        // Buffer an ability press.
         const req = input.consumeAbility();
         if (req != null && req >= 0 && req < ABILITIES.length) {
           ab.bufferedIndex = req;
           ab.bufferRemaining = INPUT_BUFFER;
         }
 
-        // 5) Try to fire the buffered ability.
+        // Attempt to fire.
         if (ab.bufferedIndex < 0) continue;
         const def = ABILITIES[ab.bufferedIndex];
-        if (ab.gcdRemaining > 0 || ab.cooldowns[ab.bufferedIndex] > 0) continue;
+        if (def.triggersGcd && ab.gcdRemaining > 0) continue;
+        if (ab.cooldowns[ab.bufferedIndex] > 0) continue;
+        if (res.current < def.cost) continue;
 
-        // Resolve a victim: the locked target if usable, else soft-acquire.
-        let victim: Entity | null = null;
-        if (tgt.entity != null && usable(world, tgt.entity, t.x, t.z, def.range, colliders)) {
-          victim = tgt.entity;
-        } else {
-          victim = softAcquire(world, t.x, t.z, input.yaw, def.range, colliders, candidates);
-          if (victim != null) tgt.entity = victim; // lock onto the soft target
-        }
-        if (victim == null) continue; // keep the buffer; nothing to hit yet
-
-        // 6) Apply the canonical formula.
-        const tr = world.get<Transform>(victim, C.Transform)!;
-        const dfn = world.get<Defense>(victim, C.Defense)!;
-        const h = world.get<Health>(victim, C.Health)!;
-        const roll = rollDamage(rng, off.critChance);
-        const res = computeDamage(def, off, dfn, roll);
-        h.current = Math.max(0, h.current - res.amount);
-
-        // Face the target on attack.
-        t.yaw = Math.atan2(tr.x - t.x, tr.z - t.z);
-
-        world.events.emit<DamageEvent>(CombatEvent.Damage, {
-          source: e,
-          target: victim,
-          amount: res.amount,
-          isCrit: res.isCrit,
-          damageType: def.damageType,
-          abilityId: def.id,
-          x: tr.x,
-          y: tr.y,
-          z: tr.z,
-        });
-        if (h.current <= 0) {
-          world.events.emit<DeathEvent>(CombatEvent.Death, { entity: victim });
+        // Resolve what gets hit.
+        let primary: Entity | null = null;
+        const hitList: Entity[] = [];
+        if (def.targeting === 'selfAoE') {
+          for (const c of candidates) {
+            if (Math.hypot(c.x - t.x, c.z - t.z) <= def.radius) hitList.push(c.entity);
+          }
+          if (hitList.length === 0) continue; // don't waste it on empty air
+          primary = hitList[0];
+        } else if (def.targeting !== 'self') {
+          primary = resolvePrimary(world, t, input.yaw, def, tgt, colliders, candidates);
+          if (primary == null) continue;
+          hitList.push(primary);
+          if (def.targeting === 'frontalSplash') {
+            const ptr = world.get<Transform>(primary, C.Transform)!;
+            for (const c of candidates) {
+              if (c.entity !== primary && Math.hypot(c.x - ptr.x, c.z - ptr.z) <= def.radius) {
+                hitList.push(c.entity);
+              }
+            }
+          }
+          tgt.entity = primary;
         }
 
-        // 7) Pay the costs.
-        if (def.triggersGcd) ab.gcdRemaining = GCD;
+        // Pay costs + set timers.
+        res.current = clamp(res.current - def.cost + def.furyGain, 0, res.max);
+        if (def.triggersGcd) ab.gcdRemaining = effectiveGcd(off.haste);
         ab.cooldowns[ab.bufferedIndex] = def.cooldown;
         ab.bufferedIndex = -1;
+        markCombat(world, e);
+
+        // Self buff (Bulwark).
+        if (def.selfBuff) {
+          const ss = world.get<Statuses>(e, C.Statuses);
+          if (ss) addStatus(ss, def.selfBuff.id, def.selfBuff.durationSec, def.selfBuff.magnitude);
+        }
+
+        // Face the primary target.
+        if (primary != null) {
+          const ptr = world.get<Transform>(primary, C.Transform)!;
+          t.yaw = Math.atan2(ptr.x - t.x, ptr.z - t.z);
+        }
+
+        // Damage.
+        if (def.base > 0 || def.coeff > 0) {
+          for (const victim of hitList) {
+            const r = applyDamage(
+              world,
+              e,
+              victim,
+              { base: def.base, coeff: def.coeff, damageType: def.damageType },
+              rng,
+              off.leech,
+            );
+            if (victim === primary && def.debuff) {
+              const vs = world.get<Statuses>(victim, C.Statuses);
+              if (vs) addStatus(vs, def.debuff.id, def.debuff.durationSec, def.debuff.magnitude);
+            }
+            if (r.killed) handleKill(world, e, victim, rng);
+          }
+        }
       }
     },
   };
@@ -159,7 +198,34 @@ function isAlive(world: World, e: Entity): boolean {
   return !!h && h.current > 0;
 }
 
-/** A target is usable if it is alive, within range, and in line of sight. */
+function markCombat(world: World, e: Entity): void {
+  const cs = world.get<CombatState>(e, C.CombatState);
+  if (cs) {
+    cs.inCombat = true;
+    cs.sinceEventSec = 0;
+  }
+}
+
+function resolvePrimary(
+  world: World,
+  t: Transform,
+  yaw: number,
+  def: AbilityDef,
+  tgt: Target,
+  cols: readonly CylinderCollider[],
+  candidates: readonly Candidate[],
+): Entity | null {
+  if (tgt.entity != null && usable(world, tgt.entity, t.x, t.z, def.range, cols)) {
+    return tgt.entity;
+  }
+  const list = hostilesInCone(t.x, t.z, yaw, def.range, CONE_HALF, candidates);
+  for (const a of list) {
+    const tr = world.get<Transform>(a.entity, C.Transform)!;
+    if (!segmentBlockedByCylinders(t.x, t.z, tr.x, tr.z, cols, LOS_PAD)) return a.entity;
+  }
+  return null;
+}
+
 function usable(
   world: World,
   e: Entity,
@@ -174,20 +240,47 @@ function usable(
   return !segmentBlockedByCylinders(ox, oz, tr.x, tr.z, cols, LOS_PAD);
 }
 
-/** Nearest hostile in the forward cone, within range, with a clear line of sight. */
-function softAcquire(
-  world: World,
-  ox: number,
-  oz: number,
-  yaw: number,
-  range: number,
-  cols: readonly CylinderCollider[],
-  candidates: readonly Candidate[],
-): Entity | null {
-  const list = hostilesInCone(ox, oz, yaw, range, CONE_HALF, candidates);
-  for (const a of list) {
-    const tr = world.get<Transform>(a.entity, C.Transform)!;
-    if (!segmentBlockedByCylinders(ox, oz, tr.x, tr.z, cols, LOS_PAD)) return a.entity;
+/** XP + loot on an enemy kill, and flag the enemy dead (AI handles respawn). */
+function handleKill(world: World, killer: Entity, victim: Entity, rng: Rng): void {
+  const enemy = world.get<Enemy>(victim, C.Enemy);
+  const einfo = world.get<EnemyInfo>(victim, C.EnemyInfo);
+  const prog = world.get<Progression>(killer, C.Progression);
+  const enemyLevel = einfo?.level ?? 1;
+
+  if (enemy && prog) {
+    const xp = Math.round(enemy.xpBase * conXpMultiplier(prog.level, enemyLevel));
+    grantXp(world, killer, xp);
   }
-  return null;
+
+  const tr = world.get<Transform>(victim, C.Transform)!;
+  const tier = enemy?.tier ?? 'standard';
+  const roll = rollLoot(rng, enemyLevel, tier);
+  const gold = enemy ? enemy.goldMin + rng.int(enemy.goldMax - enemy.goldMin + 1) : roll.gold;
+
+  const drop = world.createEntity();
+  world.set<Transform>(drop, C.Transform, {
+    x: tr.x,
+    y: tr.y,
+    z: tr.z,
+    yaw: 0,
+    prevX: tr.x,
+    prevY: tr.y,
+    prevZ: tr.z,
+    prevYaw: 0,
+  });
+  world.set<LootDrop>(drop, C.LootDrop, { item: roll.item, gold, owner: killer });
+  world.events.emit<LootDroppedEvent>(CombatEvent.LootDropped, {
+    entity: drop,
+    item: roll.item,
+    gold,
+    x: tr.x,
+    y: tr.y,
+    z: tr.z,
+  });
+
+  if (enemy) {
+    enemy.state = 'dead';
+    enemy.deadFor = 0;
+  }
+  world.events.emit<DeathEvent>(CombatEvent.Death, { entity: victim, killer });
 }
