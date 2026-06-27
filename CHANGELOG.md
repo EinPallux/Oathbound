@@ -5,6 +5,33 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.5.0-INDEV — "Road to Thirty" → Complete Lv 1–30 Progression *(in progress)*
+**Goal:** the final two regions and the rest of the kit so a character can run **1 → 30** end-to-end across all six zones (→ Level 1–30 Content Gate). Large phase, built in verified checkpoints. *(Built on the CP5 branch while PR #14 is open, so this PR stacks on it.)*
+
+### ✅ Checkpoint 1 — Riven Peaks + Gravereach zones + the undead holy-weakness lever
+- **The Riven Peaks (Lv 21–25)** to the **east** — frozen mountains introducing the **frost** damage school: **Rimebound** ice-construct bruisers (tanky, fire-weak), fast **Frostfang** packs, and **Revenant** casters (holy-weak). A **frozen-battlefield elite camp** (an elite *Frost Revenant Lord* + a Rimebound guard) and the roaming rare **Hoarfang the White**.
+- **Gravereach (Lv 26–30)** to the **north** — the Hollow Crown, the journey's end: **Wraith** blight-casters, **Bonewrought** bone-construct packs, and **Forsworn Knight** pack-leaders — **all undead and holy-weak**. An **inner-court elite camp** (a *Forsworn Knight-Captain* + bone constructs) and the rare **Gravewarden Sael**.
+- **Undead holy-weakness lever**: the Riven Revenants and every Gravereach family carry a **holy vulnerability** (×1.2–1.25), so the **Priest's** holy kit bites hardest in the endgame zones (a bonus, never a gate for other classes).
+- **Frost resist** completes the typed-defence set: a new **+Frost Resist** armour affix rolls on gear, feeds `deriveStats → Defense.resist.frost`, and mitigates frost hits (matters but never fully negates) — the natural complement to the frost zone, mirroring how fire/blight resist arrived with theirs.
+- **Regions + travel**: `regionAt` now lays out **east = Riven Peaks, north = Gravereach** around the hub; each gets an **Oathstone** (Frostgate Keep, Reclaimed Gatehouse) wired into respawn + fast travel, and the Goal Tracker now guides Lv 21→26→30 and tells you which resist to pack (frost for Riven; "undead are holy-weak" for Gravereach).
+- Six new data-driven enemy families reuse the existing archetypes (bruiser / caster / pack-leader); no new systems — pure content + the frost-resist affix.
+- Tests: Riven/Gravereach region bands + labels (and no Thornwood leak); new families' damage schools (frost) + the undead holy-weakness; holy damage amplified vs a holy-weak target; frost resist derives/equips/mitigates; high-ilvl armour rolls the frost affix → **169 unit tests**; e2e green (11).
+
+**Verified:** `typecheck` ✓ · `npm test` → 169/169 ✓ · `build` ✓ (~163 KB gzip) · `test:e2e` → 11/11 ✓.
+
+### ✅ Checkpoint 2 — the Lv-30 capstone (upgrade-style; owner-chosen)
+- **Each class gets an automatic Lv-30 capstone that *empowers an existing ability*** — no new hotbar button (the hotbar stays a clean 10 slots). At level 30 the class's signature spender becomes its mastered form: **Warrior** *Whirl → "Oathbreaker's Wrath"* (×1.8 damage + wider cleave), **Hunter** *Piercing Arrow → "Rapid Fusillade"* (×1.9), **Priest** *Searing Light → "Dawnbreak"* (×1.9). A real level-30 power/identity spike without UX bloat.
+- Data-driven: a `Capstone` on each `ClassDef` + pure `empowerAbility` / `empowerKit` (`src/sim/classes.ts`). Below Lv 30 they're a **no-op (same references)**; at 30 only the target ability is replaced. **Combat** (damage) and the **HUD** (name) both consume the empowered kit, and dinging **30 toasts the capstone unlock**.
+- Docs: `CLASS_DESIGN.md` gets an as-built note (the capstone is an upgrade, not an 11th button; the planned third choice node folded into it).
+- Tests: capstone targets a real kit ability; below-30 no-op (reference identity); at-30 rename + stronger base/coeff/radius; non-target abilities untouched; the empowered ability deals **more damage through the real formula**; Hunter/Priest spenders empowered → **175 unit tests**; e2e green (11).
+
+**Verified:** `typecheck` ✓ · `npm test` → 175/175 ✓ · `build` ✓ (~163 KB gzip) · `test:e2e` → 11/11 ✓.
+
+### ⏳ Remaining for the Lv 1–30 journey (final checkpoint)
+- **CP3:** a full **1 → 30 validation** pass (pacing / no blockers across all six zones, all three classes) → the **Level 1–30 Content Gate**.
+
+---
+
 ## 0.4.0-INDEV — "Fen & Ember" → Expanded Brackets (Lv 11–20) *(feature-complete — awaiting playtest)*
 **Goal:** mid-game depth — Lv 11–20 across **Sunken Fen** + **Emberreach**: deeper kits (interrupt, ground-AoE, choice nodes), a live **resistance** system, new archetypes, elite camps, **Epic** rarity, Reinforcement, and bad-luck protection. Large phase, built in verified checkpoints.
 

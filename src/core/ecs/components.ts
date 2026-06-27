@@ -287,6 +287,7 @@ export type AffixId =
   | 'vit'
   | 'healing'
   | 'resistFire'
+  | 'resistFrost'
   | 'resistBlight';
 
 /** A temporary absorb pool that soaks damage before HP (Priest Aegis). */

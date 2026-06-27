@@ -33,4 +33,21 @@ describe('regions', () => {
     expect(r.minLevel).toBe(16);
     expect(r.maxLevel).toBe(20);
   });
+
+  it('places the eastern peaks in the Riven Peaks (Lv 21–25)', () => {
+    const r = regionAt(30, 0);
+    expect(r.id).toBe('riven');
+    expect(regionLabel(r)).toBe('The Riven Peaks · Lv 21–25');
+  });
+
+  it('places the northern ruins in Gravereach (Lv 26–30)', () => {
+    const r = regionAt(0, 30);
+    expect(r.id).toBe('gravereach');
+    expect(r.minLevel).toBe(26);
+    expect(r.maxLevel).toBe(30);
+  });
+
+  it('keeps Thornwood in the NE corner (does not leak into the new zones)', () => {
+    expect(regionAt(30, 30).id).toBe('thornwood');
+  });
 });

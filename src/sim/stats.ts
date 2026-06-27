@@ -86,6 +86,7 @@ export function deriveStats(
   let haste = 0;
   let healPower = 0;
   let resistFire = 0;
+  let resistFrost = 0;
   let resistBlight = 0;
 
   for (const item of Object.values(equipment.slots)) {
@@ -116,6 +117,9 @@ export function deriveStats(
         case 'resistFire':
           resistFire += a.value;
           break;
+        case 'resistFrost':
+          resistFrost += a.value;
+          break;
         case 'resistBlight':
           resistBlight += a.value;
           break;
@@ -131,6 +135,6 @@ export function deriveStats(
     leech,
     haste: Math.min(haste, 0.3),
     healPower,
-    resist: { fire: resistFire, frost: 0, blight: resistBlight },
+    resist: { fire: resistFire, frost: resistFrost, blight: resistBlight },
   };
 }
