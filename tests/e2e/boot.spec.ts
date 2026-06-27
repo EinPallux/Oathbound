@@ -24,6 +24,8 @@ interface OathboundHandle {
   oathstones: () => { name: string; activated: boolean }[];
   telemetry: () => { damageDealt: number; kills: number; sessionSeconds: number };
   debugAddXp: (n: number) => void;
+  debugSetLevel: (n: number) => void;
+  debugTeleport: (x: number, z: number) => void;
   debugSetClass: (id: 'warrior' | 'hunter' | 'priest') => void;
   save: () => Promise<boolean>;
 }
@@ -190,6 +192,28 @@ test('shows the Goal Tracker + minimap and toggles the full map with M', async (
   await expect(page.locator('.map-overlay')).toBeVisible();
   await page.keyboard.press('KeyM');
   await expect(page.locator('.map-overlay')).toBeHidden();
+});
+
+test('talents: choosing the other option swaps the hotbar ability', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__oathbound !== undefined);
+  await page.evaluate(() => window.__oathbound!.debugSetClass('warrior'));
+  await page.evaluate(() => window.__oathbound!.debugSetLevel(18));
+  await page.evaluate(() => window.__oathbound!.debugTeleport(0, -45)); // clear of the camp (out of combat)
+
+  // Open the bag/talents panel.
+  await page.keyboard.press('KeyI');
+  const panel = page.locator('.inv-panel');
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('.inv-talents')).toContainText('Talents');
+
+  // Hotbar slot 9 (choice node A) shows the default option.
+  const slotA = page.locator('.hotbar .slot').nth(8).locator('.slot-name');
+  await expect(slotA).toHaveText('Rallying Cry');
+
+  // Pick the other option → the hotbar slot updates.
+  await panel.getByRole('button', { name: 'Bloodthirst' }).click();
+  await expect(slotA).toHaveText('Bloodthirst');
 });
 
 test('progress persists across a reload (save v1)', async ({ page }) => {

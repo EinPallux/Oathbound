@@ -26,7 +26,7 @@ import type { Heightfield, CylinderCollider } from '../../world/heightfield';
 import type { Rng } from '../../core/rng';
 import { clamp } from '../../core/math';
 import { resolveCircleVsCylinders } from '../collision';
-import { getClass } from '../classes';
+import { getClass, resolveKit } from '../classes';
 import {
   INPUT_BUFFER,
   TARGET_CONE_DEG,
@@ -89,7 +89,8 @@ export function createCombatSystem(deps: CombatDeps): System {
         const ab = world.get<AbilityState>(e, C.AbilityState)!;
         const tgt = world.get<Target>(e, C.Target)!;
         const res = world.get<Resource>(e, C.Resource)!;
-        const abilities = getClass(world.get<PlayerClass>(e, C.PlayerClass)?.id ?? 'warrior').abilities;
+        const pc = world.get<PlayerClass>(e, C.PlayerClass);
+        const abilities = resolveKit(getClass(pc?.id ?? 'warrior'), pc?.choices);
 
         // Timers.
         ab.gcdRemaining = Math.max(0, ab.gcdRemaining - dt);

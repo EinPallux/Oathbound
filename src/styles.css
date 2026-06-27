@@ -612,6 +612,14 @@ body {
   color: #ffb0a0;
   border-color: rgba(255, 120, 100, 0.4);
 }
+.inv-btn.chosen {
+  color: #0e1116;
+  background: #ffd166;
+  border-color: #ffd166;
+}
+.inv-talents {
+  margin-bottom: 10px;
+}
 .inv-btn:disabled,
 .inv-equip:disabled {
   opacity: 0.4;

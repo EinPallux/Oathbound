@@ -14,10 +14,17 @@ Each entry is an **independently testable build**. After each phase, work pauses
 - **Hotbar expands to 10 slots** (keys 1–9, 0) — input + HUD — to seat the growing 11–20 kit (slots 9 & 0 fill in checkpoint 2 with the choice nodes).
 - Tests: interrupt (cancels wind-up + silences + damages; unlock-gated), Silence on the enemy AI (no new telegraph), ground-AoE (ticks then despawns; placed on the target) → **134 unit tests**; e2e green (10).
 
-**Verified so far:** `typecheck` ✓ · `npm test` → 134/134 ✓ · `build` ✓ (~161 KB gzip) · `test:e2e` → 10/10 ✓.
+- Verified: `typecheck` ✓ · `npm test` → 134/134 ✓ · `build` ✓ · `test:e2e` → 10/10 ✓.
+
+### ✅ Checkpoint 2 — Lv 11–20 kit pt.2 (choice nodes / talents)
+- **Choice nodes** (Lv 14 & Lv 18) for all three classes — a **pick-one-of-two** talent per hotbar slot, producing distinct play: Warrior *Rallying Cry vs Bloodthirst* / *Unbreakable vs Ravager*; Hunter *Aimed Shot vs Explosive Trap* / *Barrage vs Camouflage*; Priest *Penance vs Holy Fire* / *Divine Aegis vs Divine Star*. These fill hotbar slots 9 & 0.
+- **Dynamic kit**: `ClassDef.choiceNodes` + `resolveKit(cls, choices)` assemble the ordered kit (8 base + one per node = 10, fixed length). Combat, HUD, and cooldown sizing read the resolved kit; the pick lives on `PlayerClass.choices` and **persists in the save**.
+- **Talents UI**: a *Talents* section in the bag/character panel (I/C) — pick A or B per unlocked node, **out of combat**; locked nodes show their unlock level. Swapping resets that slot's cooldown.
+- Tests: `resolveKit` ordering + swap, distinct-play (default node A buffs vs option-1 deals damage), unlock gating, save round-trip → **140 unit tests**; a talents-swap e2e (level up → pick the other option → hotbar slot updates) → **11 e2e**. New debug hooks (`debugSetLevel`, `debugTeleport`) for testing.
+
+**Verified:** `typecheck` ✓ · `npm test` → 140/140 ✓ · `build` ✓ (~162 KB gzip) · `test:e2e` → 11/11 ✓.
 
 ### ⏳ Remaining for the Lv 11–20 brackets (next checkpoints)
-- **CP2:** choice nodes A & B (talent picks) + dynamic kit + talents UI + save.
 - **CP3:** **resistance** system live (fire/blight mitigation + resist gear) + **support**/**pack-leader** archetypes.
 - **CP4:** **Sunken Fen** + **Emberreach** zones + elite **camps**.
 - **CP5:** **Epic** rarity + **Reinforcement** + **bad-luck protection v1**.

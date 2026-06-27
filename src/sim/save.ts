@@ -29,6 +29,8 @@ export interface SaveData {
   schemaVersion: number;
   updatedAt: number;
   classId: ClassId;
+  /** Talent picks: choice-node id → selected option index. */
+  choices: Record<string, number>;
   character: { level: number; xp: number; xpToNext: number };
   gold: number;
   materials: number;
@@ -62,6 +64,7 @@ export function serialize(world: World, player: Entity): SaveData {
     schemaVersion: SCHEMA_VERSION,
     updatedAt: Date.now(),
     classId: world.get<PlayerClass>(player, C.PlayerClass)?.id ?? 'warrior',
+    choices: clone(world.get<PlayerClass>(player, C.PlayerClass)?.choices ?? {}),
     character: { level: prog.level, xp: prog.xp, xpToNext: prog.xpToNext },
     gold: inv.gold,
     materials: inv.materials,
@@ -76,7 +79,10 @@ export function serialize(world: World, player: Entity): SaveData {
 /** Apply a save snapshot onto the player's components, rebuilding derived stats. */
 export function applySave(world: World, player: Entity, data: SaveData): void {
   const pc = world.get<PlayerClass>(player, C.PlayerClass);
-  if (pc) pc.id = data.classId ?? 'warrior';
+  if (pc) {
+    pc.id = data.classId ?? 'warrior';
+    pc.choices = clone(data.choices ?? {});
+  }
 
   const prog = world.get<Progression>(player, C.Progression)!;
   prog.level = data.character.level;

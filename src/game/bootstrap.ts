@@ -24,17 +24,18 @@ import { createGroundAoeSystem } from '../sim/systems/ground-aoe';
 import { SpatialGrid } from '../sim/spatial-grid';
 import { Projectiles } from '../sim/projectiles';
 import { Telemetry, createTelemetrySystem } from '../sim/telemetry';
-import { createPlayer, setPlayerClass, createOathstone, createVendor } from '../sim/factory';
+import { createPlayer, setPlayerClass, createOathstone, createVendor, PLAYER_HALF } from '../sim/factory';
 import { spawnEnemy, type EnemyTemplateId, type Tier } from '../sim/content/enemies';
-import { equipItem } from '../sim/inventory';
+import { equipItem, recomputeDerived } from '../sim/inventory';
 import { salvageItem, salvageAllBelow } from '../sim/salvage';
 import { nearestVendor, sellItem, sellAllBelow } from '../sim/vendor';
 import { fastTravel } from '../sim/travel';
 import { regionAt, regionLabel } from '../sim/content/regions';
 import { Onboarding } from '../sim/onboarding';
+import { getClass } from '../sim/classes';
 import { grantXp } from '../sim/progression';
 import { serialize, applySave } from '../sim/save';
-import { conColor } from '../sim/stats';
+import { conColor, xpToNext } from '../sim/stats';
 import {
   C,
   type Transform,
@@ -48,6 +49,7 @@ import {
   type PlayerClass,
   type ClassId,
   type Oathstone,
+  type AbilityState,
 } from '../core/ecs/components';
 import {
   CombatEvent,
@@ -159,6 +161,8 @@ export interface Game {
   oathstones(): { name: string; activated: boolean }[];
   telemetry(): TelemetrySnapshot;
   debugAddXp(n: number): void;
+  debugSetLevel(n: number): void;
+  debugTeleport(x: number, z: number): void;
   debugSetClass(id: ClassId): void;
   save(): Promise<boolean>;
   stop(): void;
@@ -263,6 +267,18 @@ export function boot(): Game {
   };
   invPanel.onToggleLock = (item) => {
     item.locked = !item.locked;
+    autosave();
+  };
+  invPanel.onChooseTalent = (nodeId, option) => {
+    const pc = world.get<PlayerClass>(player, C.PlayerClass);
+    if (!pc) return;
+    if (!pc.choices) pc.choices = {};
+    pc.choices[nodeId] = option;
+    // Reset the swapped slot's cooldown so the new pick is ready to use.
+    const cls = getClass(pc.id);
+    const nodeIdx = cls.choiceNodes.findIndex((n) => n.id === nodeId);
+    const ab = world.get<AbilityState>(player, C.AbilityState);
+    if (nodeIdx >= 0 && ab) ab.cooldowns[cls.abilities.length + nodeIdx] = 0;
     autosave();
   };
 
@@ -527,6 +543,23 @@ export function boot(): Game {
     },
     telemetry: () => telemetry.snapshot(),
     debugAddXp: (n) => grantXp(world, player, n),
+    debugSetLevel: (n) => {
+      const prog = world.get<Progression>(player, C.Progression)!;
+      prog.level = Math.max(1, Math.floor(n));
+      prog.xp = 0;
+      prog.xpToNext = xpToNext(prog.level);
+      recomputeDerived(world, player);
+      const h = world.get<Health>(player, C.Health)!;
+      h.current = h.max;
+    },
+    debugTeleport: (x, z) => {
+      playerTransform.x = x;
+      playerTransform.z = z;
+      playerTransform.y = field.sample(x, z) + PLAYER_HALF;
+      playerTransform.prevX = x;
+      playerTransform.prevY = playerTransform.y;
+      playerTransform.prevZ = z;
+    },
     debugSetClass: (id) => {
       setPlayerClass(world, player, id);
       classSelect.hide();
