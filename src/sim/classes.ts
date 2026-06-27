@@ -26,6 +26,24 @@ export interface ChoiceNode {
   options: readonly [AbilityDef, AbilityDef];
 }
 
+/**
+ * The Lv-30 capstone. Rather than adding an 11th hotbar button, the capstone
+ * *empowers an existing ability* at level 30 — your signature spender becomes its
+ * mastered form. (Design decision: keep the hotbar at 10 slots.)
+ */
+export interface Capstone {
+  /** The ability id this capstone upgrades. */
+  targetId: string;
+  /** The name the empowered ability takes on at Lv 30. */
+  name: string;
+  /** One-line flavour for the unlock toast. */
+  desc: string;
+  /** Multiplier applied to the ability's base + coeff damage. */
+  dmgMult: number;
+  /** Bonus radius (m) for AoE capstones. */
+  radiusBonus?: number;
+}
+
 export interface ClassDef {
   id: ClassId;
   name: string;
@@ -35,7 +53,12 @@ export interface ClassDef {
   abilities: readonly AbilityDef[];
   /** Choice nodes appended after the base kit (one hotbar slot each). */
   choiceNodes: readonly ChoiceNode[];
+  /** The Lv-30 capstone empowerment (no new hotbar slot). */
+  capstone: Capstone;
 }
+
+/** The level at which a class's capstone empowerment activates. */
+export const CAPSTONE_LEVEL = 30;
 
 const WARRIOR_ABILITIES: AbilityDef[] = [
   {
@@ -691,6 +714,13 @@ const CLASSES: Record<ClassId, ClassDef> = {
     },
     abilities: WARRIOR_ABILITIES,
     choiceNodes: WARRIOR_CHOICES,
+    capstone: {
+      targetId: 'whirl',
+      name: "Oathbreaker's Wrath",
+      desc: 'Your Whirl erupts into a massive, wider cleave.',
+      dmgMult: 1.8,
+      radiusBonus: 1.5,
+    },
   },
   hunter: {
     id: 'hunter',
@@ -706,6 +736,12 @@ const CLASSES: Record<ClassId, ClassDef> = {
     },
     abilities: HUNTER_ABILITIES,
     choiceNodes: HUNTER_CHOICES,
+    capstone: {
+      targetId: 'piercing-arrow',
+      name: 'Rapid Fusillade',
+      desc: 'Your Piercing Arrow becomes a devastating barrage.',
+      dmgMult: 1.9,
+    },
   },
   priest: {
     id: 'priest',
@@ -721,6 +757,12 @@ const CLASSES: Record<ClassId, ClassDef> = {
     },
     abilities: PRIEST_ABILITIES,
     choiceNodes: PRIEST_CHOICES,
+    capstone: {
+      targetId: 'searing-light',
+      name: 'Dawnbreak',
+      desc: "Your Searing Light blazes with the dawn's fury.",
+      dmgMult: 1.9,
+    },
   },
 };
 
@@ -741,4 +783,31 @@ export function resolveKit(cls: ClassDef, choices?: Record<string, number>): Abi
     kit.push(node.options[pick]);
   }
   return kit;
+}
+
+/**
+ * Apply the class capstone to a single ability: at Lv 30, the capstone's target
+ * ability is upgraded (renamed, harder-hitting, and — for AoE capstones — wider).
+ * Returns the ability **unchanged (same reference)** when the capstone doesn't apply.
+ */
+export function empowerAbility(cls: ClassDef, ability: AbilityDef, level: number): AbilityDef {
+  const cap = cls.capstone;
+  if (level < CAPSTONE_LEVEL || ability.id !== cap.targetId) return ability;
+  return {
+    ...ability,
+    name: cap.name,
+    base: Math.round(ability.base * cap.dmgMult),
+    coeff: ability.coeff * cap.dmgMult,
+    radius: ability.radius + (cap.radiusBonus ?? 0),
+  };
+}
+
+/** Apply the capstone across a resolved kit (no-op below Lv 30). */
+export function empowerKit(
+  cls: ClassDef,
+  kit: readonly AbilityDef[],
+  level: number,
+): readonly AbilityDef[] {
+  if (level < CAPSTONE_LEVEL) return kit;
+  return kit.map((a) => empowerAbility(cls, a, level));
 }

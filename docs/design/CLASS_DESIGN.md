@@ -23,6 +23,8 @@ Abilities and passives unlock to match progression pacing in [PROGRESSION_AND_XP
 
 **Build choice nodes** (Lv 15/22/30) are small either/or talent picks (no sprawling tree) that bias a class toward, e.g., sustained vs. burst, single-target vs. AoE, offense vs. defense. Respec is free in town (chill pillar). This is the "build development" lever without a giant talent system.
 
+> **As-built note (0.4.0–0.5.0).** The implementation lands a compact kit: **8 base abilities + 2 choice nodes = 10 hotbar slots** (keys 1–9, 0), with choice nodes at **Lv 14 & 18**. The **Lv-30 capstone is implemented as an *upgrade*, not an 11th button** — at level 30 it automatically empowers the class's signature spender (Warrior **Whirl → "Oathbreaker's Wrath"**, Hunter **Piercing Arrow → "Rapid Fusillade"**, Priest **Searing Light → "Dawnbreak"**): more damage, and for the Warrior a wider cleave. This keeps the hotbar at 10 slots while still delivering a level-30 power/identity spike. (A third choice node was folded into this; see `src/sim/classes.ts` `Capstone`/`empowerAbility`.)
+
 ---
 
 ## Warrior

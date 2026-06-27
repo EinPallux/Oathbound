@@ -26,7 +26,7 @@ import type { Heightfield, CylinderCollider } from '../../world/heightfield';
 import type { Rng } from '../../core/rng';
 import { clamp } from '../../core/math';
 import { resolveCircleVsCylinders } from '../collision';
-import { getClass, resolveKit } from '../classes';
+import { getClass, resolveKit, empowerKit } from '../classes';
 import {
   INPUT_BUFFER,
   TARGET_CONE_DEG,
@@ -90,7 +90,9 @@ export function createCombatSystem(deps: CombatDeps): System {
         const tgt = world.get<Target>(e, C.Target)!;
         const res = world.get<Resource>(e, C.Resource)!;
         const pc = world.get<PlayerClass>(e, C.PlayerClass);
-        const abilities = resolveKit(getClass(pc?.id ?? 'warrior'), pc?.choices);
+        const cls = getClass(pc?.id ?? 'warrior');
+        // At Lv 30 the capstone empowers the class's signature ability in place.
+        const abilities = empowerKit(cls, resolveKit(cls, pc?.choices), off.level);
 
         // Timers.
         ab.gcdRemaining = Math.max(0, ab.gcdRemaining - dt);
