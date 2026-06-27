@@ -18,7 +18,7 @@ import {
   type Shield,
   type CastState,
 } from '../core/ecs/components';
-import { getClass, resolveKit } from '../sim/classes';
+import { getClass, resolveKit, empowerKit } from '../sim/classes';
 import { hasStatus, Status } from '../sim/combat/statuses';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
@@ -110,10 +110,11 @@ export class Hud {
 
     const pc = world.get<PlayerClass>(player, C.PlayerClass);
     const cls = getClass(pc?.id ?? 'warrior');
-    const abilities = resolveKit(cls, pc?.choices);
     const h = world.get<Health>(player, C.Health);
     const res = world.get<Resource>(player, C.Resource);
     const prog = world.get<Progression>(player, C.Progression);
+    // At Lv 30 the capstone empowers a signature ability (name + power); reflect it here.
+    const abilities = empowerKit(cls, resolveKit(cls, pc?.choices), prog?.level ?? 1);
     const ab = world.get<AbilityState>(player, C.AbilityState);
     const inv = world.get<Inventory>(player, C.Inventory);
     const cs = world.get<CombatState>(player, C.CombatState);

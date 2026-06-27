@@ -19,9 +19,16 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 **Verified:** `typecheck` ✓ · `npm test` → 169/169 ✓ · `build` ✓ (~163 KB gzip) · `test:e2e` → 11/11 ✓.
 
-### ⏳ Remaining for the Lv 1–30 journey (next checkpoints)
-- **CP2:** the **Lv 30 capstone / kit-to-30** (a design call — the hotbar is full at 10, so the capstone likely upgrades an existing slot or adds a third choice node) + final ability tuning.
-- **CP3:** a full **1 → 30 validation** pass (pacing/blockers across all six zones) → the **Level 1–30 Content Gate**.
+### ✅ Checkpoint 2 — the Lv-30 capstone (upgrade-style; owner-chosen)
+- **Each class gets an automatic Lv-30 capstone that *empowers an existing ability*** — no new hotbar button (the hotbar stays a clean 10 slots). At level 30 the class's signature spender becomes its mastered form: **Warrior** *Whirl → "Oathbreaker's Wrath"* (×1.8 damage + wider cleave), **Hunter** *Piercing Arrow → "Rapid Fusillade"* (×1.9), **Priest** *Searing Light → "Dawnbreak"* (×1.9). A real level-30 power/identity spike without UX bloat.
+- Data-driven: a `Capstone` on each `ClassDef` + pure `empowerAbility` / `empowerKit` (`src/sim/classes.ts`). Below Lv 30 they're a **no-op (same references)**; at 30 only the target ability is replaced. **Combat** (damage) and the **HUD** (name) both consume the empowered kit, and dinging **30 toasts the capstone unlock**.
+- Docs: `CLASS_DESIGN.md` gets an as-built note (the capstone is an upgrade, not an 11th button; the planned third choice node folded into it).
+- Tests: capstone targets a real kit ability; below-30 no-op (reference identity); at-30 rename + stronger base/coeff/radius; non-target abilities untouched; the empowered ability deals **more damage through the real formula**; Hunter/Priest spenders empowered → **175 unit tests**; e2e green (11).
+
+**Verified:** `typecheck` ✓ · `npm test` → 175/175 ✓ · `build` ✓ (~163 KB gzip) · `test:e2e` → 11/11 ✓.
+
+### ⏳ Remaining for the Lv 1–30 journey (final checkpoint)
+- **CP3:** a full **1 → 30 validation** pass (pacing / no blockers across all six zones, all three classes) → the **Level 1–30 Content Gate**.
 
 ---
 

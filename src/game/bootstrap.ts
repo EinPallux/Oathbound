@@ -33,7 +33,7 @@ import { nearestVendor, sellItem, sellAllBelow } from '../sim/vendor';
 import { fastTravel } from '../sim/travel';
 import { regionAt, regionLabel } from '../sim/content/regions';
 import { Onboarding } from '../sim/onboarding';
-import { getClass } from '../sim/classes';
+import { getClass, CAPSTONE_LEVEL } from '../sim/classes';
 import { grantXp } from '../sim/progression';
 import { serialize, applySave } from '../sim/save';
 import { conColor, xpToNext } from '../sim/stats';
@@ -386,6 +386,10 @@ export function boot(): Game {
   });
   world.events.on<LevelUpEvent>(CombatEvent.LevelUp, (ev) => {
     hud.toast(`Level ${ev.level}!`, 'good');
+    if (ev.level === CAPSTONE_LEVEL) {
+      const cap = getClass(world.get<PlayerClass>(player, C.PlayerClass)?.id ?? 'warrior').capstone;
+      hud.toast(`Capstone unlocked — ${cap.name}: ${cap.desc}`, 'good');
+    }
     sfx.levelUp();
     autosave();
   });
