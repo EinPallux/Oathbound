@@ -311,7 +311,8 @@ export function boot(): Game {
     autosave();
   });
   world.events.on<LootPickedEvent>(CombatEvent.LootPicked, (ev) => {
-    hud.toast(`Looted ${ev.item.name}`, ev.item.rarity === 'common' ? 'info' : 'rare');
+    const r = ev.item.rarity;
+    hud.toast(`Looted ${ev.item.name}`, r === 'common' || r === 'uncommon' ? 'info' : r);
     sfx.loot();
     autosave();
   });

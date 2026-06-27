@@ -15,8 +15,8 @@ import { CombatEvent, type ItemSoldEvent } from './combat/events';
 /** How close the player must stand to interact with a vendor. */
 export const VENDOR_RADIUS = 3;
 
-const RARITY_ORDER: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3 };
-const RARITY_MULT: Record<Rarity, number> = { common: 1, uncommon: 3, rare: 6, epic: 11 };
+const RARITY_ORDER: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+const RARITY_MULT: Record<Rarity, number> = { common: 1, uncommon: 3, rare: 6, epic: 11, legendary: 20 };
 
 /** Gold a vendor pays for an item (scales with ilvl + rarity). */
 export function vendorValue(item: Item): number {

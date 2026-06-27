@@ -5,6 +5,25 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.6.0-INDEV — "The Chase" → Equipment Depth + Lv-30 Endgame *(in progress)*
+**Goal:** the beta's long tail — the Lv-30 gear chase: **Legendary** + **Relic** tiers, **3 solo world bosses**, and target-farming → the **Endgame Foundation Gate** ([docs/design/ENDGAME_FOUNDATION.md](./docs/design/ENDGAME_FOUNDATION.md)). Built in verified checkpoints.
+
+### ✅ Checkpoint 1 — Legendary rarity
+- **Legendary** (orange, **4 affixes**, ×1.45 budget — the aspirational random-drop tier above Epic): the apex of *rolled* gear (hand-designed **Relics** come in CP3). Distinct loot-beam/bag/vendor colour + toast.
+- **Drops as a tail** on the highest-value sources: ~6% on **rare-named** kills and ~1.5% on **elites** (never from standards). **Bad-luck protection** now treats Legendary as rare+ (resets the pity counter; the pity boost raises the Legendary tail too).
+- Salvages into the most whetstones and sells for the most gold; reinforces like any item.
+- Loot toasts now colour by rarity (rare/epic/legendary) instead of one generic style.
+- Tests: Legendary gen (4 affixes, out-budgets Epic), drop tail (rare-named yes / standards never), counts as rare+ for BLP, pity raises the Legendary tail → **204 unit tests**; e2e green (11).
+
+**Verified:** `typecheck` ✓ · `npm test` → 204/204 ✓ · `build` ✓ (~163 KB gzip) · `test:e2e` → 11/11 ✓.
+
+### ⏳ Remaining for the endgame (next checkpoints)
+- **CP2:** the **3 solo world bosses** (Emberhorn, the Rimewyrm, Maelgrith) — multi-phase, telegraph-heavy, with Legendary/Relic loot tables.
+- **CP3:** **Relics** — a small set of hand-designed unique items with fixed build-enabling effects (+ the effect-hook plumbing).
+- **CP4:** the Lv-30 endgame loop + target-farming guidance → the **Endgame Foundation Gate** validation.
+
+---
+
 ## 0.5.0-INDEV — "Road to Thirty" → Complete Lv 1–30 Progression *(✅ merged — awaiting playtest)*
 **Goal:** the final two regions and the rest of the kit so a character can run **1 → 30** end-to-end across all six zones (→ Level 1–30 Content Gate). Large phase, built in verified checkpoints (CP1–CP3, landed via PRs #16/#17/#19). All of `0.0.1`–`0.5.0` is now merged into `claude/game-design-docs-70dim2`.
 

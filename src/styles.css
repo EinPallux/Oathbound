@@ -334,6 +334,10 @@ body {
   color: #b061ff;
   border: 1px solid #b061ff;
 }
+.toast.legendary {
+  color: #ff8a3d;
+  border: 1px solid #ff8a3d;
+}
 
 /* ── Inventory / equipment panel ────────────────────────────────────── */
 .inv-panel {
@@ -399,6 +403,9 @@ body {
 }
 .inv-name.epic {
   color: #b061ff;
+}
+.inv-name.legendary {
+  color: #ff8a3d;
 }
 .inv-name.empty {
   color: #4a5a6a;
