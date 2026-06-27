@@ -224,7 +224,7 @@ export type EquipSlot =
   | 'ring1'
   | 'ring2';
 
-export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
 export type PrimaryStatId = 'STR' | 'DEX' | 'SPR' | 'VIT';
 

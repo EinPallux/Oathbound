@@ -15,18 +15,18 @@ interface TierTable {
   /** Probability an item drops at all. */
   dropChance: number;
   /** Relative rarity weights. */
-  weights: { common: number; uncommon: number; rare: number; epic: number };
+  weights: { common: number; uncommon: number; rare: number; epic: number; legendary: number };
 }
 
 const TIERS: Record<string, TierTable> = {
-  standard: { dropChance: 0.35, weights: { common: 0.72, uncommon: 0.28, rare: 0, epic: 0 } },
-  elite: { dropChance: 0.7, weights: { common: 0.18, uncommon: 0.45, rare: 0.3, epic: 0.07 } },
-  rare: { dropChance: 1.0, weights: { common: 0.08, uncommon: 0.27, rare: 0.5, epic: 0.15 } },
+  standard: { dropChance: 0.35, weights: { common: 0.72, uncommon: 0.28, rare: 0, epic: 0, legendary: 0 } },
+  elite: { dropChance: 0.7, weights: { common: 0.18, uncommon: 0.45, rare: 0.3, epic: 0.07, legendary: 0.015 } },
+  rare: { dropChance: 1.0, weights: { common: 0.08, uncommon: 0.22, rare: 0.5, epic: 0.15, legendary: 0.06 } },
 };
 
 /** Items of this rarity or better reset the bad-luck-protection pity counter. */
 export function isRarePlus(r: Rarity): boolean {
-  return r === 'rare' || r === 'epic';
+  return r === 'rare' || r === 'epic' || r === 'legendary';
 }
 
 /** Bad-luck protection: each unlucky kill raises the rare+ weight (capped). */
@@ -41,12 +41,14 @@ function pickRarity(rng: Rng, w: TierTable['weights'], conMult: number, pityMult
   const uncommon = w.uncommon * conMult;
   const rare = w.rare * conMult * pityMult;
   const epic = w.epic * conMult * pityMult;
-  const total = common + uncommon + rare + epic;
+  const legendary = w.legendary * conMult * pityMult;
+  const total = common + uncommon + rare + epic + legendary;
   let r = rng.next() * total;
   if ((r -= common) < 0) return 'common';
   if ((r -= uncommon) < 0) return 'uncommon';
   if ((r -= rare) < 0) return 'rare';
-  return 'epic';
+  if ((r -= epic) < 0) return 'epic';
+  return 'legendary';
 }
 
 /**

@@ -57,10 +57,17 @@ const QUALITY_WORD: Record<Rarity, readonly string[]> = {
   uncommon: ['Sturdy', 'Fine', 'Honed'],
   rare: ['Gleaming', 'Runed', 'Vanguard'],
   epic: ['Resplendent', 'Ascendant', 'Oathforged'],
+  legendary: ['Fabled', 'Sovereign', 'Eternal'],
 };
 
-const RARITY_MULT: Record<Rarity, number> = { common: 1.0, uncommon: 1.1, rare: 1.2, epic: 1.32 };
-const RARITY_AFFIXES: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3 };
+const RARITY_MULT: Record<Rarity, number> = {
+  common: 1.0,
+  uncommon: 1.1,
+  rare: 1.2,
+  epic: 1.32,
+  legendary: 1.45,
+};
+const RARITY_AFFIXES: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
 
 /** Chest-equivalent budget at an item level. */
 export function baseBudget(ilvl: number): number {

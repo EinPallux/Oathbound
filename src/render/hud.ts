@@ -83,7 +83,7 @@ export class Hud {
     this.toastWrap = div('toast-wrap', parent);
   }
 
-  toast(text: string, kind: 'info' | 'good' | 'rare' = 'info'): void {
+  toast(text: string, kind: 'info' | 'good' | 'rare' | 'epic' | 'legendary' = 'info'): void {
     const el = document.createElement('div');
     el.className = `toast ${kind}`;
     el.textContent = text;
