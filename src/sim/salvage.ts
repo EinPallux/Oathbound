@@ -13,7 +13,7 @@ import { CombatEvent, type ItemSalvagedEvent } from './combat/events';
 
 export const SALVAGE_LEVEL = 3;
 
-const RARITY_ORDER: Record<Rarity, number> = { common: 0, uncommon: 1 };
+const RARITY_ORDER: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2 };
 
 /** Whetstones + gold returned for salvaging an item. */
 export function salvageYield(item: Item): { whetstones: number; gold: number } {

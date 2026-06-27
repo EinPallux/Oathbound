@@ -228,6 +228,13 @@ function fireAttack(
   projectiles: Projectiles | undefined,
   rng: Rng,
 ): void {
+  // Elites/rares enrage below 30% HP (a readable "real fight" mechanic).
+  let base = en.attackBase;
+  if (en.tier !== 'standard') {
+    const h = world.get<Health>(e, C.Health);
+    if (h && h.current < 0.3 * h.max) base = Math.round(base * 1.4);
+  }
+
   if (projectile) {
     projectiles?.spawn({
       x: tr.x,
@@ -236,7 +243,7 @@ function fireAttack(
       source: e,
       target: player,
       speed: ENEMY_PROJECTILE_SPEED,
-      base: en.attackBase,
+      base,
       coeff: en.attackCoeff,
       damageType: en.attackType,
       fromPlayer: false,
@@ -248,7 +255,7 @@ function fireAttack(
     world,
     e,
     player,
-    { base: en.attackBase, coeff: en.attackCoeff, damageType: en.attackType },
+    { base, coeff: en.attackCoeff, damageType: en.attackType },
     rng,
     0,
   );

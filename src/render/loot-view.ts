@@ -8,6 +8,7 @@ import { C, type Transform, type LootDrop, type Rarity } from '../core/ecs/compo
 const RARITY_COLOR: Record<Rarity, number> = {
   common: 0xc9d1d9,
   uncommon: 0x5fd35f,
+  rare: 0x5aa0ff,
 };
 const GOLD_COLOR = 0xffcc44;
 

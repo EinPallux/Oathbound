@@ -390,6 +390,9 @@ body {
 .inv-name.uncommon {
   color: #5fd35f;
 }
+.inv-name.rare {
+  color: #5aa0ff;
+}
 .inv-name.empty {
   color: #4a5a6a;
 }

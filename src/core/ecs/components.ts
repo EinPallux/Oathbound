@@ -165,7 +165,7 @@ export type EnemyState = 'idle' | 'engage' | 'attack' | 'leash' | 'dead';
 export interface Enemy {
   archetype: 'melee_bruiser' | 'ranged_skirmisher' | 'caster';
   family: string;
-  tier: 'standard';
+  tier: 'standard' | 'elite' | 'rare';
   state: EnemyState;
   /** Spawn point — leash + reset returns here. */
   homeX: number;
@@ -219,7 +219,7 @@ export type EquipSlot =
   | 'ring1'
   | 'ring2';
 
-export type Rarity = 'common' | 'uncommon';
+export type Rarity = 'common' | 'uncommon' | 'rare';
 
 export type PrimaryStatId = 'STR' | 'DEX' | 'SPR' | 'VIT';
 

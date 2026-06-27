@@ -25,8 +25,11 @@ describe('generateItem', () => {
   it('rarity controls affix count', () => {
     const common = generateItem(new Rng(2), { ilvl: 10, slot: 'weapon', rarity: 'common' });
     const uncommon = generateItem(new Rng(2), { ilvl: 10, slot: 'weapon', rarity: 'uncommon' });
+    const rare = generateItem(new Rng(2), { ilvl: 10, slot: 'weapon', rarity: 'rare' });
     expect(common.affixes.length).toBe(0);
     expect(uncommon.affixes.length).toBe(1);
+    expect(rare.affixes.length).toBe(2);
+    expect(rare.score).toBeGreaterThan(common.score); // higher budget
   });
 
   it('is deterministic in its rolled fields for a given seed', () => {
@@ -65,5 +68,24 @@ describe('rollLoot', () => {
     // ~8–12% uncommon of all kills (0.35 * 0.28 ≈ 0.098)
     expect(uncommon / N).toBeGreaterThan(0.05);
     expect(uncommon / N).toBeLessThan(0.15);
+  });
+
+  it('elites drop more often and can drop Rare; standards never do', () => {
+    const rng = new Rng(999);
+    const N = 3000;
+    let standardRare = 0;
+    let eliteDrops = 0;
+    let eliteRare = 0;
+    for (let i = 0; i < N; i++) {
+      if (rollLoot(rng, 5, 'standard').item?.rarity === 'rare') standardRare++;
+      const e = rollLoot(rng, 5, 'elite');
+      if (e.item) {
+        eliteDrops++;
+        if (e.item.rarity === 'rare') eliteRare++;
+      }
+    }
+    expect(standardRare).toBe(0); // standards never drop Rare
+    expect(eliteDrops / N).toBeGreaterThan(0.55); // elites drop far more
+    expect(eliteRare).toBeGreaterThan(0); // and can be Rare
   });
 });
