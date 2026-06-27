@@ -11,9 +11,12 @@ import {
   type Inventory,
   type Equipment,
   type Progression,
+  type PlayerClass,
+  type CombatState,
 } from '../core/ecs/components';
 import { EQUIP_SLOTS } from '../sim/loot/items';
 import { SALVAGE_LEVEL } from '../sim/salvage';
+import { getClass } from '../sim/classes';
 
 const SLOT_LABEL: Record<EquipSlot, string> = {
   weapon: 'Weapon',
@@ -31,6 +34,7 @@ const SLOT_LABEL: Record<EquipSlot, string> = {
 export class InventoryPanel {
   private readonly root: HTMLDivElement;
   private readonly wallet: HTMLDivElement;
+  private readonly talents: HTMLDivElement;
   private readonly actions: HTMLDivElement;
   private readonly equipList: HTMLDivElement;
   private readonly invList: HTMLDivElement;
@@ -41,6 +45,7 @@ export class InventoryPanel {
   onSalvage: (item: Item) => void = () => {};
   onSalvageCommons: () => void = () => {};
   onToggleLock: (item: Item) => void = () => {};
+  onChooseTalent: (nodeId: string, option: number) => void = () => {};
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
@@ -55,6 +60,10 @@ export class InventoryPanel {
     this.wallet = document.createElement('div');
     this.wallet.className = 'inv-wallet';
     this.root.appendChild(this.wallet);
+
+    this.talents = document.createElement('div');
+    this.talents.className = 'inv-talents';
+    this.root.appendChild(this.talents);
 
     this.actions = document.createElement('div');
     this.actions.className = 'inv-actions';
@@ -99,14 +108,19 @@ export class InventoryPanel {
     const eq = world.get<Equipment>(player, C.Equipment);
     const prog = world.get<Progression>(player, C.Progression);
     if (!inv || !eq || !prog) return;
+    const pc = world.get<PlayerClass>(player, C.PlayerClass);
+    const cs = world.get<CombatState>(player, C.CombatState);
 
     const sig =
       EQUIP_SLOTS.map((s) => eq.slots[s]?.uid ?? '-').join(',') +
       '|' +
       inv.items.map((i) => `${i.uid}${i.locked ? 'L' : ''}`).join(',') +
-      `|${inv.gold}|${inv.materials}|${prog.level}`;
+      `|${inv.gold}|${inv.materials}|${prog.level}` +
+      `|${pc?.id ?? ''}|${JSON.stringify(pc?.choices ?? {})}|${cs?.inCombat ? 'c' : ''}`;
     if (sig === this.lastSig) return;
     this.lastSig = sig;
+
+    this.renderTalents(pc, prog.level, cs?.inCombat ?? false);
 
     const canSalvage = prog.level >= SALVAGE_LEVEL;
 
@@ -172,6 +186,54 @@ export class InventoryPanel {
       row.appendChild(salv);
 
       this.invList.appendChild(row);
+    }
+  }
+
+  /** Choice-node talents: pick one of two per node (out of combat). */
+  private renderTalents(pc: PlayerClass | undefined, level: number, inCombat: boolean): void {
+    this.talents.replaceChildren();
+    if (!pc) return;
+    const nodes = getClass(pc.id).choiceNodes;
+    if (nodes.length === 0) return;
+
+    const head = document.createElement('div');
+    head.className = 'inv-col-head';
+    head.textContent = 'Talents';
+    this.talents.appendChild(head);
+
+    for (const node of nodes) {
+      const row = document.createElement('div');
+      row.className = 'inv-row';
+
+      if (level < node.unlockLevel) {
+        const lbl = document.createElement('span');
+        lbl.className = 'inv-name empty';
+        lbl.textContent = `${node.options[0].name} / ${node.options[1].name}`;
+        row.appendChild(lbl);
+        const hint = document.createElement('span');
+        hint.className = 'inv-hint';
+        hint.textContent = `Lv ${node.unlockLevel}`;
+        row.appendChild(hint);
+        this.talents.appendChild(row);
+        continue;
+      }
+
+      const picked = pc.choices?.[node.id] === 1 ? 1 : 0;
+      for (let i = 0; i < node.options.length; i++) {
+        const b = document.createElement('button');
+        b.className = `inv-btn small${picked === i ? ' chosen' : ''}`;
+        b.textContent = node.options[i].name;
+        b.disabled = inCombat || picked === i;
+        b.onclick = () => this.onChooseTalent(node.id, i);
+        row.appendChild(b);
+      }
+      if (inCombat) {
+        const hint = document.createElement('span');
+        hint.className = 'inv-hint';
+        hint.textContent = 'Out of combat only';
+        row.appendChild(hint);
+      }
+      this.talents.appendChild(row);
     }
   }
 

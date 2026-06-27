@@ -18,7 +18,7 @@ import {
   type Shield,
   type CastState,
 } from '../core/ecs/components';
-import { getClass } from '../sim/classes';
+import { getClass, resolveKit } from '../sim/classes';
 import { hasStatus, Status } from '../sim/combat/statuses';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
@@ -108,8 +108,9 @@ export class Hud {
     const dt = Math.min(0.1, (now - this.lastMs) / 1000);
     this.lastMs = now;
 
-    const cls = getClass(world.get<PlayerClass>(player, C.PlayerClass)?.id ?? 'warrior');
-    const abilities = cls.abilities;
+    const pc = world.get<PlayerClass>(player, C.PlayerClass);
+    const cls = getClass(pc?.id ?? 'warrior');
+    const abilities = resolveKit(cls, pc?.choices);
     const h = world.get<Health>(player, C.Health);
     const res = world.get<Resource>(player, C.Resource);
     const prog = world.get<Progression>(player, C.Progression);

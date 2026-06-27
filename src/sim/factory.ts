@@ -25,7 +25,7 @@ import {
   type Vendor,
 } from '../core/ecs/components';
 import type { Heightfield } from '../world/heightfield';
-import { getClass } from './classes';
+import { getClass, kitLength } from './classes';
 import { recomputeDerived } from './inventory';
 import { xpToNext, CRIT_MULT } from './stats';
 import { spawnEnemy } from './content/enemies';
@@ -86,7 +86,7 @@ export function createPlayer(
   world.set<CombatState>(e, C.CombatState, { inCombat: false, sinceEventSec: 999 });
   world.set<AbilityState>(e, C.AbilityState, {
     gcdRemaining: 0,
-    cooldowns: cls.abilities.map(() => 0),
+    cooldowns: new Array(kitLength(cls)).fill(0),
     bufferedIndex: -1,
     bufferRemaining: 0,
   });
@@ -105,9 +105,12 @@ export function createPlayer(
 export function setPlayerClass(world: World, player: Entity, classId: ClassId): void {
   const cls = getClass(classId);
   const pc = world.get<PlayerClass>(player, C.PlayerClass);
-  if (pc) pc.id = classId;
+  if (pc) {
+    pc.id = classId;
+    pc.choices = {}; // talent ids are class-specific — start fresh
+  }
   const ab = world.get<AbilityState>(player, C.AbilityState)!;
-  ab.cooldowns = cls.abilities.map(() => 0);
+  ab.cooldowns = new Array(kitLength(cls)).fill(0);
   ab.gcdRemaining = 0;
   ab.bufferedIndex = -1;
   ab.bufferRemaining = 0;

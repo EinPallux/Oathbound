@@ -19,12 +19,22 @@ export interface ResourceConfig {
   startsFull: boolean;
 }
 
+/** A talent "choice node": pick one of two abilities for a single hotbar slot. */
+export interface ChoiceNode {
+  id: string;
+  unlockLevel: number;
+  options: readonly [AbilityDef, AbilityDef];
+}
+
 export interface ClassDef {
   id: ClassId;
   name: string;
   primaryStatId: PrimaryStatId;
   resource: ResourceConfig;
+  /** Always-on abilities (hotbar slots in declaration order). */
   abilities: readonly AbilityDef[];
+  /** Choice nodes appended after the base kit (one hotbar slot each). */
+  choiceNodes: readonly ChoiceNode[];
 }
 
 const WARRIOR_ABILITIES: AbilityDef[] = [
@@ -424,6 +434,248 @@ const PRIEST_ABILITIES: AbilityDef[] = [
   },
 ];
 
+// ── Choice nodes (Lv 14 / Lv 18): pick one of two for a hotbar slot ──────────
+// Each pair offers a clearly different option (defensive vs offensive, burst vs
+// control) so the choice "produces distinct play" per the 0.4.0 acceptance.
+
+const WARRIOR_CHOICES: ChoiceNode[] = [
+  {
+    id: 'war-a',
+    unlockLevel: 14,
+    options: [
+      {
+        id: 'rallying-cry',
+        name: 'Rallying Cry',
+        unlockLevel: 14,
+        base: 0,
+        coeff: 0,
+        damageType: 'physical',
+        cost: 0,
+        furyGain: 0,
+        cooldown: 24,
+        triggersGcd: false,
+        targeting: 'self',
+        range: 0,
+        radius: 0,
+        selfBuff: { id: Status.Bulwark, durationSec: 8, magnitude: 0.4 },
+      },
+      {
+        id: 'bloodthirst',
+        name: 'Bloodthirst',
+        unlockLevel: 14,
+        base: 8,
+        coeff: 1.2,
+        damageType: 'physical',
+        cost: 25,
+        furyGain: 0,
+        cooldown: 6,
+        triggersGcd: true,
+        targeting: 'target',
+        range: 6,
+        radius: 0,
+        heal: { base: 6, coeff: 0.4 },
+      },
+    ],
+  },
+  {
+    id: 'war-b',
+    unlockLevel: 18,
+    options: [
+      {
+        id: 'unbreakable',
+        name: 'Unbreakable',
+        unlockLevel: 18,
+        base: 0,
+        coeff: 0,
+        damageType: 'physical',
+        cost: 0,
+        furyGain: 0,
+        cooldown: 30,
+        triggersGcd: false,
+        targeting: 'shield',
+        range: 0,
+        radius: 0,
+        shield: { coeff: 2.5, durationSec: 8 },
+      },
+      {
+        id: 'ravager',
+        name: 'Ravager',
+        unlockLevel: 18,
+        base: 7,
+        coeff: 1,
+        damageType: 'physical',
+        cost: 45,
+        furyGain: 0,
+        cooldown: 15,
+        triggersGcd: true,
+        targeting: 'selfAoE',
+        range: 0,
+        radius: 5,
+      },
+    ],
+  },
+];
+
+const HUNTER_CHOICES: ChoiceNode[] = [
+  {
+    id: 'hun-a',
+    unlockLevel: 14,
+    options: [
+      {
+        id: 'aimed-shot',
+        name: 'Aimed Shot',
+        unlockLevel: 14,
+        base: 9,
+        coeff: 1.6,
+        damageType: 'physical',
+        cost: 35,
+        furyGain: 0,
+        cooldown: 8,
+        triggersGcd: true,
+        targeting: 'projectile',
+        range: 28,
+        radius: 0,
+        projectileSpeed: 40,
+      },
+      {
+        id: 'explosive-trap',
+        name: 'Explosive Trap',
+        unlockLevel: 14,
+        base: 7,
+        coeff: 0.9,
+        damageType: 'fire',
+        cost: 30,
+        furyGain: 0,
+        cooldown: 14,
+        triggersGcd: true,
+        targeting: 'trap',
+        range: 0,
+        radius: 0,
+        trapRadius: 3,
+        trapRootSec: 1.5,
+        trapTtl: 30,
+      },
+    ],
+  },
+  {
+    id: 'hun-b',
+    unlockLevel: 18,
+    options: [
+      {
+        id: 'barrage',
+        name: 'Barrage',
+        unlockLevel: 18,
+        base: 6,
+        coeff: 1,
+        damageType: 'physical',
+        cost: 45,
+        furyGain: 0,
+        cooldown: 12,
+        triggersGcd: true,
+        targeting: 'cone',
+        range: 18,
+        radius: 0,
+        coneHalfDeg: 35,
+      },
+      {
+        id: 'camouflage',
+        name: 'Camouflage',
+        unlockLevel: 18,
+        base: 0,
+        coeff: 0,
+        damageType: 'physical',
+        cost: 0,
+        furyGain: 0,
+        cooldown: 24,
+        triggersGcd: false,
+        targeting: 'self',
+        range: 0,
+        radius: 0,
+        selfBuff: { id: Status.Bulwark, durationSec: 6, magnitude: 0.4 },
+      },
+    ],
+  },
+];
+
+const PRIEST_CHOICES: ChoiceNode[] = [
+  {
+    id: 'pri-a',
+    unlockLevel: 14,
+    options: [
+      {
+        id: 'penance',
+        name: 'Penance',
+        unlockLevel: 14,
+        base: 7,
+        coeff: 1.3,
+        damageType: 'holy',
+        cost: 20,
+        furyGain: 0,
+        cooldown: 8,
+        triggersGcd: true,
+        targeting: 'target',
+        range: 25,
+        radius: 0,
+        heal: { base: 5, coeff: 0.5 },
+      },
+      {
+        id: 'holy-fire',
+        name: 'Holy Fire',
+        unlockLevel: 14,
+        base: 8,
+        coeff: 1.6,
+        damageType: 'holy',
+        cost: 22,
+        furyGain: 0,
+        cooldown: 7,
+        triggersGcd: true,
+        targeting: 'target',
+        range: 25,
+        radius: 0,
+        castTime: 1.2,
+      },
+    ],
+  },
+  {
+    id: 'pri-b',
+    unlockLevel: 18,
+    options: [
+      {
+        id: 'divine-aegis',
+        name: 'Divine Aegis',
+        unlockLevel: 18,
+        base: 0,
+        coeff: 0,
+        damageType: 'holy',
+        cost: 25,
+        furyGain: 0,
+        cooldown: 24,
+        triggersGcd: false,
+        targeting: 'shield',
+        range: 0,
+        radius: 0,
+        shield: { coeff: 2.2, durationSec: 10 },
+      },
+      {
+        id: 'divine-star',
+        name: 'Divine Star',
+        unlockLevel: 18,
+        base: 6,
+        coeff: 1,
+        damageType: 'holy',
+        cost: 30,
+        furyGain: 0,
+        cooldown: 9,
+        triggersGcd: true,
+        targeting: 'selfAoE',
+        range: 0,
+        radius: 5,
+        heal: { base: 5, coeff: 0.4 },
+      },
+    ],
+  },
+];
+
 const CLASSES: Record<ClassId, ClassDef> = {
   warrior: {
     id: 'warrior',
@@ -438,6 +690,7 @@ const CLASSES: Record<ClassId, ClassDef> = {
       startsFull: false,
     },
     abilities: WARRIOR_ABILITIES,
+    choiceNodes: WARRIOR_CHOICES,
   },
   hunter: {
     id: 'hunter',
@@ -452,6 +705,7 @@ const CLASSES: Record<ClassId, ClassDef> = {
       startsFull: true,
     },
     abilities: HUNTER_ABILITIES,
+    choiceNodes: HUNTER_CHOICES,
   },
   priest: {
     id: 'priest',
@@ -466,9 +720,25 @@ const CLASSES: Record<ClassId, ClassDef> = {
       startsFull: true,
     },
     abilities: PRIEST_ABILITIES,
+    choiceNodes: PRIEST_CHOICES,
   },
 };
 
 export function getClass(id: ClassId): ClassDef {
   return CLASSES[id];
+}
+
+/** Total hotbar slots for a class: base abilities + one per choice node (fixed). */
+export function kitLength(cls: ClassDef): number {
+  return cls.abilities.length + cls.choiceNodes.length;
+}
+
+/** The player's ordered kit: base abilities, then the selected option per choice node. */
+export function resolveKit(cls: ClassDef, choices?: Record<string, number>): AbilityDef[] {
+  const kit: AbilityDef[] = [...cls.abilities];
+  for (const node of cls.choiceNodes) {
+    const pick = choices?.[node.id] === 1 ? 1 : 0;
+    kit.push(node.options[pick]);
+  }
+  return kit;
 }

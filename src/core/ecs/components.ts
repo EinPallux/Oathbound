@@ -233,6 +233,8 @@ export type ClassId = 'warrior' | 'hunter' | 'priest';
 /** Which class the player is. Drives kit, resource, and primary stat. */
 export interface PlayerClass {
   id: ClassId;
+  /** Talent picks: choice-node id → selected option index (0/1). Absent ⇒ option 0. */
+  choices?: Record<string, number>;
 }
 
 /** A waypoint shrine: activates on first visit, then serves as a respawn + fast-travel node. */
