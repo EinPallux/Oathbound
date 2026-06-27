@@ -26,7 +26,9 @@ export type EnemyTemplateId =
   | 'wisp'
   | 'weaver'
   | 'bramblekin'
-  | 'sporeling';
+  | 'sporeling'
+  | 'sporemother'
+  | 'warchief';
 
 export type Tier = 'standard' | 'elite' | 'rare';
 
@@ -207,6 +209,57 @@ const TEMPLATES: Record<EnemyTemplateId, Template> = {
     goldMax: 4,
     lootTable: 'thornwood_standard',
     weakness: { fire: 1.25 },
+  },
+  // ── Support / pack-leader archetypes (mid-game; previewed in Thornwood) ──
+  sporemother: {
+    name: 'Sporemother',
+    family: 'Sporelings',
+    archetype: 'support',
+    attackType: 'blight',
+    hpBase: 40,
+    hpPerLevel: 12,
+    armorBase: 8,
+    armorPerLevel: 3,
+    primaryBase: 9,
+    primaryPerLevel: 2.5, // scales her heals
+    attackBase: 8, // reused as heal base
+    attackCoeff: 0.9, // reused as heal coeff
+    aggroRadius: 16,
+    leashRange: 38,
+    socialRange: 14, // heals allies within this
+    moveSpeed: 2.8,
+    attackRange: 16, // hangs back and tends the swarm
+    attackCooldown: 3.2,
+    windup: 1.0,
+    goldMin: 4,
+    goldMax: 9,
+    lootTable: 'thornwood_standard',
+    weakness: { fire: 1.2 },
+  },
+  warchief: {
+    name: 'Bramble Warchief',
+    family: 'Bramblekin',
+    archetype: 'pack_leader',
+    attackType: 'physical',
+    hpBase: 58,
+    hpPerLevel: 16,
+    armorBase: 24,
+    armorPerLevel: 7,
+    primaryBase: 9,
+    primaryPerLevel: 2,
+    attackBase: 8,
+    attackCoeff: 0.7,
+    aggroRadius: 11,
+    leashRange: 38,
+    socialRange: 9, // empowers allies within this
+    moveSpeed: 3.0,
+    attackRange: 2.5,
+    attackCooldown: 2.4,
+    windup: 0.9,
+    goldMin: 5,
+    goldMax: 11,
+    lootTable: 'thornwood_standard',
+    weakness: { fire: 1.15 },
   },
 };
 

@@ -66,6 +66,8 @@ export interface DerivedStats {
   haste: number;
   /** Flat bonus to healing done (+Healing affix). */
   healPower: number;
+  /** Typed mitigation from gear (resist affixes). */
+  resist: { fire: number; frost: number; blight: number };
 }
 
 /** Combine level base stats with equipment into the player's derived combat stats.
@@ -83,6 +85,8 @@ export function deriveStats(
   let leech = 0;
   let haste = 0;
   let healPower = 0;
+  let resistFire = 0;
+  let resistBlight = 0;
 
   for (const item of Object.values(equipment.slots)) {
     if (!item) continue;
@@ -109,6 +113,12 @@ export function deriveStats(
         case 'healing':
           healPower += a.value;
           break;
+        case 'resistFire':
+          resistFire += a.value;
+          break;
+        case 'resistBlight':
+          resistBlight += a.value;
+          break;
       }
     }
   }
@@ -121,5 +131,6 @@ export function deriveStats(
     leech,
     haste: Math.min(haste, 0.3),
     healPower,
+    resist: { fire: resistFire, frost: 0, blight: resistBlight },
   };
 }

@@ -167,7 +167,7 @@ export interface CombatState {
 export type EnemyState = 'idle' | 'engage' | 'attack' | 'leash' | 'dead';
 
 export interface Enemy {
-  archetype: 'melee_bruiser' | 'ranged_skirmisher' | 'caster';
+  archetype: 'melee_bruiser' | 'ranged_skirmisher' | 'caster' | 'support' | 'pack_leader';
   family: string;
   tier: 'standard' | 'elite' | 'rare';
   state: EnemyState;
@@ -278,7 +278,15 @@ export interface Trap {
   coeff: number;
 }
 
-export type AffixId = 'crit' | 'leech' | 'haste' | 'armor' | 'vit' | 'healing';
+export type AffixId =
+  | 'crit'
+  | 'leech'
+  | 'haste'
+  | 'armor'
+  | 'vit'
+  | 'healing'
+  | 'resistFire'
+  | 'resistBlight';
 
 /** A temporary absorb pool that soaks damage before HP (Priest Aegis). */
 export interface Shield {
