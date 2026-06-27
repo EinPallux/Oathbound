@@ -51,12 +51,16 @@ export function createMovementSystem(deps: MovementDeps): System {
           strafe /= mag;
         }
 
-        // World-space move direction from camera yaw.
-        // forward(yaw) = (sin, cos); right(yaw) = (cos, -sin).
+        // World-space move direction from the camera yaw. Forward follows where the
+        // camera looks: forward(yaw) = (sin, cos). Screen-right must match the camera's
+        // actual right axis — Three's lookAt builds right = cross(up, eye−target), which
+        // at yaw 0 (camera south of the player) is world −x. So right(yaw) = (−cos, sin);
+        // strafing D moves toward the right of the screen. (Using (cos, −sin) here inverts
+        // A/D relative to the camera — the classic strafe-inversion bug.)
         const sy = Math.sin(input.yaw);
         const cy = Math.cos(input.yaw);
-        const moveX = sy * fwd + cy * strafe;
-        const moveZ = cy * fwd - sy * strafe;
+        const moveX = sy * fwd - cy * strafe;
+        const moveZ = cy * fwd + sy * strafe;
 
         // Fleet (Disengage) gives a brief move-speed bonus.
         const fleet = statusMagnitude(world.get<Statuses>(e, C.Statuses), Status.Fleet);

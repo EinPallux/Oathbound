@@ -244,17 +244,18 @@ export function generateScenery(size: number, opts: SceneryOptions = {}): Scener
   };
 }
 
-/** A meandering river through the lowland heartland (kept off the eastern peaks). */
+/** A meandering river winding through the lowland heartland (kept off the eastern peaks). */
 function buildRivers(half: number): SceneryPath[] {
   const main: { x: number; z: number }[] = [];
-  const zStart = Math.min(half - 10, 210);
-  const zEnd = Math.max(-half + 10, -210);
-  for (let z = zStart; z >= zEnd; z -= 8) {
-    // West of town; gently winding so it never climbs the Riven mountains (east).
-    const x = -34 + Math.sin(z * 0.018) * 26 + Math.sin(z * 0.05) * 6;
+  const zStart = Math.min(half - 10, 215);
+  const zEnd = Math.max(-half + 10, -215);
+  for (let z = zStart; z >= zEnd; z -= 6) {
+    // Sweeps west↔centre across the heartland (crossing the road north of town) but
+    // never reaches the Riven mountains (east) or the Emberreach border (far west).
+    const x = -26 + Math.sin(z * 0.018) * 44 + Math.sin(z * 0.05) * 8;
     main.push({ x, z });
   }
-  return [{ points: main, width: 6 }];
+  return [{ points: main, width: 7 }];
 }
 
 /** Straight-ish roads from the hub out to each frontier destination (gentle curve). */
@@ -274,7 +275,7 @@ function buildRoads(targets: { x: number; z: number }[]): SceneryPath[] {
       const curve = Math.sin(s * Math.PI) * bend;
       points.push({ x: t.x * s + px * curve, z: t.z * s + pz * curve });
     }
-    roads.push({ points, width: 3.4 });
+    roads.push({ points, width: 4.5 });
   }
   return roads;
 }
