@@ -18,6 +18,9 @@ export const CombatEvent = {
   LootPicked: 'loot/picked',
   GoldGained: 'loot/gold',
   ItemSalvaged: 'item/salvaged',
+  ItemSold: 'item/sold',
+  OathstoneActivated: 'oathstone/activated',
+  FastTraveled: 'travel/used',
 } as const;
 
 export interface DamageEvent {
@@ -93,4 +96,19 @@ export interface ItemSalvagedEvent {
   itemName: string;
   whetstones: number;
   gold: number;
+}
+
+export interface ItemSoldEvent {
+  itemName: string;
+  gold: number;
+}
+
+export interface OathstoneActivatedEvent {
+  entity: number;
+  name: string;
+}
+
+export interface FastTraveledEvent {
+  name: string;
+  cost: number;
 }

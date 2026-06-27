@@ -1,6 +1,7 @@
-// Composition root for Phase 0.2.0 "The Hunter": two classes (Warrior melee/Fury,
-// Hunter ranged/Focus), a mixed Greenmarch camp (melee Bloomhusks + ranged Reavers),
-// pooled projectiles, traps, class-select, XP/loot/equip/salvage, and a persisted run.
+// Composition root for Phase 0.3.0 "First Ten Levels": three classes, the Greenmarch +
+// Thornwood Vale regions with enemy tiers/rares, the full grind loop (XP/loot/equip/
+// salvage), and — this checkpoint — the Oathstone network: waypoints that activate on
+// proximity, bind your respawn, fast-travel for a toll (T), plus vendors to sell to (F).
 
 import * as THREE from 'three';
 import { Renderer } from '../render/renderer';
@@ -13,18 +14,21 @@ import { generateHeightfield, generateColliders } from '../world/heightfield';
 import { createMovementSystem } from '../sim/systems/movement';
 import { createCombatSystem } from '../sim/systems/combat';
 import { createEnemyAiSystem } from '../sim/systems/enemy-ai';
-import { createLootSystem } from '../sim/systems/loot';
+import { createLootSystem, pickUpNearest } from '../sim/systems/loot';
 import { createRecoverySystem } from '../sim/systems/recovery';
+import { createWaypointSystem } from '../sim/systems/waypoint';
 import { createSpatialSystem } from '../sim/systems/spatial';
 import { createProjectileSystem } from '../sim/systems/projectile';
 import { createTrapSystem } from '../sim/systems/trap';
 import { SpatialGrid } from '../sim/spatial-grid';
 import { Projectiles } from '../sim/projectiles';
 import { Telemetry, createTelemetrySystem } from '../sim/telemetry';
-import { createPlayer, setPlayerClass } from '../sim/factory';
+import { createPlayer, setPlayerClass, createOathstone, createVendor } from '../sim/factory';
 import { spawnEnemy, type EnemyTemplateId, type Tier } from '../sim/content/enemies';
 import { equipItem } from '../sim/inventory';
 import { salvageItem, salvageAllBelow } from '../sim/salvage';
+import { nearestVendor, sellItem, sellAllBelow } from '../sim/vendor';
+import { fastTravel } from '../sim/travel';
 import { grantXp } from '../sim/progression';
 import { serialize, applySave } from '../sim/save';
 import { conColor } from '../sim/stats';
@@ -40,6 +44,7 @@ import {
   type Resource,
   type PlayerClass,
   type ClassId,
+  type Oathstone,
 } from '../core/ecs/components';
 import {
   CombatEvent,
@@ -49,6 +54,8 @@ import {
   type LootPickedEvent,
   type PlayerDiedEvent,
   type ItemSalvagedEvent,
+  type ItemSoldEvent,
+  type OathstoneActivatedEvent,
 } from '../sim/combat/events';
 import type { TelemetrySnapshot } from '../sim/telemetry';
 import { Rng } from '../core/rng';
@@ -63,6 +70,9 @@ import { Hud } from '../render/hud';
 import { InventoryPanel } from '../render/inventory-panel';
 import { ProjectileView } from '../render/projectile-view';
 import { TrapView } from '../render/trap-view';
+import { InteractableView } from '../render/interactable-view';
+import { VendorPanel } from '../render/vendor-panel';
+import { TravelPanel } from '../render/travel-panel';
 import { ClassSelect } from '../render/class-select';
 import { Sfx } from '../platform/audio';
 import { loadSave, writeSave } from '../platform/save-store';
@@ -103,6 +113,21 @@ const SPAWNS: Spawn[] = [
   { id: 'bramblekin', x: 41, z: 41, level: 8, tier: 'rare', name: 'Old Thornback' },
 ];
 
+// Oathstone waypoint network (~one per region + the hub). The hub sits next to spawn
+// so it auto-activates on the first tick (binding the starting respawn); the others are
+// discovered by walking. Vendor row at the hub.
+interface OathstoneSpawn {
+  id: string;
+  name: string;
+  x: number;
+  z: number;
+}
+const OATHSTONES: OathstoneSpawn[] = [
+  { id: 'oathhold', name: 'Oathhold', x: 0, z: -3 }, // hub — auto-activates at spawn
+  { id: 'millford', name: 'Millford Waystation', x: 14, z: 16 }, // Greenmarch
+  { id: 'thornlodge', name: 'Thornwood Lodge', x: 30, z: 28 }, // Thornwood Vale
+];
+
 export interface EnemySnapshot {
   id: number;
   name: string;
@@ -125,6 +150,7 @@ export interface Game {
   bagCount(): number;
   classId(): ClassId;
   resource(): { current: number; max: number };
+  oathstones(): { name: string; activated: boolean }[];
   telemetry(): TelemetrySnapshot;
   debugAddXp(n: number): void;
   debugSetClass(id: ClassId): void;
@@ -162,16 +188,21 @@ export function boot(): Game {
   for (const s of SPAWNS) {
     spawnEnemy(world, field, s.id, s.x, s.z, { level: s.level, tier: s.tier, name: s.name });
   }
+  for (const o of OATHSTONES) createOathstone(world, field, o.id, o.name, o.x, o.z);
+  createVendor(world, field, 'Quartermaster', 3, -3);
   telemetry.attach(world, player);
 
-  // Systems: spatial → movement → combat → enemy AI → projectiles → traps → loot → recovery → telemetry.
+  // Systems: spatial → movement → combat → enemy AI → projectiles → traps → loot →
+  // waypoint → recovery → telemetry. Waypoint runs after movement so it sees the
+  // updated position, and before recovery so respawn binds to the stone just visited.
   world.addSystem(createSpatialSystem(grid));
   world.addSystem(createMovementSystem({ input, field, colliders }));
   world.addSystem(createCombatSystem({ input, rng, colliders, field, projectiles, grid }));
   world.addSystem(createEnemyAiSystem({ field, colliders, rng, grid, projectiles }));
   world.addSystem(createProjectileSystem(projectiles, rng));
   world.addSystem(createTrapSystem(rng));
-  world.addSystem(createLootSystem({ input }));
+  world.addSystem(createLootSystem());
+  world.addSystem(createWaypointSystem());
   world.addSystem(createRecoverySystem({ field, spawnX: 0, spawnZ: 0 }));
   world.addSystem(createTelemetrySystem(telemetry));
 
@@ -182,10 +213,13 @@ export function boot(): Game {
   const lootView = new LootView(renderer.scene);
   const projectileView = new ProjectileView(renderer.scene, projectiles);
   const trapView = new TrapView(renderer.scene);
+  const interactableView = new InteractableView(renderer.scene);
   const damageNumbers = new DamageNumbers(uiRoot);
   const targetFrame = new TargetFrame(uiRoot);
   const hud = new Hud(uiRoot);
   const invPanel = new InventoryPanel(uiRoot);
+  const vendorPanel = new VendorPanel(uiRoot);
+  const travelPanel = new TravelPanel(uiRoot);
   const classSelect = new ClassSelect(uiRoot);
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -206,6 +240,30 @@ export function boot(): Game {
   invPanel.onToggleLock = (item) => {
     item.locked = !item.locked;
     autosave();
+  };
+
+  vendorPanel.onSell = (item) => {
+    if (sellItem(world, player, item.uid)) autosave();
+  };
+  vendorPanel.onSellCommons = () => {
+    if (sellAllBelow(world, player, 'common') > 0) autosave();
+  };
+  travelPanel.onTravel = (dest) => {
+    const res = fastTravel(world, player, dest, field);
+    if (res.ok) {
+      travelPanel.close();
+      hud.toast(`Travelled to ${res.name} (−${res.cost} g)`);
+      sfx.loot();
+      autosave();
+    } else {
+      hud.toast(
+        res.reason === 'combat'
+          ? 'Cannot travel while in combat'
+          : res.reason === 'gold'
+            ? 'Not enough gold for the toll'
+            : 'Cannot travel there',
+      );
+    }
   };
 
   // Combat/loot feedback.
@@ -239,11 +297,23 @@ export function boot(): Game {
   world.events.on<ItemSalvagedEvent>(CombatEvent.ItemSalvaged, (ev) => {
     hud.toast(`Salvaged ${ev.itemName} (+${ev.whetstones} whetstones)`);
   });
+  world.events.on<ItemSoldEvent>(CombatEvent.ItemSold, (ev) => {
+    hud.toast(`Sold ${ev.itemName} (+${ev.gold} g)`);
+    sfx.loot();
+  });
+  world.events.on<OathstoneActivatedEvent>(CombatEvent.OathstoneActivated, (ev) => {
+    hud.toast(`Oathstone attuned — ${ev.name}`, 'good');
+    sfx.levelUp();
+    autosave();
+  });
 
   // Persistence: load the saved run, then autosave on key events + a timer + unload.
+  // `loaded` gates autosave so the first-tick Oathstone attune doesn't write a default
+  // snapshot over the real save before loadSave's read resolves.
   let saving = false;
+  let loaded = false;
   function autosave(): void {
-    if (saving) return;
+    if (saving || !loaded) return;
     saving = true;
     void writeSave(serialize(world, player)).finally(() => {
       saving = false;
@@ -258,7 +328,10 @@ export function boot(): Game {
       if (data) applySave(world, player, data);
       else classSelect.show(); // fresh character → pick a class
     })
-    .catch(() => {});
+    .catch(() => {})
+    .finally(() => {
+      loaded = true;
+    });
   const saveTimer = window.setInterval(autosave, 30_000);
   const onHide = (): void => autosave();
   const onVisibility = (): void => {
@@ -280,8 +353,30 @@ export function boot(): Game {
       const rdt = Math.min(0.1, (now - lastRender) / 1000);
       lastRender = now;
 
-      // Toggle the inventory/character panel.
-      if (input.consumeToggleInventory() || input.consumeToggleCharacter()) invPanel.toggle();
+      // Centre panels are mutually exclusive (inventory / vendor / travel).
+      if (input.consumeToggleInventory() || input.consumeToggleCharacter()) {
+        vendorPanel.close();
+        travelPanel.close();
+        invPanel.toggle();
+      }
+      if (input.consumeToggleTravel()) {
+        if (invPanel.isOpen) invPanel.toggle();
+        vendorPanel.close();
+        travelPanel.toggle();
+      }
+      // F interact: close an open vendor panel, else grab nearby loot, else open the
+      // vendor panel when standing by a vendor. (Centralized interact key.)
+      if (input.consumeInteract()) {
+        if (vendorPanel.isOpen) {
+          vendorPanel.close();
+        } else if (!pickUpNearest(world) && nearestVendor(world, player) != null) {
+          if (invPanel.isOpen) invPanel.toggle();
+          travelPanel.close();
+          vendorPanel.open();
+        }
+      }
+      // Auto-close the vendor panel once you walk away from the stall.
+      if (vendorPanel.isOpen && nearestVendor(world, player) == null) vendorPanel.close();
 
       // Left-click select.
       const click = input.consumeClick();
@@ -310,6 +405,7 @@ export function boot(): Game {
       lootView.update(world);
       projectileView.update();
       trapView.update(world);
+      interactableView.update(world);
 
       // Target frame (with con colour).
       const te = playerTarget.entity;
@@ -328,6 +424,8 @@ export function boot(): Game {
 
       hud.update(world, player);
       invPanel.update(world, player);
+      vendorPanel.update(world, player);
+      travelPanel.update(world, player);
 
       renderer.render();
       damageNumbers.update(renderer.camera, window.innerWidth, window.innerHeight);
@@ -371,6 +469,14 @@ export function boot(): Game {
     resource: () => {
       const r = world.get<Resource>(player, C.Resource)!;
       return { current: r.current, max: r.max };
+    },
+    oathstones: () => {
+      const out: { name: string; activated: boolean }[] = [];
+      for (const e of world.query(C.Oathstone)) {
+        const os = world.get<Oathstone>(e, C.Oathstone)!;
+        out.push({ name: os.name, activated: os.activated });
+      }
+      return out;
     },
     telemetry: () => telemetry.snapshot(),
     debugAddXp: (n) => grantXp(world, player, n),

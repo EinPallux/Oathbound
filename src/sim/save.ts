@@ -17,6 +17,8 @@ import {
   type Transform,
   type Health,
   type Resource,
+  type Respawn,
+  type Oathstone,
 } from '../core/ecs/components';
 import { recomputeDerived } from './inventory';
 import { xpToNext } from './stats';
@@ -31,6 +33,9 @@ export interface SaveData {
   gold: number;
   materials: number;
   position: { x: number; z: number };
+  respawn: { x: number; z: number };
+  /** Ids of activated Oathstones. */
+  oathstones: string[];
   inventory: Item[];
   equipment: Partial<Record<EquipSlot, Item>>;
 }
@@ -45,6 +50,13 @@ export function serialize(world: World, player: Entity): SaveData {
   const inv = world.get<Inventory>(player, C.Inventory)!;
   const eq = world.get<Equipment>(player, C.Equipment)!;
   const tr = world.get<Transform>(player, C.Transform)!;
+  const respawn = world.get<Respawn>(player, C.Respawn);
+
+  const oathstones: string[] = [];
+  for (const e of world.query(C.Oathstone)) {
+    const os = world.get<Oathstone>(e, C.Oathstone)!;
+    if (os.activated) oathstones.push(os.id);
+  }
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -54,6 +66,8 @@ export function serialize(world: World, player: Entity): SaveData {
     gold: inv.gold,
     materials: inv.materials,
     position: { x: tr.x, z: tr.z },
+    respawn: { x: respawn?.x ?? tr.x, z: respawn?.z ?? tr.z },
+    oathstones,
     inventory: clone(inv.items),
     equipment: clone(eq.slots),
   };
@@ -82,6 +96,19 @@ export function applySave(world: World, player: Entity, data: SaveData): void {
   tr.z = data.position.z;
   tr.prevX = tr.x;
   tr.prevZ = tr.z;
+
+  const respawn = world.get<Respawn>(player, C.Respawn);
+  if (respawn && data.respawn) {
+    respawn.x = data.respawn.x;
+    respawn.z = data.respawn.z;
+  }
+
+  // Re-mark Oathstones that were activated in the saved run.
+  const activated = new Set(data.oathstones ?? []);
+  for (const e of world.query(C.Oathstone)) {
+    const os = world.get<Oathstone>(e, C.Oathstone)!;
+    if (activated.has(os.id)) os.activated = true;
+  }
 
   recomputeDerived(world, player);
   const h = world.get<Health>(player, C.Health)!;
