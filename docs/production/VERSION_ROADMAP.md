@@ -4,7 +4,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 
 > **Roadmap philosophy (anti-scope-creep).** We do **not** build: a fake dungeon before combat is fun · a raid mockup before enemies work · a guild menu before networking · an auction house without an economy · ten empty zones · three one-ability classes · stat-less equipment · giant empty terrain. We **do** build one satisfying slice and deepen it.
 
-> 📍 **Live progress** (which phases are actually done) is tracked in [`AGENTS.md`](../../AGENTS.md) and [`CHANGELOG.md`](../../CHANGELOG.md), not here — this document is the **static plan**. As of the latest commit: `0.0.1`–`0.0.3` are ✅ done (Core Movement Gate passed); **next is `0.0.4`**.
+> 📍 **Live progress** (which phases are actually done) is tracked in [`AGENTS.md`](../../AGENTS.md) and [`CHANGELOG.md`](../../CHANGELOG.md), not here — this document is the **static plan**. As of the latest sync: **`0.0.1`–`0.5.0` are ✅ done** (the full Lv 1–30 game is playable; Level 1–30 Content Gate automatable scope passed); **next is `0.6.0`** (equipment depth + Lv-30 endgame).
 
 ## Milestone band overview
 | Band | Theme | Player-facing outcome | Exit gate |
@@ -49,7 +49,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 - **Validation:** Playwright movement smoke; manual traversal; perf capture.
 - **Deliverables:** traversable greybox zone.
 
-### 0.0.4-INDEV — "First Contact" ◀ NEXT
+### 0.0.4-INDEV — "First Contact" ✅ done
 - **Outcome:** a target dummy can be selected and hit; damage numbers appear; one ability + GCD work. · **Deps:** 0.0.3.
 - **Included:** soft tab-target ([COMBAT_DESIGN](../design/COMBAT_DESIGN.md#1-targeting-model--decision)); basic attack + one spender; GCD/cooldown; [canonical damage formula](../design/COMBAT_DESIGN.md#5-damage-calculation-canonical-formula) (first pass); hit feedback; object pooling for damage numbers.
 - **Excluded:** enemy AI, loot, progression.
@@ -60,7 +60,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 
 ## 0.1.x — First Complete Grinding Loop (ONE class, ONE family)
 
-### 0.1.0-INDEV — "Vertical Slice" → **Combat Gate + Core Loop Gate**
+### 0.1.0-INDEV — "Vertical Slice" ✅ done → **Combat Gate + Core Loop Gate**
 - **Outcome:** as a **Warrior**, fight one **Greenmarch** family (Standard tier), gain **XP**, get **loot**, **equip** an upgrade, recover, repeat — and it's *fun*. · **Deps:** 0.0.4. · **Effort:** L · **Complexity:** M · **Risk:** M.
 - **Included:** Warrior early kit (filler, Sunder, Whirl, Bulwark); **melee enemy archetype** with aggro/leash/social/respawn ([ENEMY_DESIGN](../design/ENEMY_DESIGN.md)); XP curve + leveling ([PROGRESSION_AND_XP](../design/PROGRESSION_AND_XP.md)); loot drop→pickup→inventory→equip; a handful of equipment slots; rarities Common/Uncommon; gold; **save v1** (IndexedDB) ([SAVE_SYSTEM_PLAN](../technical/SAVE_SYSTEM_PLAN.md)); minimal HUD.
 - **Excluded:** other classes, other families/zones, elites/rares, Rare+ rarity, world bosses, full UI.
@@ -68,17 +68,17 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 - **Validation:** combat-sim tests; a recorded 20-min playtest with telemetry vs [SOLO_BALANCE_RULES](../design/SOLO_BALANCE_RULES.md); leak check over the session.
 - **Deliverables:** the playable core loop. **This is the most important milestone — if this isn't fun, do not proceed to breadth.**
 
-### 0.1.1-INDEV — "Loop Hardening"
+### 0.1.1-INDEV — "Loop Hardening" ✅ done
 - **Outcome:** the slice is robust and performant. · Included: pooling everywhere, AI throttling, spatial grid, drop/inventory polish, salvage v1, telemetry counters. · Acceptance: perf budgets hold; no leaks over 60-min session; inventory never blocks flow.
 
 ---
 
 ## 0.2.x — All Three Classes Operational → **Three-Class Gate**
 
-### 0.2.0-INDEV — "The Hunter"
+### 0.2.0-INDEV — "The Hunter" ✅ done
 - **Outcome:** Hunter is solo-viable through the slice (ranged, Focus, kiting, traps). · Included: Hunter early kit; **ranged-skirmisher enemy archetype**; projectile pooling; trap/ground-target tech. · Excluded: Priest. · Acceptance: Hunter clears the slice solo; kiting doesn't break leashing.
 
-### 0.2.1-INDEV — "The Priest" → **Three-Class Gate**
+### 0.2.1-INDEV — "The Priest" ✅ done → **Three-Class Gate**
 - **Outcome:** Priest is solo-viable (holy damage + Atonement self-sustain + shields). · Included: Priest early kit; **caster enemy archetype** (telegraph + interrupt target); healing/shield systems; +Healing affix. · Acceptance: [Three-Class Gate](./RELEASE_GATES.md#4-three-class-gate) — all three classes solo the slice; inter-class TTK within ±20%; Priest is **not** a weak-damage healer; Warrior is **not** a slow tank; Hunter needs **no pet**.
 - **Deliverables:** three operational classes with early kits.
 
@@ -86,7 +86,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 
 ## 0.3.x — Initial World Progression (Lv 1–10) → **Level 1–10 Gate**
 
-### 0.3.0 — "First Ten Levels"
+### 0.3.0 — "First Ten Levels" ✅ done
 - **Outcome:** a polished Lv 1–10 journey across **Greenmarch** + **Thornwood Vale**. · Deps: 0.2.1. · Effort: L · Complexity: M · Risk: M.
 - **Included:** full ability unlocks Lv 1–10 for all classes; Thornwood families (spiders/bramble/spore) + **defensive** & **swarm** archetypes; first **elite** + first **rare-named**; full equipment slot set; rarity up to **Rare**; vendors/gold sinks; Oathstones + fast travel; **onboarding** (≤2 min to first kill); HUD v1; map v1.
 - **Excluded:** zones beyond Thornwood; Epic+; world bosses; choice nodes beyond what unlocks by 10.
@@ -98,7 +98,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 
 ## 0.4.x — Expanded Brackets (Lv 11–20)
 
-### 0.4.0 — "Fen & Ember"
+### 0.4.0 — "Fen & Ember" ✅ done
 - **Outcome:** Lv 11–20 across **Sunken Fen** + **Emberreach**. · Deps: 0.3.0. · Effort: L · Complexity: M · Risk: M.
 - **Included:** ability unlocks 11–20 (interrupt, choice node A, ground-AoE tool, choice node B); **resistance system** (blight/fire) live; **caster/support/pack-leader** archetypes; elite **camps**; **Epic** rarity; Reinforcement upgrade + salvage materials; bad-luck protection v1.
 - **Excluded:** Lv 21–30 zones; Legendary/Relic; world bosses.
@@ -109,7 +109,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 
 ## 0.5.x — Complete Lv 1–30 Progression → **Level 1–30 Content Gate**
 
-### 0.5.0 — "Road to Thirty"
+### 0.5.0 — "Road to Thirty" ✅ done
 - **Outcome:** the **entire** Lv 1–30 path is playable across all six regions. · Deps: 0.4.0. · Effort: XL · Complexity: M · Risk: M.
 - **Included:** **Riven Peaks** (21–25) + **Gravereach** (26–30); full ability kits to **Lv 30** incl. capstones + choice node C; all enemy **families**; undead **holy-weakness** lever; complete zone connectivity & travel.
 - **Excluded:** Legendary/Relic depth, world bosses (foundation only), final polish/optimization.
@@ -121,7 +121,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 
 ## 0.6.x — Equipment Depth & Level-30 Farming → **Endgame Foundation Gate**
 
-### 0.6.0 — "The Chase"
+### 0.6.0 — "The Chase" ◀ NEXT
 - **Outcome:** a real level-30 gear chase. · Deps: 0.5.0. · Effort: L · Complexity: M · Risk: M.
 - **Included:** **Legendary** + **Relic** tiers; full affix depth & tiers; bad-luck protection tuned; Reinforcement to cap; **3 solo world bosses** (Emberhorn, Rimewyrm, Maelgrith); named rares per zone; target-farming sources; loot identities per zone ([ENDGAME_FOUNDATION](../design/ENDGAME_FOUNDATION.md)).
 - **Excluded:** dungeons/raids (deferred), any group content.
