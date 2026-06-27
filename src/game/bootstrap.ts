@@ -21,7 +21,8 @@ import { createTrapSystem } from '../sim/systems/trap';
 import { SpatialGrid } from '../sim/spatial-grid';
 import { Projectiles } from '../sim/projectiles';
 import { Telemetry, createTelemetrySystem } from '../sim/telemetry';
-import { createPlayer, createBloomhusk, createReaver, createWisp, setPlayerClass } from '../sim/factory';
+import { createPlayer, setPlayerClass } from '../sim/factory';
+import { spawnEnemy, type EnemyTemplateId, type Tier } from '../sim/content/enemies';
 import { equipItem } from '../sim/inventory';
 import { salvageItem, salvageAllBelow } from '../sim/salvage';
 import { grantXp } from '../sim/progression';
@@ -70,14 +71,36 @@ import { lerp, lerpAngle } from '../core/math';
 const WORLD_SIZE = 100;
 const WORLD_RES = 129;
 
-// A mixed Greenmarch camp ahead of spawn (+Z): melee Bloomhusks, ranged Reavers, a Wisp caster.
-const CAMP: { x: number; z: number; level: number; kind: 'bloomhusk' | 'reaver' | 'wisp' }[] = [
-  { x: 0, z: 6, level: 1, kind: 'bloomhusk' },
-  { x: 3, z: 9, level: 1, kind: 'bloomhusk' },
-  { x: -3, z: 9, level: 1, kind: 'reaver' },
-  { x: 6, z: 12, level: 2, kind: 'bloomhusk' },
-  { x: -6, z: 12, level: 2, kind: 'wisp' },
-  { x: 0, z: 14, level: 2, kind: 'reaver' },
+// Enemy spawns. Greenmarch (Lv 1–2) ahead of spawn; an elite anchor; Thornwood Vale
+// (Lv 6–8) out to the north-east; a rare-named deep in Thornwood.
+interface Spawn {
+  id: EnemyTemplateId;
+  x: number;
+  z: number;
+  level: number;
+  tier?: Tier;
+  name?: string;
+}
+const SPAWNS: Spawn[] = [
+  // Greenmarch camp (+Z).
+  { id: 'bloomhusk', x: 0, z: 6, level: 1 },
+  { id: 'bloomhusk', x: 3, z: 9, level: 1 },
+  { id: 'reaver', x: -3, z: 9, level: 1 },
+  { id: 'bloomhusk', x: 6, z: 12, level: 2 },
+  { id: 'wisp', x: -6, z: 12, level: 2 },
+  { id: 'reaver', x: 0, z: 14, level: 2 },
+  // Greenmarch elite anchor.
+  { id: 'bloomhusk', x: 12, z: 18, level: 3, tier: 'elite', name: 'Bloomhusk Matriarch' },
+  // Thornwood Vale (north-east): fast Weavers + Sporeling swarms + a tanky Bramblekin.
+  { id: 'weaver', x: 30, z: 30, level: 6 },
+  { id: 'weaver', x: 33, z: 32, level: 6 },
+  { id: 'sporeling', x: 28, z: 34, level: 6 },
+  { id: 'sporeling', x: 31, z: 36, level: 6 },
+  { id: 'sporeling', x: 27, z: 31, level: 6 },
+  { id: 'bramblekin', x: 36, z: 34, level: 7 },
+  { id: 'reaver', x: 34, z: 39, level: 7 },
+  // Rare-named, deep in Thornwood.
+  { id: 'bramblekin', x: 41, z: 41, level: 8, tier: 'rare', name: 'Old Thornback' },
 ];
 
 export interface EnemySnapshot {
@@ -136,10 +159,8 @@ export function boot(): Game {
   const projectiles = new Projectiles();
   const telemetry = new Telemetry();
   const player = createPlayer(world, field, 0, 0);
-  for (const c of CAMP) {
-    if (c.kind === 'reaver') createReaver(world, field, c.x, c.z, c.level);
-    else if (c.kind === 'wisp') createWisp(world, field, c.x, c.z, c.level);
-    else createBloomhusk(world, field, c.x, c.z, c.level);
+  for (const s of SPAWNS) {
+    spawnEnemy(world, field, s.id, s.x, s.z, { level: s.level, tier: s.tier, name: s.name });
   }
   telemetry.attach(world, player);
 
@@ -207,7 +228,7 @@ export function boot(): Game {
     autosave();
   });
   world.events.on<LootPickedEvent>(CombatEvent.LootPicked, (ev) => {
-    hud.toast(`Looted ${ev.item.name}`, ev.item.rarity === 'uncommon' ? 'rare' : 'info');
+    hud.toast(`Looted ${ev.item.name}`, ev.item.rarity === 'common' ? 'info' : 'rare');
     sfx.loot();
     autosave();
   });

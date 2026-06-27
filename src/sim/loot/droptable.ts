@@ -1,6 +1,6 @@
-// Drop resolution: gold + (maybe) one item, weighted by enemy tier. Pure /
-// deterministic for a given RNG. Trimmed slice (standard tier, Common/Uncommon).
-// Targets ~8–12% uncommon+ from a standard kill (docs/design/SOLO_BALANCE_RULES.md).
+// Drop resolution: gold + (maybe) one item, with rarity weighted by enemy tier.
+// Pure / deterministic for a given RNG. Standards lean common/uncommon; elites add
+// Rare; rare-named mostly Rare. See docs/design/ITEMS_AND_EQUIPMENT.md.
 
 import type { Item, Rarity } from '../../core/ecs/components';
 import type { Rng } from '../../core/rng';
@@ -14,17 +14,31 @@ export interface LootRoll {
 interface TierTable {
   /** Probability an item drops at all. */
   dropChance: number;
-  /** Probability the dropped item is Uncommon (else Common). */
-  uncommonShare: number;
+  /** Relative rarity weights. */
+  weights: { common: number; uncommon: number; rare: number };
 }
 
 const TIERS: Record<string, TierTable> = {
-  standard: { dropChance: 0.35, uncommonShare: 0.28 },
+  standard: { dropChance: 0.35, weights: { common: 0.72, uncommon: 0.28, rare: 0 } },
+  elite: { dropChance: 0.7, weights: { common: 0.2, uncommon: 0.5, rare: 0.3 } },
+  rare: { dropChance: 1.0, weights: { common: 0.1, uncommon: 0.3, rare: 0.6 } },
 };
 
+function pickRarity(rng: Rng, w: TierTable['weights'], conMult: number): Rarity {
+  // `conMult` mildly biases toward the better rolls for higher-con enemies.
+  const common = w.common;
+  const uncommon = w.uncommon * conMult;
+  const rare = w.rare * conMult;
+  const total = common + uncommon + rare;
+  let r = rng.next() * total;
+  if ((r -= common) < 0) return 'common';
+  if ((r -= uncommon) < 0) return 'uncommon';
+  return 'rare';
+}
+
 /**
- * Roll loot for a kill. `conMult` mildly biases rarity for higher-con enemies.
- * Gold is small and always awarded.
+ * Roll loot for a kill. Gold is small and always awarded; an item drops per the
+ * tier's `dropChance`, with rarity weighted by tier (and mildly by con).
  */
 export function rollLoot(
   rng: Rng,
@@ -38,8 +52,7 @@ export function rollLoot(
 
   if (rng.next() > t.dropChance) return { item: null, gold };
 
-  const uncommonChance = Math.min(0.6, t.uncommonShare * conMult);
-  const rarity: Rarity = rng.next() < uncommonChance ? 'uncommon' : 'common';
+  const rarity = pickRarity(rng, t.weights, conMult);
   const item = generateItem(rng, { ilvl: enemyLevel, rarity, primaryStat });
   return { item, gold };
 }

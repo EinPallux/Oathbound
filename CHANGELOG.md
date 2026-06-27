@@ -17,14 +17,18 @@ Each entry is an **independently testable build**. After each phase, work pauses
 - New mechanics: `charge` targeting (gap-closer), missing-HP healing rider, and a `Marked` vulnerability handled in the shared damage applier.
 - Tests: unlock gating (locked → no fire; unlocked → fires), Charge (closes distance + roots), Second Wind (heals), Hunter's Mark (marked targets take more) → **104 unit tests**; e2e green (8).
 
+### ✅ Checkpoint 2 — Thornwood Vale + enemy tiers + Rare loot
+- **Data-driven enemies** (`src/sim/content/enemies.ts`): a template table (shared level curve + per-template overrides) and a generic `spawnEnemy` with **tier multipliers**. `createBloomhusk/Reaver/Wisp` are now thin wrappers.
+- **Thornwood Vale (zone 2)** families, placed out to the north-east (Lv 6–8): **Weaver** (fast melee swarm), **Bramblekin** (slow, heavy-armour bruiser), **Sporeling** (fragile fungal swarm).
+- **Enemy tiers**: **elite** (×5 HP, ×1.5 dmg, ×5 XP, longer respawn) with an **enrage below 30% HP**, and a **rare-named** (×8 HP, ×12 XP, unique name) — both visually larger/tinted. A Greenmarch elite anchor (*Bloomhusk Matriarch*) and a Thornwood rare (*Old Thornback*).
+- **Rare** rarity (blue, 2 affixes, ×1.20 budget) + **tier-aware drop tables** (standards lean common/uncommon; elites add Rare; rare-named mostly Rare). Loot beams + inventory show the new colour.
+- Tests: data-driven spawn + tier scaling, Rare item gen, tier loot weights → **108 unit tests**.
+
 ### ⏳ Remaining for the Level 1–10 Gate (next checkpoints)
-- **Thornwood Vale** (zone 2) + its families (Weavers/Bramblekin/Sporelings).
-- First **elite** + first **rare-named** (tiers, bigger HP/XP, better drops).
-- **Rare** rarity tier + the complete equipment slot loadout.
 - **Oathstones** (waypoints) + **fast-travel**; **vendors** (sell/buy).
 - **Onboarding** (teach move/target/ability/loot/equip/recover ≤2 min) + **HUD/map v1**.
 
-**Verified so far:** `typecheck` ✓ · `npm test` → 104/104 ✓ · `build` ✓ (~155 KB gzip) · `test:e2e` → 8/8 ✓.
+**Verified so far:** `typecheck` ✓ · `npm test` → 108/108 ✓ · `build` ✓ (~155 KB gzip) · `test:e2e` → 8/8 ✓.
 
 ---
 

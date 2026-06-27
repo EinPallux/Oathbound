@@ -42,11 +42,14 @@ export class EnemyView {
     this.scene.add(this.reticle);
   }
 
-  private ensure(e: Entity): EnemyVisual {
+  private ensure(e: Entity, tier: Enemy['tier']): EnemyVisual {
     let v = this.visuals.get(e);
     if (v) return v;
-    const material = new THREE.MeshStandardMaterial({ color: BODY_COLOR, roughness: 0.7 });
+    const color = tier === 'rare' ? 0xb060d0 : tier === 'elite' ? 0xd08a3a : BODY_COLOR;
+    const scale = tier === 'rare' ? 1.8 : tier === 'elite' ? 1.4 : 1;
+    const material = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, HALF * 2 - 0.9, 6, 12), material);
+    body.scale.setScalar(scale);
     body.userData.entity = e;
     this.scene.add(body);
 
@@ -86,8 +89,8 @@ export class EnemyView {
 
     for (const e of world.query(C.Enemy, C.Transform, C.Health)) {
       seen.add(e);
-      const v = this.ensure(e);
       const en = world.get<Enemy>(e, C.Enemy)!;
+      const v = this.ensure(e, en.tier);
       const tr = world.get<Transform>(e, C.Transform)!;
       const h = world.get<Health>(e, C.Health)!;
 

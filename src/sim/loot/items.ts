@@ -55,10 +55,11 @@ const BASE_NAME: Record<EquipSlot, string> = {
 const QUALITY_WORD: Record<Rarity, readonly string[]> = {
   common: ['Worn', 'Plain', 'Crude'],
   uncommon: ['Sturdy', 'Fine', 'Honed'],
+  rare: ['Gleaming', 'Runed', 'Vanguard'],
 };
 
-const RARITY_MULT: Record<Rarity, number> = { common: 1.0, uncommon: 1.1 };
-const RARITY_AFFIXES: Record<Rarity, number> = { common: 0, uncommon: 1 };
+const RARITY_MULT: Record<Rarity, number> = { common: 1.0, uncommon: 1.1, rare: 1.2 };
+const RARITY_AFFIXES: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2 };
 
 /** Chest-equivalent budget at an item level. */
 export function baseBudget(ilvl: number): number {
