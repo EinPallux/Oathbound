@@ -15,7 +15,7 @@ import { Projectiles } from '../../src/sim/projectiles';
 import { Status, hasStatus } from '../../src/sim/combat/statuses';
 import { Rng } from '../../src/core/rng';
 import { DT } from '../../src/core/time';
-import { flatField, makeInput } from './helpers';
+import { flatField, makeInput, setLevel } from './helpers';
 
 const FIELD = flatField();
 
@@ -96,7 +96,8 @@ describe('Hunter — traps + root', () => {
   it('a placed Snare Trap roots and damages the first enemy, then is consumed', () => {
     const world = new World();
     const { ctrl, state } = makeInput();
-    createPlayer(world, FIELD, 0, 0, 'hunter');
+    const player = createPlayer(world, FIELD, 0, 0, 'hunter');
+    setLevel(world, player, 10); // unlock Snare Trap (Lv 9)
     const projectiles = new Projectiles();
     const combat = createCombatSystem({
       input: ctrl,
@@ -107,7 +108,7 @@ describe('Hunter — traps + root', () => {
     });
     const trapSys = createTrapSystem(new Rng(2));
 
-    state.ability = 4; // Snare Trap → placed at the player
+    state.ability = 5; // Snare Trap → placed at the player
     combat.update(world, DT);
 
     const traps = [...world.query(C.Trap, C.Transform)];

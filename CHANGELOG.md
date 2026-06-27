@@ -5,6 +5,29 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.3.0-INDEV — "First Ten Levels" → Level 1–10 Gate *(in progress)*
+**Goal:** a polished first bracket for all three classes (the **breadth** band). Large phase, built in verified checkpoints.
+
+### ✅ Checkpoint 1 — ability unlocks + complete Lv 1–10 kits
+- **Ability unlock system**: each ability has an `unlockLevel`; the combat system refuses locked abilities, and the hotbar shows locked slots as `Lv N` (greyed). Level up to learn the kit.
+- **Complete Lv 1–10 kits** for all three classes (6 abilities each, hotbar keys 1–6):
+  - **Warrior** + **Charge** (Lv 7, off-GCD gap-closer: leap to target, build Fury, root it) + **Second Wind** (Lv 9, self-heal scaling with **missing HP**).
+  - **Hunter** + **Hunter's Mark** (Lv 5, applies a **vulnerability** debuff — the target takes +12% damage).
+  - **Priest** kit assigned unlock levels (Smite/Searing 1 · Holy Nova 3 · Mend 5 · Aegis 7 · Atonement 9).
+- New mechanics: `charge` targeting (gap-closer), missing-HP healing rider, and a `Marked` vulnerability handled in the shared damage applier.
+- Tests: unlock gating (locked → no fire; unlocked → fires), Charge (closes distance + roots), Second Wind (heals), Hunter's Mark (marked targets take more) → **104 unit tests**; e2e green (8).
+
+### ⏳ Remaining for the Level 1–10 Gate (next checkpoints)
+- **Thornwood Vale** (zone 2) + its families (Weavers/Bramblekin/Sporelings).
+- First **elite** + first **rare-named** (tiers, bigger HP/XP, better drops).
+- **Rare** rarity tier + the complete equipment slot loadout.
+- **Oathstones** (waypoints) + **fast-travel**; **vendors** (sell/buy).
+- **Onboarding** (teach move/target/ability/loot/equip/recover ≤2 min) + **HUD/map v1**.
+
+**Verified so far:** `typecheck` ✓ · `npm test` → 104/104 ✓ · `build` ✓ (~155 KB gzip) · `test:e2e` → 8/8 ✓.
+
+---
+
 ## 0.2.1-INDEV — "The Priest" → Three-Class Gate
 **Goal:** the third class — a **Priest** who fights with holy power and survives by weaving heals, shields, and Atonement — completing the three operational classes. Targets the [Three-Class Gate](./docs/production/RELEASE_GATES.md#4-three-class-gate).
 

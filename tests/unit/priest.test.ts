@@ -16,7 +16,7 @@ import { applyDamage } from '../../src/sim/combat/apply';
 import { Status, hasStatus } from '../../src/sim/combat/statuses';
 import { Rng } from '../../src/core/rng';
 import { DT } from '../../src/core/time';
-import { flatField, makeInput } from './helpers';
+import { flatField, makeInput, setLevel } from './helpers';
 
 const FIELD = flatField();
 
@@ -24,6 +24,7 @@ function priestSetup(seed = 1) {
   const world = new World();
   const { ctrl, state } = makeInput();
   const player = createPlayer(world, FIELD, 0, 0, 'priest');
+  setLevel(world, player, 10); // unlock the full early kit
   const projectiles = new Projectiles();
   const combat = createCombatSystem({
     input: ctrl,

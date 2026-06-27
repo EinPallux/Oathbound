@@ -8,10 +8,11 @@ Entry point for **any coding agent or LLM** working in this repository (Claude C
 ## ▶ Current status — where to continue
 > **Keep this section up to date at the end of every phase.**
 
-- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0` Vertical Slice · `0.1.1` Loop Hardening · `0.2.0` The Hunter · **`0.2.1-INDEV` The Priest** (third class, healing/shields/cast-time, caster enemy).
-- **Last gate passed:** **Core Movement Gate** + the *automatable* parts of **Combat/Core Loop/Three-Class** gates. Three operational classes (Warrior/Hunter/Priest) each solo a same-level standard within the **3–6s TTK band** and within the inter-class tolerance (combat-sim gate test). Camp spans all three enemy archetypes (melee/ranged/caster).
-- **⏳ Awaiting owner playtest:** the *subjective* gate items — each class *feels* fun + solo-viable end-to-end; a same-level **elite** is soloable with correct play (elites arrive in `0.3.0`); plus the standing Core Loop perf/fun checks.
-- **▶ Next phase to build:** **`0.3.0` "First Ten Levels"** → **Level 1–10 Gate** — full Lv 1–10 ability unlocks, **Thornwood Vale** (zone 2) + families, first **elite** + **rare-named**, full equipment slots up to **Rare**, vendors/Oathstones/fast-travel, onboarding, HUD/map v1. This opens the **breadth** band (now that the Three-Class Gate is met).
+- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0` Vertical Slice · `0.1.1` Loop Hardening · `0.2.0` The Hunter · `0.2.1` The Priest · **`0.3.0-INDEV` First Ten Levels — checkpoint 1** (ability-unlock system + complete Lv 1–10 kits for all three classes).
+- **Last gate passed:** **Core Movement Gate** + the *automatable* parts of **Combat/Core Loop/Three-Class** gates. Three classes each solo a same-level standard within the **3–6s TTK band**; full Lv 1–10 kits now unlock by level (hotbar 1–6).
+- **🚧 In progress — `0.3.0` toward the Level 1–10 Gate** (built in checkpoints). Done: ability unlocks + full kits. **Remaining:** Thornwood Vale (zone 2) + families · first elite + rare-named · Rare tier + full equipment loadout · Oathstones + fast-travel · vendors · onboarding · HUD/map v1.
+- **⏳ Awaiting owner playtest:** each class *feels* solo-viable end-to-end; standing Core Loop perf/fun checks.
+- **▶ Next checkpoint:** zone 2 (Thornwood) + the elite/rare tiers + Rare loot — then vendors/Oathstones/fast-travel, then onboarding/map. (Confirm with the owner before each.)
 - **Live progress log:** [`CHANGELOG.md`](./CHANGELOG.md) (every phase, each ending with "Next phase →").
 - **The full plan:** [`docs/production/VERSION_ROADMAP.md`](./docs/production/VERSION_ROADMAP.md) (`0.0.1-INDEV` → `1.0-BETA`).
 

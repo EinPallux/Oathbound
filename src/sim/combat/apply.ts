@@ -54,9 +54,10 @@ export function applyDamage(
   const roll = rollDamage(rng, off.critChance);
   const res = computeDamage(hit, off, defAdj, roll);
 
-  // Post multipliers: Shaken weakens the source; Bulwark protects the target.
+  // Post multipliers: Shaken weakens the source; Marked amplifies; Bulwark protects.
   let amount = res.amount;
   amount *= 1 - statusMagnitude(sourceStatuses, Status.Shaken);
+  amount *= 1 + statusMagnitude(targetStatuses, Status.Marked);
   amount *= 1 - statusMagnitude(targetStatuses, Status.Bulwark);
   amount = Math.max(0, Math.round(amount));
 

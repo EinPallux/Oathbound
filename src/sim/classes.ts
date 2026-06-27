@@ -31,6 +31,7 @@ const WARRIOR_ABILITIES: AbilityDef[] = [
   {
     id: 'cleaving-strike',
     name: 'Cleaving Strike',
+    unlockLevel: 1,
     base: 4,
     coeff: 0.7,
     damageType: 'physical',
@@ -45,6 +46,7 @@ const WARRIOR_ABILITIES: AbilityDef[] = [
   {
     id: 'sunder',
     name: 'Sunder',
+    unlockLevel: 1,
     base: 6,
     coeff: 1.6,
     damageType: 'physical',
@@ -60,6 +62,7 @@ const WARRIOR_ABILITIES: AbilityDef[] = [
   {
     id: 'whirl',
     name: 'Whirl',
+    unlockLevel: 3,
     base: 5,
     coeff: 0.9,
     damageType: 'physical',
@@ -74,6 +77,7 @@ const WARRIOR_ABILITIES: AbilityDef[] = [
   {
     id: 'bulwark',
     name: 'Bulwark',
+    unlockLevel: 5,
     base: 0,
     coeff: 0,
     damageType: 'physical',
@@ -86,12 +90,45 @@ const WARRIOR_ABILITIES: AbilityDef[] = [
     radius: 0,
     selfBuff: { id: Status.Bulwark, durationSec: 4, magnitude: 0.5 },
   },
+  {
+    id: 'charge',
+    name: 'Charge',
+    unlockLevel: 7,
+    base: 0,
+    coeff: 0,
+    damageType: 'physical',
+    cost: 0,
+    furyGain: 15,
+    cooldown: 12,
+    triggersGcd: false,
+    targeting: 'charge',
+    range: 18,
+    radius: 0,
+    debuff: { id: Status.Root, durationSec: 1, magnitude: 1 },
+  },
+  {
+    id: 'second-wind',
+    name: 'Second Wind',
+    unlockLevel: 9,
+    base: 0,
+    coeff: 0,
+    damageType: 'physical',
+    cost: 40,
+    furyGain: 0,
+    cooldown: 14,
+    triggersGcd: true,
+    targeting: 'heal',
+    range: 0,
+    radius: 0,
+    heal: { base: 10, coeff: 0.5, missingHpPct: 0.25 },
+  },
 ];
 
 const HUNTER_ABILITIES: AbilityDef[] = [
   {
     id: 'quick-shot',
     name: 'Quick Shot',
+    unlockLevel: 1,
     base: 3,
     coeff: 0.7,
     damageType: 'physical',
@@ -107,6 +144,7 @@ const HUNTER_ABILITIES: AbilityDef[] = [
   {
     id: 'piercing-arrow',
     name: 'Piercing Arrow',
+    unlockLevel: 1,
     base: 5,
     coeff: 1.1,
     damageType: 'physical',
@@ -122,6 +160,7 @@ const HUNTER_ABILITIES: AbilityDef[] = [
   {
     id: 'volley',
     name: 'Volley',
+    unlockLevel: 3,
     base: 5,
     coeff: 0.8,
     damageType: 'physical',
@@ -135,8 +174,25 @@ const HUNTER_ABILITIES: AbilityDef[] = [
     coneHalfDeg: 30,
   },
   {
+    id: 'hunters-mark',
+    name: "Hunter's Mark",
+    unlockLevel: 5,
+    base: 1,
+    coeff: 0,
+    damageType: 'physical',
+    cost: 15,
+    furyGain: 0,
+    cooldown: 10,
+    triggersGcd: true,
+    targeting: 'target',
+    range: 25,
+    radius: 0,
+    debuff: { id: Status.Marked, durationSec: 12, magnitude: 0.12 },
+  },
+  {
     id: 'disengage',
     name: 'Disengage',
+    unlockLevel: 7,
     base: 0,
     coeff: 0,
     damageType: 'physical',
@@ -153,6 +209,7 @@ const HUNTER_ABILITIES: AbilityDef[] = [
   {
     id: 'snare-trap',
     name: 'Snare Trap',
+    unlockLevel: 9,
     base: 4,
     coeff: 0.5,
     damageType: 'physical',
@@ -173,6 +230,7 @@ const PRIEST_ABILITIES: AbilityDef[] = [
   {
     id: 'smite',
     name: 'Smite',
+    unlockLevel: 1,
     base: 3,
     coeff: 0.8,
     damageType: 'holy',
@@ -188,6 +246,7 @@ const PRIEST_ABILITIES: AbilityDef[] = [
   {
     id: 'searing-light',
     name: 'Searing Light',
+    unlockLevel: 1,
     base: 5,
     coeff: 1.2,
     damageType: 'holy',
@@ -203,6 +262,7 @@ const PRIEST_ABILITIES: AbilityDef[] = [
   {
     id: 'holy-nova',
     name: 'Holy Nova',
+    unlockLevel: 3,
     base: 4,
     coeff: 0.6,
     damageType: 'holy',
@@ -218,6 +278,7 @@ const PRIEST_ABILITIES: AbilityDef[] = [
   {
     id: 'mend',
     name: 'Mend',
+    unlockLevel: 5,
     base: 0,
     coeff: 0,
     damageType: 'holy',
@@ -233,6 +294,7 @@ const PRIEST_ABILITIES: AbilityDef[] = [
   {
     id: 'aegis',
     name: 'Aegis',
+    unlockLevel: 7,
     base: 0,
     coeff: 0,
     damageType: 'holy',
@@ -248,6 +310,7 @@ const PRIEST_ABILITIES: AbilityDef[] = [
   {
     id: 'atonement',
     name: 'Atonement',
+    unlockLevel: 9,
     base: 0,
     coeff: 0,
     damageType: 'holy',
