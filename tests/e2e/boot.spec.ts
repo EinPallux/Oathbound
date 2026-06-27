@@ -46,7 +46,7 @@ test('boots the vertical slice, renders, and runs the loop', async ({ page }) =>
   await page.goto('/');
 
   await expect(page.locator('#game')).toBeVisible();
-  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.3.0-INDEV');
+  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.4.0-INDEV');
 
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
   const running = await page.evaluate(() => window.__oathbound!.loop.isRunning);

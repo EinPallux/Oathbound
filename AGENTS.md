@@ -8,11 +8,11 @@ Entry point for **any coding agent or LLM** working in this repository (Claude C
 ## ▶ Current status — where to continue
 > **Keep this section up to date at the end of every phase.**
 
-- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0`–`0.1.1` loop · `0.2.0`–`0.2.1` three classes · **`0.3.0-INDEV` First Ten Levels — feature-complete (checkpoints 1–4)** (full Lv 1–10 kits; data-driven enemies + Thornwood Vale; elite/rare tiers; Rare loot; Oathstones + fast-travel + vendors; **onboarding + Goal Tracker + minimap/map v1**).
-- **Last gate passed:** **Core Movement Gate** + the *automatable* parts of **Combat/Core Loop/Three-Class** gates, and the **automatable scope of the Level 1–10 Gate**. Three classes each solo a same-level standard within the **3–6s TTK band**; Lv 1–10 kits unlock by level; two zones + elite/rare tiers; waypoints/vendors/onboarding/map in.
-- **✅ `0.3.0` is feature-complete** toward the Level 1–10 Gate: ability unlocks + kits · data-driven enemies + Thornwood + elite/rare + Rare loot · Oathstones + fast-travel + vendors · onboarding + HUD/map v1. Awaiting the owner's gate playtest.
-- **⏳ Awaiting owner playtest (Level 1–10 Gate sign-off):** each class *feels* solo-viable 1→10; the first elite/rare are readable + soloable with correct play; onboarding genuinely ≤2 min to first kill; Oathstone density/run-back feel; standing Core Loop perf/fun checks.
-- **▶ Next phase:** `0.4.0` (per [VERSION_ROADMAP](./docs/production/VERSION_ROADMAP.md)) — **only after** the owner signs off the Level 1–10 Gate. (Confirm with the owner before starting.)
+- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0`–`0.1.1` loop · `0.2.0`–`0.2.1` three classes · `0.3.0-INDEV` First Ten Levels (feature-complete; owner playtested the skeleton ✓) · **`0.4.0-INDEV` Fen & Ember — checkpoint 1** (Lv 11–20 kit pt.1: interrupt + ground-AoE; hotbar to 10).
+- **Last gate passed:** **Core Movement Gate** + the *automatable* parts of **Combat/Core Loop/Three-Class** gates, and the **automatable scope of the Level 1–10 Gate**. Owner confirmed the 0.3.0 skeleton plays fine.
+- **🚧 In progress — `0.4.0` Expanded Brackets (Lv 11–20)** (checkpoints). Done: interrupt + ground-AoE + hotbar to 10. **Remaining:** CP2 choice nodes + talents · CP3 resistance system + support/pack-leader archetypes · CP4 Sunken Fen + Emberreach + elite camps · CP5 Epic rarity + Reinforcement + bad-luck protection.
+- **⏳ Awaiting owner playtest:** the interrupt/ground-AoE additions feel good in the kit (try Lv 12+ vs the Wisp; Lv 16+ ground-AoE on a pack); plus the standing 0.3.0 Level 1–10 Gate subjective checks.
+- **▶ Next checkpoint (2):** choice nodes A & B (talent picks) + the dynamic kit + talents UI + save. (Confirm with the owner before each checkpoint.)
 - **Live progress log:** [`CHANGELOG.md`](./CHANGELOG.md) (every phase, each ending with "Next phase →").
 - **The full plan:** [`docs/production/VERSION_ROADMAP.md`](./docs/production/VERSION_ROADMAP.md) (`0.0.1-INDEV` → `1.0-BETA`).
 

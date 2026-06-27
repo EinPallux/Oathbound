@@ -7,7 +7,9 @@ describe('class registry', () => {
     expect(w.primaryStatId).toBe('STR');
     expect(w.resource.name).toBe('Fury');
     expect(w.resource.startsFull).toBe(false);
-    expect(w.abilities.length).toBe(6);
+    expect(w.abilities.length).toBe(8); // 6 base + interrupt + ground-AoE (Lv 11–20)
+    expect(w.abilities.map((a) => a.targeting)).toContain('interrupt');
+    expect(w.abilities.map((a) => a.targeting)).toContain('groundAoE');
   });
 
   it('defines the Hunter (ranged/DEX/Focus)', () => {
@@ -16,7 +18,7 @@ describe('class registry', () => {
     expect(h.resource.name).toBe('Focus');
     expect(h.resource.startsFull).toBe(true);
     expect(h.resource.regenPerSec).toBeGreaterThan(0);
-    expect(h.abilities.length).toBe(6);
+    expect(h.abilities.length).toBe(8); // 6 base + interrupt + ground-AoE (Lv 11–20)
     expect(h.abilities.map((a) => a.targeting)).toContain('projectile');
     expect(h.abilities.map((a) => a.targeting)).toContain('trap');
   });

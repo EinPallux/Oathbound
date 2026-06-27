@@ -18,6 +18,8 @@ import {
   type Trap,
   type CastState,
   type Shield,
+  type Enemy,
+  type GroundAoe,
 } from '../../core/ecs/components';
 import type { ControlState } from '../../platform/input';
 import type { Heightfield, CylinderCollider } from '../../world/heightfield';
@@ -160,11 +162,15 @@ export function createCombatSystem(deps: CombatDeps): System {
         } else if (
           def.targeting === 'target' ||
           def.targeting === 'projectile' ||
-          def.targeting === 'charge'
+          def.targeting === 'charge' ||
+          def.targeting === 'interrupt'
         ) {
           primary = resolvePrimary(world, t, input.yaw, def.range, tgt, colliders, candidates);
           if (primary == null) continue;
-          if (def.targeting !== 'charge') hitList.push(primary);
+          if (def.targeting !== 'charge' && def.targeting !== 'interrupt') hitList.push(primary);
+        } else if (def.targeting === 'groundAoE') {
+          // Aimed at the locked/soft target if there is one; otherwise dropped ahead.
+          primary = resolvePrimary(world, t, input.yaw, def.range, tgt, colliders, candidates);
         } else if (def.targeting === 'frontalSplash') {
           primary = resolvePrimary(world, t, input.yaw, def.range, tgt, colliders, candidates);
           if (primary == null) continue;
@@ -222,6 +228,30 @@ export function createCombatSystem(deps: CombatDeps): System {
           markCombat(world, e);
         } else if (def.targeting === 'trap') {
           placeTrap(world, e, t, def);
+          markCombat(world, e);
+        } else if (def.targeting === 'interrupt' && primary != null) {
+          // Cancel any telegraph in progress, then silence + lightly damage the target.
+          const en = world.get<Enemy>(primary, C.Enemy);
+          if (en) {
+            en.windupTimer = -1;
+            en.attackTimer = Math.max(en.attackTimer, en.attackCooldown);
+          }
+          const r = applyDamage(
+            world,
+            e,
+            primary,
+            { base: def.base, coeff: def.coeff, damageType: def.damageType },
+            rng,
+            leech,
+          );
+          if (def.debuff) {
+            const vs = world.get<Statuses>(primary, C.Statuses);
+            if (vs) addStatus(vs, def.debuff.id, def.debuff.durationSec, def.debuff.magnitude);
+          }
+          if (r.killed) rewardKill(world, e, primary, rng);
+          markCombat(world, e);
+        } else if (def.targeting === 'groundAoE') {
+          placeGroundAoe(world, e, t, def, primary, input.yaw, field);
           markCombat(world, e);
         } else if (def.targeting === 'heal' && def.heal) {
           let flat = 0;
@@ -419,6 +449,53 @@ function doCharge(
   t.z = clamp(r.z, -bound, bound);
   t.y = field.sample(t.x, t.z) + PLAYER_HALF;
   t.yaw = Math.atan2(dx, dz);
+}
+
+/** Drop a ground-AoE zone at the target (if any) or a point ahead of the caster. */
+function placeGroundAoe(
+  world: World,
+  source: Entity,
+  t: Transform,
+  def: AbilityDef,
+  primary: Entity | null,
+  yaw: number,
+  field: Heightfield,
+): void {
+  let x = t.x;
+  let z = t.z;
+  if (primary != null) {
+    const pt = world.get<Transform>(primary, C.Transform);
+    if (pt) {
+      x = pt.x;
+      z = pt.z;
+    }
+  } else {
+    const dist = Math.min(def.range, 8);
+    x = t.x + Math.sin(yaw) * dist;
+    z = t.z + Math.cos(yaw) * dist;
+  }
+  const e = world.createEntity();
+  const y = field.sample(x, z) + 0.05;
+  world.set<Transform>(e, C.Transform, {
+    x,
+    y,
+    z,
+    yaw: 0,
+    prevX: x,
+    prevY: y,
+    prevZ: z,
+    prevYaw: 0,
+  });
+  world.set<GroundAoe>(e, C.GroundAoe, {
+    source,
+    radius: def.radius,
+    ttl: def.aoeTtl ?? 4,
+    tickEvery: def.aoeTick ?? 1,
+    tickTimer: 0,
+    base: def.base,
+    coeff: def.coeff,
+    damageType: def.damageType,
+  });
 }
 
 function placeTrap(world: World, source: Entity, t: Transform, def: AbilityDef): void {

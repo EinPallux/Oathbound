@@ -16,7 +16,9 @@ export type Targeting =
   | 'charge' // leap to a target (gap-closer) + generate resource + root it
   | 'heal' // restore HP to the caster
   | 'shield' // grant the caster an absorb shield
-  | 'toggle'; // flip a sustained self-status (Atonement)
+  | 'toggle' // flip a sustained self-status (Atonement)
+  | 'interrupt' // cancel a target's wind-up + silence it (Lv 12)
+  | 'groundAoE'; // place a damaging ground zone at the target / in front (Lv 16)
 
 export interface AbilityDef extends AbilityHit {
   id: string;
@@ -48,6 +50,9 @@ export interface AbilityDef extends AbilityHit {
   trapRadius?: number;
   trapRootSec?: number;
   trapTtl?: number;
+  /** Ground-AoE parameters for `groundAoE` targeting: lifetime + tick cadence (s). */
+  aoeTtl?: number;
+  aoeTick?: number;
   /** Cast time (s) — the ability channels a bar before it resolves; moving cancels. */
   castTime?: number;
   /** Self-heal for `heal` targeting (and the self-heal rider on Holy Nova).

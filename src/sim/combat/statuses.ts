@@ -17,6 +17,8 @@ export const Status = {
   Atonement: 'atonement',
   /** On an enemy: takes `magnitude` extra fraction of damage (Hunter's Mark). */
   Marked: 'marked',
+  /** On an enemy: cannot begin a new attack/cast wind-up (interrupt lockout). */
+  Silence: 'silence',
 } as const;
 
 /** Add or refresh a status (keeps the longer remaining time). */

@@ -5,6 +5,25 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.4.0-INDEV — "Fen & Ember" → Expanded Brackets (Lv 11–20) *(in progress)*
+**Goal:** mid-game depth — Lv 11–20 across **Sunken Fen** + **Emberreach**: deeper kits (interrupt, ground-AoE, choice nodes), a live **resistance** system, new archetypes, elite camps, **Epic** rarity, Reinforcement, and bad-luck protection. Large phase, built in verified checkpoints.
+
+### ✅ Checkpoint 1 — Lv 11–20 kit pt.1 (interrupt + ground-AoE)
+- **Interrupt** (Lv 12, off-GCD) for all three classes — *Pommel Strike* / *Scatter Shot* / *Silence*: a new `interrupt` targeting that **cancels a winding-up enemy's telegraph** and applies a **Silence** status; the enemy AI refuses to begin a new wind-up while silenced (the Wisp's blight bolt is now counterable).
+- **Ground-AoE tool** (Lv 16) for all three classes — *Earthsplitter* / *Rain of Arrows* / *Consecration*: a new `groundAoE` targeting that drops a `GroundAoe` zone (on the target, or ahead of you) which **ticks damage** in radius for its lifetime, then expires. New pure `ground-aoe` system + a tinted, pulsing ground-disc view.
+- **Hotbar expands to 10 slots** (keys 1–9, 0) — input + HUD — to seat the growing 11–20 kit (slots 9 & 0 fill in checkpoint 2 with the choice nodes).
+- Tests: interrupt (cancels wind-up + silences + damages; unlock-gated), Silence on the enemy AI (no new telegraph), ground-AoE (ticks then despawns; placed on the target) → **134 unit tests**; e2e green (10).
+
+**Verified so far:** `typecheck` ✓ · `npm test` → 134/134 ✓ · `build` ✓ (~161 KB gzip) · `test:e2e` → 10/10 ✓.
+
+### ⏳ Remaining for the Lv 11–20 brackets (next checkpoints)
+- **CP2:** choice nodes A & B (talent picks) + dynamic kit + talents UI + save.
+- **CP3:** **resistance** system live (fire/blight mitigation + resist gear) + **support**/**pack-leader** archetypes.
+- **CP4:** **Sunken Fen** + **Emberreach** zones + elite **camps**.
+- **CP5:** **Epic** rarity + **Reinforcement** + **bad-luck protection v1**.
+
+---
+
 ## 0.3.0-INDEV — "First Ten Levels" → Level 1–10 Gate *(feature-complete — awaiting gate playtest)*
 **Goal:** a polished first bracket for all three classes (the **breadth** band). Large phase, built in verified checkpoints.
 
