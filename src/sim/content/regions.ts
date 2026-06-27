@@ -13,14 +13,21 @@ export interface RegionInfo {
 const OATHHOLD: RegionInfo = { id: 'oathhold', name: 'Oathhold', minLevel: 0, maxLevel: 0 };
 const GREENMARCH: RegionInfo = { id: 'greenmarch', name: 'The Greenmarch', minLevel: 1, maxLevel: 5 };
 const THORNWOOD: RegionInfo = { id: 'thornwood', name: 'Thornwood Vale', minLevel: 6, maxLevel: 10 };
+const SUNKEN_FEN: RegionInfo = { id: 'fen', name: 'The Sunken Fen', minLevel: 11, maxLevel: 15 };
+const EMBERREACH: RegionInfo = { id: 'ember', name: 'The Emberreach', minLevel: 16, maxLevel: 20 };
 
 /** Radius of the central safe hub around the world origin (m). */
 const HUB_RADIUS = 6;
 
-/** Which region a world position falls in. */
+/**
+ * Which region a world position falls in. Directional layout around the hub
+ * (per docs/design/WORLD_AND_ZONES.md): NE woods, south bog, west scorch.
+ */
 export function regionAt(x: number, z: number): RegionInfo {
   if (Math.hypot(x, z) < HUB_RADIUS) return OATHHOLD;
-  if (x >= 22 && z >= 22) return THORNWOOD;
+  if (x <= -22) return EMBERREACH; // west — scorched volcanic highlands
+  if (z <= -22) return SUNKEN_FEN; // south — the waterlogged bog
+  if (x >= 22 && z >= 22) return THORNWOOD; // north-east — dim forest
   return GREENMARCH;
 }
 

@@ -117,12 +117,37 @@ const SPAWNS: Spawn[] = [
   { id: 'sporeling', x: 27, z: 31, level: 6 },
   { id: 'bramblekin', x: 36, z: 34, level: 7 },
   { id: 'reaver', x: 34, z: 39, level: 7 },
-  // Support/pack-leader preview: a Sporemother that heals the swarm + a Warchief that
-  // rallies the Bramblekin (proper Fen/Ember camps come in checkpoint 4).
+  // Thornwood support/pack-leader: a Sporemother healing the swarm + a Warchief.
   { id: 'sporemother', x: 29, z: 33, level: 8 },
   { id: 'warchief', x: 38, z: 37, level: 9 },
   // Rare-named, deep in Thornwood.
   { id: 'bramblekin', x: 41, z: 41, level: 8, tier: 'rare', name: 'Old Thornback' },
+  // ── The Sunken Fen (south): Drudge bruisers + Fenstalker ambushers + Mireling
+  //    casters; blight damage (resist matters). First proper elite camp (Lv 11–15). ──
+  { id: 'drudge', x: 2, z: -26, level: 11 },
+  { id: 'drudge', x: -4, z: -28, level: 11 },
+  { id: 'fenstalker', x: 7, z: -30, level: 12 },
+  { id: 'mireling', x: -8, z: -31, level: 12 },
+  { id: 'fenstalker', x: -2, z: -34, level: 13 },
+  // Fen elite camp (crypt approach): an elite Crypt Drudge backed by a Sporemother.
+  { id: 'drudge', x: 14, z: -34, level: 13, tier: 'elite', name: 'Crypt Drudge' },
+  { id: 'sporemother', x: 16, z: -31, level: 13 },
+  { id: 'drudge', x: 11, z: -33, level: 13 },
+  // Rare: the Henge-Keeper, deep in the bog.
+  { id: 'mireling', x: 0, z: -44, level: 15, tier: 'rare', name: 'The Henge-Keeper' },
+  // ── The Emberreach (west): Magmaw beasts + Ashen Reavers + Cinderborn casters;
+  //    fire damage (resist-check) + a fire-cult warcamp elite camp (Lv 16–20). ──
+  { id: 'magmaw', x: -26, z: -6, level: 16 },
+  { id: 'ashreaver', x: -30, z: 2, level: 16 },
+  { id: 'cinderborn', x: -32, z: -3, level: 17 },
+  { id: 'magmaw', x: -34, z: -9, level: 17 },
+  { id: 'ashreaver', x: -33, z: 8, level: 18 },
+  // Ember elite camp (the warcamp): an Ember Warlord (pack-leader) + an elite caster.
+  { id: 'emberwarlord', x: -38, z: 1, level: 19 },
+  { id: 'cinderborn', x: -36, z: 5, level: 18, tier: 'elite', name: 'Cult Pyremaster' },
+  { id: 'cinderborn', x: -40, z: -3, level: 18 },
+  // Rare: Emberhorn, a roaming Magmaw mini-boss, deep west.
+  { id: 'magmaw', x: -45, z: 0, level: 20, tier: 'rare', name: 'Emberhorn' },
 ];
 
 // Oathstone waypoint network (~one per region + the hub). The hub sits next to spawn
@@ -138,6 +163,8 @@ const OATHSTONES: OathstoneSpawn[] = [
   { id: 'oathhold', name: 'Oathhold', x: 0, z: -3 }, // hub — auto-activates at spawn
   { id: 'millford', name: 'Millford Waystation', x: 14, z: 16 }, // Greenmarch
   { id: 'thornlodge', name: 'Thornwood Lodge', x: 30, z: 28 }, // Thornwood Vale
+  { id: 'fenhollow', name: 'Fenhollow Camp', x: 0, z: -24 }, // Sunken Fen (south)
+  { id: 'windbreak', name: 'Windbreak Outpost', x: -24, z: 2 }, // Emberreach (west)
 ];
 
 export interface EnemySnapshot {

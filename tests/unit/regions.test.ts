@@ -20,4 +20,17 @@ describe('regions', () => {
     expect(r.minLevel).toBe(6);
     expect(r.maxLevel).toBe(10);
   });
+
+  it('places the south bog in the Sunken Fen (Lv 11–15)', () => {
+    const r = regionAt(0, -30);
+    expect(r.id).toBe('fen');
+    expect(regionLabel(r)).toBe('The Sunken Fen · Lv 11–15');
+  });
+
+  it('places the western scorch in the Emberreach (Lv 16–20)', () => {
+    const r = regionAt(-30, 0);
+    expect(r.id).toBe('ember');
+    expect(r.minLevel).toBe(16);
+    expect(r.maxLevel).toBe(20);
+  });
 });

@@ -8,11 +8,11 @@ Entry point for **any coding agent or LLM** working in this repository (Claude C
 ## ▶ Current status — where to continue
 > **Keep this section up to date at the end of every phase.**
 
-- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0`–`0.1.1` loop · `0.2.0`–`0.2.1` three classes · `0.3.0-INDEV` First Ten Levels (feature-complete; owner playtested the skeleton ✓) · **`0.4.0-INDEV` Fen & Ember — checkpoints 1–3** (Lv 11–20 kit: interrupt + ground-AoE + hotbar to 10; choice-node talents + dynamic kit; **resistance system live** + **support/pack-leader** archetypes).
+- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0`–`0.1.1` loop · `0.2.0`–`0.2.1` three classes · `0.3.0-INDEV` First Ten Levels (feature-complete; owner playtested the skeleton ✓) · **`0.4.0-INDEV` Fen & Ember — checkpoints 1–4** (Lv 11–20 kit + talents + resistance + support/pack-leader; **Sunken Fen + Emberreach zones + elite camps**).
 - **Last gate passed:** **Core Movement Gate** + the *automatable* parts of **Combat/Core Loop/Three-Class** gates, and the **automatable scope of the Level 1–10 Gate**. Owner confirmed the 0.3.0 skeleton plays fine.
-- **🚧 In progress — `0.4.0` Expanded Brackets (Lv 11–20)** (checkpoints). Done: interrupt + ground-AoE + hotbar to 10 · choice nodes (talents) + dynamic kit + save · resistance (fire/blight resist gear) + support (Sporemother) / pack-leader (Warchief) archetypes. **Remaining:** CP4 Sunken Fen + Emberreach + elite camps · CP5 Epic rarity + Reinforcement + bad-luck protection.
-- **⏳ Awaiting owner playtest:** the Lv 11–20 kit + new mechanics feel good (interrupt vs casters; talent picks at 14/18; resist gear vs blight; killing the Sporemother first; the Warchief's rally on its pack — both previewed in Thornwood now).
-- **▶ Next checkpoint (4):** Sunken Fen + Emberreach zones + elite camps (proper homes for the new archetypes + where resist gear matters). (Confirm with the owner before each checkpoint.)
+- **🚧 In progress — `0.4.0` Expanded Brackets (Lv 11–20)** (checkpoints). Done: interrupt + ground-AoE + hotbar to 10 · choice nodes + dynamic kit · resistance + support/pack-leader archetypes · Sunken Fen (south, blight) + Emberreach (west, fire) zones + elite camps + per-zone Oathstones. **Remaining:** CP5 Epic rarity + Reinforcement + bad-luck protection (closes 0.4.0).
+- **⏳ Awaiting owner playtest:** the two new zones play well (Fen blight + ambush; Ember fire telegraphs + warcamp; resist gear earns its keep; the elite camps want cooldown use); plus the standing 0.3.0 Level 1–10 Gate subjective checks.
+- **▶ Next checkpoint (5):** Epic rarity + Reinforcement (spend materials to upgrade gear) + bad-luck protection v1 — closes 0.4.0. (Confirm with the owner before starting.)
 - **Live progress log:** [`CHANGELOG.md`](./CHANGELOG.md) (every phase, each ending with "Next phase →").
 - **The full plan:** [`docs/production/VERSION_ROADMAP.md`](./docs/production/VERSION_ROADMAP.md) (`0.0.1-INDEV` → `1.0-BETA`).
 
