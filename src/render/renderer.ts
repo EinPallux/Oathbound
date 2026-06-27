@@ -12,10 +12,12 @@ export class Renderer {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    this.scene.background = new THREE.Color(0x0e1116);
-    this.scene.fog = new THREE.Fog(0x0e1116, 30, 80);
+    // Open-world depth: distant terrain/mountains fade into haze rather than a near
+    // fog wall, so the enlarged world (layout.ts) reads as a big landscape.
+    this.scene.background = new THREE.Color(0x141a22);
+    this.scene.fog = new THREE.Fog(0x141a22, 120, 620);
 
-    this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+    this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2400);
     this.camera.position.set(0, 9, 16);
     this.camera.lookAt(0, 0, 0);
 

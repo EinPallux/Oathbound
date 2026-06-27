@@ -11,6 +11,8 @@ import { PerfOverlay } from '../devtools/perf-overlay';
 import { GameState } from './states';
 import { InputController } from '../platform/input';
 import { generateHeightfield, generateColliders } from '../world/heightfield';
+import { WORLD_SIZE, WORLD_RES } from '../world/layout';
+import { generateScenery, type Clearing } from '../world/scenery';
 import { createMovementSystem } from '../sim/systems/movement';
 import { createCombatSystem } from '../sim/systems/combat';
 import { createEnemyAiSystem } from '../sim/systems/enemy-ai';
@@ -68,6 +70,7 @@ import {
 import type { TelemetrySnapshot } from '../sim/telemetry';
 import { Rng } from '../core/rng';
 import { buildTerrainMesh, buildProps } from '../render/terrain-mesh';
+import { buildScenery } from '../render/scenery-view';
 import { PlayerView } from '../render/player-view';
 import { CameraRig } from '../render/camera-rig';
 import { EnemyView } from '../render/enemy-view';
@@ -89,29 +92,32 @@ import { Sfx } from '../platform/audio';
 import { loadSave, writeSave } from '../platform/save-store';
 import { lerp, lerpAngle } from '../core/math';
 
-const WORLD_SIZE = 100;
-const WORLD_RES = 129;
+// World dimensions + the directional zone layout live in src/world/layout.ts so the
+// sim, the region atlas, the biome field, and the renderer share one coordinate space.
 
 // Enemy spawns live in src/sim/content/spawns.ts (pure, testable content).
 const SPAWNS = WORLD_SPAWNS;
 
-// Oathstone waypoint network (~one per region + the hub). The hub sits next to spawn
-// so it auto-activates on the first tick (binding the starting respawn); the others are
-// discovered by walking. Vendor row at the hub.
+// Oathstone waypoint network (~one per region + the hub). The hub sits next to spawn so
+// it auto-activates on the first tick (binding the starting respawn); the others are
+// discovered by walking out to each frontier zone. Positions match the spread-out
+// 0.6.0 world (layout.ts); each frontier stone also anchors a road from the hub.
 interface OathstoneSpawn {
   id: string;
   name: string;
   x: number;
   z: number;
+  /** Frontier stones double as road destinations from the hub. */
+  road?: boolean;
 }
 const OATHSTONES: OathstoneSpawn[] = [
   { id: 'oathhold', name: 'Oathhold', x: 0, z: -3 }, // hub — auto-activates at spawn
-  { id: 'millford', name: 'Millford Waystation', x: 14, z: 16 }, // Greenmarch
-  { id: 'thornlodge', name: 'Thornwood Lodge', x: 30, z: 28 }, // Thornwood Vale
-  { id: 'fenhollow', name: 'Fenhollow Camp', x: 0, z: -24 }, // Sunken Fen (south)
-  { id: 'windbreak', name: 'Windbreak Outpost', x: -24, z: 2 }, // Emberreach (west)
-  { id: 'frostgate', name: 'Frostgate Keep', x: 24, z: 2 }, // The Riven Peaks (east)
-  { id: 'gravegate', name: 'Reclaimed Gatehouse', x: 0, z: 24 }, // Gravereach (north)
+  { id: 'millford', name: 'Millford Waystation', x: 30, z: 28, road: true }, // Greenmarch heartland
+  { id: 'thornlodge', name: 'Thornwood Lodge', x: 132, z: 132, road: true }, // Thornwood Vale (NE)
+  { id: 'fenhollow', name: 'Fenhollow Camp', x: 0, z: -132, road: true }, // Sunken Fen (south)
+  { id: 'windbreak', name: 'Windbreak Outpost', x: -132, z: 2, road: true }, // Emberreach (west)
+  { id: 'frostgate', name: 'Frostgate Keep', x: 132, z: 6, road: true }, // The Riven Peaks (east)
+  { id: 'gravegate', name: 'Reclaimed Gatehouse', x: 4, z: 132, road: true }, // Gravereach (north)
 ];
 
 export interface EnemySnapshot {
@@ -160,11 +166,25 @@ export function boot(): Game {
 
   // World data (pure) + meshes (render).
   const field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337);
-  const colliders = generateColliders(WORLD_SIZE, 24, 99);
+  // Collidable rocks (the only physical props — scenery below is purely visual). Count
+  // scales with the larger world; the generator keeps them clear of the spawn.
+  const colliders = generateColliders(WORLD_SIZE, 160, 99);
   renderer.scene.add(buildTerrainMesh(field));
   const props = buildProps(colliders, field);
   renderer.scene.add(props);
   const terrain = renderer.scene.getObjectByName('terrain')!;
+
+  // Decorative scenery (pure data → instanced meshes): trees, boulders, pebbles, bushes,
+  // grass, flowers, rivers, roads — biome-aware, deterministic, no colliders. Keep large
+  // props clear of camps, waypoints and the vendor so nothing covers an enemy or stall.
+  const clearings: Clearing[] = [
+    ...SPAWNS.map((s) => ({ x: s.x, z: s.z, r: 7 })),
+    ...OATHSTONES.map((o) => ({ x: o.x, z: o.z, r: 9 })),
+    { x: 3, z: -3, r: 7 }, // vendor stall
+  ];
+  const roadTargets = OATHSTONES.filter((o) => o.road).map((o) => ({ x: o.x, z: o.z }));
+  const scenery = generateScenery(WORLD_SIZE, { clearings, roadTargets, seed: 7777 });
+  renderer.scene.add(buildScenery(scenery, field));
 
   // Entities.
   const world = new World();
