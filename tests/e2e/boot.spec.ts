@@ -199,7 +199,7 @@ test('talents: choosing the other option swaps the hotbar ability', async ({ pag
   await page.waitForFunction(() => window.__oathbound !== undefined);
   await page.evaluate(() => window.__oathbound!.debugSetClass('warrior'));
   await page.evaluate(() => window.__oathbound!.debugSetLevel(18));
-  await page.evaluate(() => window.__oathbound!.debugTeleport(0, -45)); // clear of the camp (out of combat)
+  await page.evaluate(() => window.__oathbound!.debugTeleport(40, 0)); // empty space, out of combat
 
   // Open the bag/talents panel.
   await page.keyboard.press('KeyI');

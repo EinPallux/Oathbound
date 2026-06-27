@@ -31,11 +31,19 @@ Each entry is an **independently testable build**. After each phase, work pauses
 - A preview pair (Sporemother tending the Sporeling swarm + a Warchief rallying the Bramblekin) is dropped into Thornwood now; proper Fen/Ember camps follow in CP4.
 - Tests: resist derives from gear + equipping sets `Defense.resist` + blight resist mitigates; support heals a wounded ally; pack-leader empowers allies; an Empowered attacker hits harder → **146 unit tests**; e2e green (11).
 
-**Verified:** `typecheck` ✓ · `npm test` → 146/146 ✓ · `build` ✓ (~162 KB gzip) · `test:e2e` → 11/11 ✓.
+- Verified: `typecheck` ✓ · `npm test` → 146/146 ✓ · `build` ✓ · `test:e2e` → 11/11 ✓.
 
-### ⏳ Remaining for the Lv 11–20 brackets (next checkpoints)
-- **CP4:** **Sunken Fen** + **Emberreach** zones + elite **camps**.
-- **CP5:** **Epic** rarity + **Reinforcement** + **bad-luck protection v1**.
+### ✅ Checkpoint 4 — Sunken Fen + Emberreach zones + elite camps
+- **The Sunken Fen (Lv 11–15)** to the **south** — a blight bog: **Drudge** bruisers, **Fenstalker** ambushers (high aggro), and **Mireling** casters, all dealing **blight** (so the new blight resist matters). A **crypt-approach elite camp** (an elite *Crypt Drudge* backed by a Sporemother healer) and the rare **Henge-Keeper** deep in the bog.
+- **The Emberreach (Lv 16–20)** to the **west** — scorched highlands: **Magmaw** heavy beasts, **Ashen Reaver** skirmishers, and **Cinderborn** casters (big fire telegraphs → interrupt/ground-AoE them), all dealing **fire**. A fire-cult **warcamp elite camp** (an **Ember Warlord** pack-leader + an elite *Cult Pyremaster* caster) and the roaming rare **Emberhorn**.
+- **Regions + travel**: `regionAt` now lays the world out directionally around the hub (NE woods · south bog · west scorch); each new zone gets an **Oathstone** (Fenhollow Camp, Windbreak Outpost) wired into respawn + fast travel, a minimap tint, and a zone-discovery prompt. The Goal Tracker now points you to the next zone + the resist to pack.
+- Six new data-driven enemy families reuse the existing archetypes (incl. CP3 support/pack-leader); no new systems — pure content.
+- Tests: Fen/Ember region bands + labels, the new families' damage schools (blight/fire) + the Warlord's pack-leader archetype → **150 unit tests**; e2e green (11).
+
+**Verified:** `typecheck` ✓ · `npm test` → 150/150 ✓ · `build` ✓ (~162 KB gzip) · `test:e2e` → 11/11 ✓.
+
+### ⏳ Remaining for the Lv 11–20 brackets (final checkpoint)
+- **CP5:** **Epic** rarity + **Reinforcement** (upgrade gear with materials) + **bad-luck protection v1**.
 
 ---
 

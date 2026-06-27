@@ -32,6 +32,31 @@ describe('data-driven enemies', () => {
     expect(world.get<Enemy>(e, C.Enemy)!.attackType).toBe('blight');
   });
 
+  it('Fen families deal blight; Emberreach families deal fire', () => {
+    const world = new World();
+    const fen: Parameters<typeof spawnEnemy>[2][] = ['drudge', 'fenstalker', 'mireling'];
+    for (const id of fen) {
+      const e = spawnEnemy(world, FIELD, id, 0, -30, { level: 12 });
+      expect(world.get<Enemy>(e, C.Enemy)!.attackType).toBe('blight');
+    }
+    const ember: Parameters<typeof spawnEnemy>[2][] = [
+      'magmaw',
+      'ashreaver',
+      'cinderborn',
+      'emberwarlord',
+    ];
+    for (const id of ember) {
+      const e = spawnEnemy(world, FIELD, id, -30, 0, { level: 18 });
+      expect(world.get<Enemy>(e, C.Enemy)!.attackType).toBe('fire');
+    }
+  });
+
+  it('the Ember Warlord is a pack-leader (rallies allies)', () => {
+    const world = new World();
+    const e = spawnEnemy(world, FIELD, 'emberwarlord', -30, 0, { level: 19 });
+    expect(world.get<Enemy>(e, C.Enemy)!.archetype).toBe('pack_leader');
+  });
+
   it('elite/rare tiers scale HP, XP, and damage above standard', () => {
     const world = new World();
     const std = spawnEnemy(world, FIELD, 'bloomhusk', 0, 5, { level: 5 });

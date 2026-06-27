@@ -95,11 +95,19 @@ export class GoalTracker {
 
   private softGoals(level: number): string[] {
     const goals: string[] = [];
-    if (level < 6) goals.push('Reach Lv 6 → unlock Thornwood Vale');
-    else if (level < 11) goals.push('Reach Lv 11 → the next region opens');
+    if (level < 6) goals.push('Reach Lv 6 → the Thornwood Vale');
+    else if (level < 11) goals.push('Reach Lv 11 → the Sunken Fen');
+    else if (level < 16) goals.push('Reach Lv 16 → the Emberreach');
+    else if (level < 20) goals.push('Push to Lv 20 — clear the Emberreach');
     else goals.push('Push toward Lv 30');
     goals.push('Upgrade your gear from drops or the vendor (F)');
-    goals.push(level < 6 ? 'Attune Oathstones for fast travel (T)' : 'Hunt the rare Old Thornback in Thornwood');
+    goals.push(
+      level < 11
+        ? 'Attune Oathstones for fast travel (T)'
+        : level < 16
+          ? 'Bring blight resist into the Sunken Fen'
+          : 'Bring fire resist into the Emberreach',
+    );
     return goals;
   }
 }
