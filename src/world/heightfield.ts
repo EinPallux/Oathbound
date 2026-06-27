@@ -4,6 +4,7 @@
 
 import { Rng } from '../core/rng';
 import { clamp } from '../core/math';
+import { biomeElevation } from './biomes';
 
 export interface CylinderCollider {
   x: number;
@@ -49,8 +50,13 @@ export class Heightfield {
 }
 
 /**
- * Greybox terrain: gentle layered hills with a flattened spawn area near the
- * origin. Deterministic for a given seed.
+ * Open-world terrain: gentle layered hills as a base, plus a biome-shaped elevation
+ * offset (Riven mountains, the Fen depression, the Gravereach plateau…), with a
+ * flattened spawn area near the origin. Deterministic for a given seed — the biome
+ * offset is a pure function of position, so the simulation and renderer agree.
+ *
+ * The biome ramps only kick in well beyond the hub (see biomes.ts), so a small field
+ * (e.g. the 100 m unit-test field) is just the rolling hills + flat spawn as before.
  */
 export function generateHeightfield(size: number, res: number, seed = 1): Heightfield {
   const rng = new Rng(seed);
@@ -68,6 +74,7 @@ export function generateHeightfield(size: number, res: number, seed = 1): Height
         Math.sin((wx + ox) * 0.06) * Math.cos((wz + oz) * 0.05) * 2.2 +
         Math.sin(wx * 0.13 + oz) * 0.6 +
         Math.cos(wz * 0.11 + ox) * 0.6;
+      h += biomeElevation(wx, wz);
       // Flatten a clear spawn area within ~8 units of the origin.
       const d = Math.hypot(wx, wz);
       const flat = Math.max(0, 1 - d / 8);

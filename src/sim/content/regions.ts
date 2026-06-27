@@ -1,6 +1,14 @@
-// Region atlas (pure data + a point lookup) for the slice's playable area. Drives the
-// HUD zone label, the minimap tint, and zone-discovery prompts. Canonical level ranges
-// per docs/design/WORLD_AND_ZONES.md (Oathhold hub · Greenmarch 1–5 · Thornwood 6–10).
+// Region atlas (pure data + a point lookup) for the playable world. Drives the HUD zone
+// label, the minimap tint, and zone-discovery prompts. Canonical level ranges per
+// docs/design/WORLD_AND_ZONES.md (Oathhold hub · Greenmarch 1–5 · Thornwood 6–10 ·
+// Sunken Fen 11–15 · Emberreach 16–20 · Riven Peaks 21–25 · Gravereach 26–30).
+//
+// 0.6.0 map expansion: the world is now large and open. Oathhold + the Greenmarch
+// heartland surround the origin; the five higher regions are spread far out, beginning
+// at ZONE_THRESHOLD in their cardinal/diagonal directions. The directional layout is
+// unchanged from the original greybox — only the scale grew (layout.ts).
+
+import { HUB_RADIUS, ZONE_THRESHOLD } from '../../world/layout';
 
 export interface RegionInfo {
   id: string;
@@ -18,21 +26,20 @@ const EMBERREACH: RegionInfo = { id: 'ember', name: 'The Emberreach', minLevel: 
 const RIVEN_PEAKS: RegionInfo = { id: 'riven', name: 'The Riven Peaks', minLevel: 21, maxLevel: 25 };
 const GRAVEREACH: RegionInfo = { id: 'gravereach', name: 'Gravereach', minLevel: 26, maxLevel: 30 };
 
-/** Radius of the central safe hub around the world origin (m). */
-const HUB_RADIUS = 6;
-
 /**
  * Which region a world position falls in. Directional layout around the hub
  * (per docs/design/WORLD_AND_ZONES.md): NE woods, south bog, west scorch, east
- * frozen peaks, north corrupted ruins.
+ * frozen peaks, north corrupted ruins. The frontier zones begin at ZONE_THRESHOLD;
+ * the Greenmarch heartland fills the area between the hub and the frontier.
  */
 export function regionAt(x: number, z: number): RegionInfo {
+  const T = ZONE_THRESHOLD;
   if (Math.hypot(x, z) < HUB_RADIUS) return OATHHOLD;
-  if (x <= -22) return EMBERREACH; // west — scorched volcanic highlands
-  if (z <= -22) return SUNKEN_FEN; // south — the waterlogged bog
-  if (x >= 22 && z >= 22) return THORNWOOD; // north-east — dim forest
-  if (x >= 22) return RIVEN_PEAKS; // east — frozen mountains (Lv 21–25)
-  if (z >= 22) return GRAVEREACH; // north — the Hollow Crown ruins (Lv 26–30)
+  if (x <= -T) return EMBERREACH; // west — scorched volcanic highlands
+  if (z <= -T) return SUNKEN_FEN; // south — the waterlogged bog
+  if (x >= T && z >= T) return THORNWOOD; // north-east — dim forest
+  if (x >= T) return RIVEN_PEAKS; // east — frozen mountains (Lv 21–25)
+  if (z >= T) return GRAVEREACH; // north — the Hollow Crown ruins (Lv 26–30)
   return GREENMARCH;
 }
 
