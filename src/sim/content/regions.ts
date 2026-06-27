@@ -15,19 +15,24 @@ const GREENMARCH: RegionInfo = { id: 'greenmarch', name: 'The Greenmarch', minLe
 const THORNWOOD: RegionInfo = { id: 'thornwood', name: 'Thornwood Vale', minLevel: 6, maxLevel: 10 };
 const SUNKEN_FEN: RegionInfo = { id: 'fen', name: 'The Sunken Fen', minLevel: 11, maxLevel: 15 };
 const EMBERREACH: RegionInfo = { id: 'ember', name: 'The Emberreach', minLevel: 16, maxLevel: 20 };
+const RIVEN_PEAKS: RegionInfo = { id: 'riven', name: 'The Riven Peaks', minLevel: 21, maxLevel: 25 };
+const GRAVEREACH: RegionInfo = { id: 'gravereach', name: 'Gravereach', minLevel: 26, maxLevel: 30 };
 
 /** Radius of the central safe hub around the world origin (m). */
 const HUB_RADIUS = 6;
 
 /**
  * Which region a world position falls in. Directional layout around the hub
- * (per docs/design/WORLD_AND_ZONES.md): NE woods, south bog, west scorch.
+ * (per docs/design/WORLD_AND_ZONES.md): NE woods, south bog, west scorch, east
+ * frozen peaks, north corrupted ruins.
  */
 export function regionAt(x: number, z: number): RegionInfo {
   if (Math.hypot(x, z) < HUB_RADIUS) return OATHHOLD;
   if (x <= -22) return EMBERREACH; // west — scorched volcanic highlands
   if (z <= -22) return SUNKEN_FEN; // south — the waterlogged bog
   if (x >= 22 && z >= 22) return THORNWOOD; // north-east — dim forest
+  if (x >= 22) return RIVEN_PEAKS; // east — frozen mountains (Lv 21–25)
+  if (z >= 22) return GRAVEREACH; // north — the Hollow Crown ruins (Lv 26–30)
   return GREENMARCH;
 }
 

@@ -150,6 +150,32 @@ const SPAWNS: Spawn[] = [
   { id: 'cinderborn', x: -40, z: -3, level: 18 },
   // Rare: Emberhorn, a roaming Magmaw mini-boss, deep west.
   { id: 'magmaw', x: -45, z: 0, level: 20, tier: 'rare', name: 'Emberhorn' },
+  // ── The Riven Peaks (east): Rimebound constructs + fast Frostfang packs + Revenant
+  //    casters; frost damage (frost resist matters); Revenants are holy-weak (Lv 21–25). ──
+  { id: 'frostfang', x: 26, z: 6, level: 21 },
+  { id: 'frostfang', x: 29, z: 10, level: 21 },
+  { id: 'rimebound', x: 31, z: 4, level: 22 },
+  { id: 'revenant', x: 34, z: 9, level: 22 },
+  { id: 'frostfang', x: 33, z: 13, level: 23 },
+  { id: 'rimebound', x: 38, z: 6, level: 23 },
+  // Riven elite camp (the frozen battlefield): an elite Frost Revenant Lord + a guard.
+  { id: 'revenant', x: 41, z: 2, level: 24, tier: 'elite', name: 'Frost Revenant Lord' },
+  { id: 'rimebound', x: 43, z: 6, level: 24 },
+  // Rare: Hoarfang, alpha of the Frostfang packs, deep east.
+  { id: 'frostfang', x: 46, z: -4, level: 25, tier: 'rare', name: 'Hoarfang the White' },
+  // ── Gravereach (north): Wraith casters + Bonewrought constructs + Forsworn knights;
+  //    undead/Blight — all holy-weak (Priest shines). Final region (Lv 26–30). ──
+  { id: 'wraith', x: 2, z: 26, level: 26 },
+  { id: 'bonewrought', x: -5, z: 28, level: 26 },
+  { id: 'wraith', x: 6, z: 30, level: 27 },
+  { id: 'bonewrought', x: -9, z: 31, level: 27 },
+  { id: 'forsworn', x: 0, z: 34, level: 28 },
+  // Gravereach inner-court elite camp: a Forsworn Knight-Captain + bone constructs.
+  { id: 'forsworn', x: 11, z: 39, level: 29, tier: 'elite', name: 'Forsworn Knight-Captain' },
+  { id: 'bonewrought', x: 14, z: 36, level: 29 },
+  { id: 'wraith', x: 8, z: 41, level: 29 },
+  // Rare: Gravewarden Sael, a named Forsworn deep in the Hollow Crown.
+  { id: 'forsworn', x: 0, z: 46, level: 30, tier: 'rare', name: 'Gravewarden Sael' },
 ];
 
 // Oathstone waypoint network (~one per region + the hub). The hub sits next to spawn
@@ -167,6 +193,8 @@ const OATHSTONES: OathstoneSpawn[] = [
   { id: 'thornlodge', name: 'Thornwood Lodge', x: 30, z: 28 }, // Thornwood Vale
   { id: 'fenhollow', name: 'Fenhollow Camp', x: 0, z: -24 }, // Sunken Fen (south)
   { id: 'windbreak', name: 'Windbreak Outpost', x: -24, z: 2 }, // Emberreach (west)
+  { id: 'frostgate', name: 'Frostgate Keep', x: 24, z: 2 }, // The Riven Peaks (east)
+  { id: 'gravegate', name: 'Reclaimed Gatehouse', x: 0, z: 24 }, // Gravereach (north)
 ];
 
 export interface EnemySnapshot {
