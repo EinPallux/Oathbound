@@ -168,8 +168,11 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
                 if (playerAlive)
                   fireAttack(world, e, en, tr, player, distPlayer, usesProjectile, projectiles, rng);
               }
-            } else if (en.attackTimer <= 0) {
-              en.windupTimer = en.windup; // begin a new telegraph
+            } else if (
+              en.attackTimer <= 0 &&
+              !hasStatus(world.get<Statuses>(e, C.Statuses), Status.Silence)
+            ) {
+              en.windupTimer = en.windup; // begin a new telegraph (blocked while silenced)
             }
           }
         } else if (en.state === 'leash') {

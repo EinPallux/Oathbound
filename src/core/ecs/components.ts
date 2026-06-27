@@ -31,6 +31,7 @@ export const C = {
   Oathstone: 'oathstone',
   Vendor: 'vendor',
   Respawn: 'respawn',
+  GroundAoe: 'groundAoe',
 } as const;
 
 /**
@@ -250,6 +251,19 @@ export interface Vendor {
 export interface Respawn {
   x: number;
   z: number;
+}
+
+/** A persistent ground hazard (the Lv 16 ground-AoE tool): ticks damage to enemies in
+ *  radius every `tickEvery` seconds for its lifetime. */
+export interface GroundAoe {
+  source: number;
+  radius: number;
+  ttl: number;
+  tickEvery: number;
+  tickTimer: number;
+  base: number;
+  coeff: number;
+  damageType: DamageType;
 }
 
 /** A placed trap (Hunter Snare Trap): roots the first enemy that enters, then expires. */

@@ -20,6 +20,7 @@ import { createWaypointSystem } from '../sim/systems/waypoint';
 import { createSpatialSystem } from '../sim/systems/spatial';
 import { createProjectileSystem } from '../sim/systems/projectile';
 import { createTrapSystem } from '../sim/systems/trap';
+import { createGroundAoeSystem } from '../sim/systems/ground-aoe';
 import { SpatialGrid } from '../sim/spatial-grid';
 import { Projectiles } from '../sim/projectiles';
 import { Telemetry, createTelemetrySystem } from '../sim/telemetry';
@@ -72,6 +73,7 @@ import { Hud } from '../render/hud';
 import { InventoryPanel } from '../render/inventory-panel';
 import { ProjectileView } from '../render/projectile-view';
 import { TrapView } from '../render/trap-view';
+import { GroundAoeView } from '../render/ground-aoe-view';
 import { InteractableView } from '../render/interactable-view';
 import { VendorPanel } from '../render/vendor-panel';
 import { TravelPanel } from '../render/travel-panel';
@@ -219,6 +221,7 @@ export function boot(): Game {
   world.addSystem(createEnemyAiSystem({ field, colliders, rng, grid, projectiles }));
   world.addSystem(createProjectileSystem(projectiles, rng));
   world.addSystem(createTrapSystem(rng));
+  world.addSystem(createGroundAoeSystem(rng));
   world.addSystem(createLootSystem());
   world.addSystem(createWaypointSystem());
   world.addSystem(createRecoverySystem({ field, spawnX: 0, spawnZ: 0 }));
@@ -231,6 +234,7 @@ export function boot(): Game {
   const lootView = new LootView(renderer.scene);
   const projectileView = new ProjectileView(renderer.scene, projectiles);
   const trapView = new TrapView(renderer.scene);
+  const groundAoeView = new GroundAoeView(renderer.scene);
   const interactableView = new InteractableView(renderer.scene);
   const damageNumbers = new DamageNumbers(uiRoot);
   const targetFrame = new TargetFrame(uiRoot);
@@ -427,6 +431,7 @@ export function boot(): Game {
       lootView.update(world);
       projectileView.update();
       trapView.update(world);
+      groundAoeView.update(world);
       interactableView.update(world);
 
       // Target frame (with con colour).

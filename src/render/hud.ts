@@ -21,7 +21,7 @@ import {
 import { getClass } from '../sim/classes';
 import { hasStatus, Status } from '../sim/combat/statuses';
 
-const KEYS = ['1', '2', '3', '4', '5', '6'];
+const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 const PICKUP_RADIUS = 2.5;
 
 interface Toast {
