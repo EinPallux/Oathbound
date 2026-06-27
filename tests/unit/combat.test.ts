@@ -16,6 +16,7 @@ import { Projectiles } from '../../src/sim/projectiles';
 import { Rng } from '../../src/core/rng';
 import { GCD } from '../../src/sim/combat/abilities';
 import { Status, statusMagnitude } from '../../src/sim/combat/statuses';
+import { CombatEvent, type AbilityUsedEvent } from '../../src/sim/combat/events';
 import { DT } from '../../src/core/time';
 import { flatField, makeInput } from './helpers';
 
@@ -48,6 +49,33 @@ describe('warrior combat', () => {
     );
     expect(world.get<Resource>(player, C.Resource)!.current).toBe(12); // furyGain
     expect(world.get<Target>(player, C.Target)!.entity).toBe(enemy);
+  });
+
+  it('emits AbilityUsed when an ability fires (drives the player-model animation)', () => {
+    const { world, state, player, sys } = setup();
+    createBloomhusk(world, FIELD, 0, 3);
+    const events: AbilityUsedEvent[] = [];
+    world.events.on<AbilityUsedEvent>(CombatEvent.AbilityUsed, (e) => events.push(e));
+
+    state.ability = 0;
+    sys.update(world, DT);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].entity).toBe(player);
+    expect(events[0].classId).toBe('warrior');
+    expect(events[0].targeting.length).toBeGreaterThan(0);
+    expect(events[0].castTime).toBe(0);
+  });
+
+  it('does not emit AbilityUsed when no target is in range (ability does not fire)', () => {
+    const { world, state, sys } = setup(); // no enemy spawned
+    const events: AbilityUsedEvent[] = [];
+    world.events.on<AbilityUsedEvent>(CombatEvent.AbilityUsed, (e) => events.push(e));
+
+    state.ability = 0;
+    sys.update(world, DT);
+
+    expect(events).toHaveLength(0);
   });
 
   it('enforces the GCD between casts', () => {

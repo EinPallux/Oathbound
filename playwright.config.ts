@@ -30,7 +30,10 @@ const executablePath = process.env.PW_CHROMIUM_BIN || findChromium();
 
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 30_000,
+  // The world is now a large open world; in the headless software-GL container each
+  // frame is slow, so heavy interaction tests need more headroom (they pass in ~20s
+  // alone but contend under parallel load). Real-hardware FPS is unaffected.
+  timeout: 60_000,
   expect: { timeout: 5_000 },
   fullyParallel: true,
   reporter: [['list']],
