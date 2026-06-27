@@ -19,6 +19,7 @@ import {
   type Resource,
   type Respawn,
   type Oathstone,
+  type LootLuck,
 } from '../core/ecs/components';
 import { recomputeDerived } from './inventory';
 import { xpToNext } from './stats';
@@ -38,6 +39,8 @@ export interface SaveData {
   respawn: { x: number; z: number };
   /** Ids of activated Oathstones. */
   oathstones: string[];
+  /** Bad-luck-protection pity counter. */
+  pity: number;
   inventory: Item[];
   equipment: Partial<Record<EquipSlot, Item>>;
 }
@@ -71,6 +74,7 @@ export function serialize(world: World, player: Entity): SaveData {
     position: { x: tr.x, z: tr.z },
     respawn: { x: respawn?.x ?? tr.x, z: respawn?.z ?? tr.z },
     oathstones,
+    pity: world.get<LootLuck>(player, C.LootLuck)?.pity ?? 0,
     inventory: clone(inv.items),
     equipment: clone(eq.slots),
   };
@@ -108,6 +112,9 @@ export function applySave(world: World, player: Entity, data: SaveData): void {
     respawn.x = data.respawn.x;
     respawn.z = data.respawn.z;
   }
+
+  const luck = world.get<LootLuck>(player, C.LootLuck);
+  if (luck) luck.pity = data.pity ?? 0;
 
   // Re-mark Oathstones that were activated in the saved run.
   const activated = new Set(data.oathstones ?? []);

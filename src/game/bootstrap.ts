@@ -28,6 +28,7 @@ import { createPlayer, setPlayerClass, createOathstone, createVendor, PLAYER_HAL
 import { spawnEnemy, type EnemyTemplateId, type Tier } from '../sim/content/enemies';
 import { equipItem, recomputeDerived } from '../sim/inventory';
 import { salvageItem, salvageAllBelow } from '../sim/salvage';
+import { reinforceItem } from '../sim/reinforce';
 import { nearestVendor, sellItem, sellAllBelow } from '../sim/vendor';
 import { fastTravel } from '../sim/travel';
 import { regionAt, regionLabel } from '../sim/content/regions';
@@ -60,6 +61,7 @@ import {
   type PlayerDiedEvent,
   type ItemSalvagedEvent,
   type ItemSoldEvent,
+  type ItemReinforcedEvent,
   type OathstoneActivatedEvent,
 } from '../sim/combat/events';
 import type { TelemetrySnapshot } from '../sim/telemetry';
@@ -300,6 +302,9 @@ export function boot(): Game {
     item.locked = !item.locked;
     autosave();
   };
+  invPanel.onReinforce = (item) => {
+    if (reinforceItem(world, player, item.uid)) autosave();
+  };
   invPanel.onChooseTalent = (nodeId, option) => {
     const pc = world.get<PlayerClass>(player, C.PlayerClass);
     if (!pc) return;
@@ -371,6 +376,10 @@ export function boot(): Game {
   world.events.on<ItemSoldEvent>(CombatEvent.ItemSold, (ev) => {
     hud.toast(`Sold ${ev.itemName} (+${ev.gold} g)`);
     sfx.loot();
+  });
+  world.events.on<ItemReinforcedEvent>(CombatEvent.ItemReinforced, (ev) => {
+    hud.toast(`Reinforced ${ev.itemName} → +${ev.level}`, 'good');
+    sfx.levelUp();
   });
   world.events.on<OathstoneActivatedEvent>(CombatEvent.OathstoneActivated, (ev) => {
     hud.toast(`Oathstone attuned — ${ev.name}`, 'good');

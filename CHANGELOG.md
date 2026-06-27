@@ -5,7 +5,7 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
-## 0.4.0-INDEV — "Fen & Ember" → Expanded Brackets (Lv 11–20) *(in progress)*
+## 0.4.0-INDEV — "Fen & Ember" → Expanded Brackets (Lv 11–20) *(feature-complete — awaiting playtest)*
 **Goal:** mid-game depth — Lv 11–20 across **Sunken Fen** + **Emberreach**: deeper kits (interrupt, ground-AoE, choice nodes), a live **resistance** system, new archetypes, elite camps, **Epic** rarity, Reinforcement, and bad-luck protection. Large phase, built in verified checkpoints.
 
 ### ✅ Checkpoint 1 — Lv 11–20 kit pt.1 (interrupt + ground-AoE)
@@ -42,8 +42,15 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 **Verified:** `typecheck` ✓ · `npm test` → 150/150 ✓ · `build` ✓ (~162 KB gzip) · `test:e2e` → 11/11 ✓.
 
-### ⏳ Remaining for the Lv 11–20 brackets (final checkpoint)
-- **CP5:** **Epic** rarity + **Reinforcement** (upgrade gear with materials) + **bad-luck protection v1**.
+### ✅ Checkpoint 5 — Epic rarity + Reinforcement + bad-luck protection
+- **Epic rarity** (purple, **3 affixes**, ×1.32 budget — the "strong build piece" tier): rolls on the **elite** drop table (a ~7% tail) and the **rare-named** table (~15% tail); never from standards. Loot beams, the bag, and the vendor panel show the new purple; colourblind-safe tier text/labels unchanged. Epic salvages into more whetstones and sells for more gold.
+- **Reinforcement** (`src/sim/reinforce.ts`) — the optional gold + whetstone **upgrade sink** (ADR-010): spend currency to add **+1..+5 effective item levels** to a piece you own, strengthening its **base stats** (primary + armor) and rescoring it. Rising per-step cost, hard cap at +5 (stays below the next rarity's natural power). A **⚒ Reinforce** button on every bag **and equipped** item shows the next step + cost; reinforcing equipped gear recomputes derived stats live. Items carry a `reinforced` step count that **persists in the save**.
+- **Bad-luck protection v1** (`LootLuck` component + `pityMultiplier`): a **pity counter** rises on every kill that doesn't drop rare-or-better and **boosts the rare+ weight** (+8%/kill, capped +200%); it **resets to 0** the moment a rare+ finally drops. Makes target-farming elites/named feel fair without hidden total-drop inflation. Persists in the save.
+- Tests: Epic gen (3 affixes, out-budgets Rare) + epic drop tails (elite/rare yes, standard never); pity multiplier ramp + cap; **`rewardKill` BLP integration** (pity climbs on unlucky kills, resets on a rare+ drop); Reinforcement cost ramp, currency spend, stat/score boost, +5 cap, affordability gate, **equipped-armor recompute**, and reinforced+pity save round-trip → **161 unit tests**; e2e green (11).
+
+**Verified:** `typecheck` ✓ · `npm test` → 161/161 ✓ · `build` ✓ (~163 KB gzip) · `test:e2e` → 11/11 ✓.
+
+**0.4.0 is now feature-complete** (all 5 checkpoints done). Awaiting owner playtest of the full Lv 11–20 experience (zones, mechanics, Epic/Reinforcement chase) before closing the bracket and moving to **0.5.0** (Lv 21–30 / the complete 1–30 journey).
 
 ---
 

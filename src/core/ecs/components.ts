@@ -32,6 +32,7 @@ export const C = {
   Vendor: 'vendor',
   Respawn: 'respawn',
   GroundAoe: 'groundAoe',
+  LootLuck: 'lootLuck',
 } as const;
 
 /**
@@ -223,7 +224,7 @@ export type EquipSlot =
   | 'ring1'
   | 'ring2';
 
-export type Rarity = 'common' | 'uncommon' | 'rare';
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
 
 export type PrimaryStatId = 'STR' | 'DEX' | 'SPR' | 'VIT';
 
@@ -322,6 +323,8 @@ export interface Item {
   score: number;
   /** Locked items can't be salvaged or sold. */
   locked: boolean;
+  /** Reinforcement steps applied (0..MAX_REINFORCE); boosts effective item level. */
+  reinforced?: number;
 }
 
 export interface Inventory {
@@ -334,6 +337,12 @@ export interface Inventory {
 
 export interface Equipment {
   slots: Partial<Record<EquipSlot, Item>>;
+}
+
+/** Bad-luck protection state: consecutive kills without a rare-or-better drop.
+ *  Raises the rare+ chance as it climbs, and resets to 0 when one finally drops. */
+export interface LootLuck {
+  pity: number;
 }
 
 /** A loot drop in the world (corpse pickup). Owner-eligibility is modelled now so

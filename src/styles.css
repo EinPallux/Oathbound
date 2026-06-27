@@ -330,6 +330,10 @@ body {
   color: #5fd35f;
   border: 1px solid #5fd35f;
 }
+.toast.epic {
+  color: #b061ff;
+  border: 1px solid #b061ff;
+}
 
 /* ── Inventory / equipment panel ────────────────────────────────────── */
 .inv-panel {
@@ -393,8 +397,14 @@ body {
 .inv-name.rare {
   color: #5aa0ff;
 }
+.inv-name.epic {
+  color: #b061ff;
+}
 .inv-name.empty {
   color: #4a5a6a;
+}
+.inv-btn.reinforce {
+  color: #ffd49a;
 }
 .inv-delta {
   width: 44px;

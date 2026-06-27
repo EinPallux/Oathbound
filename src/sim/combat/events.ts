@@ -19,6 +19,7 @@ export const CombatEvent = {
   GoldGained: 'loot/gold',
   ItemSalvaged: 'item/salvaged',
   ItemSold: 'item/sold',
+  ItemReinforced: 'item/reinforced',
   OathstoneActivated: 'oathstone/activated',
   FastTraveled: 'travel/used',
 } as const;
@@ -101,6 +102,12 @@ export interface ItemSalvagedEvent {
 export interface ItemSoldEvent {
   itemName: string;
   gold: number;
+}
+
+export interface ItemReinforcedEvent {
+  itemName: string;
+  /** New reinforcement level (1..MAX_REINFORCE). */
+  level: number;
 }
 
 export interface OathstoneActivatedEvent {

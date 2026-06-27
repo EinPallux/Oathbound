@@ -9,6 +9,7 @@ const RARITY_COLOR: Record<Rarity, number> = {
   common: 0xc9d1d9,
   uncommon: 0x5fd35f,
   rare: 0x5aa0ff,
+  epic: 0xb061ff,
 };
 const GOLD_COLOR = 0xffcc44;
 

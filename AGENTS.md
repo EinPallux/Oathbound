@@ -8,11 +8,12 @@ Entry point for **any coding agent or LLM** working in this repository (Claude C
 ## ▶ Current status — where to continue
 > **Keep this section up to date at the end of every phase.**
 
-- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0`–`0.1.1` loop · `0.2.0`–`0.2.1` three classes · `0.3.0-INDEV` First Ten Levels (feature-complete; owner playtested the skeleton ✓) · **`0.4.0-INDEV` Fen & Ember — checkpoints 1–4** (Lv 11–20 kit + talents + resistance + support/pack-leader; **Sunken Fen + Emberreach zones + elite camps**).
+- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0`–`0.1.1` loop · `0.2.0`–`0.2.1` three classes · `0.3.0-INDEV` First Ten Levels (feature-complete; owner playtested the skeleton ✓) · **`0.4.0-INDEV` Fen & Ember — checkpoints 1–5 → FEATURE-COMPLETE** (Lv 11–20 kit + talents + resistance + support/pack-leader; Sunken Fen + Emberreach zones + elite camps; **Epic rarity + Reinforcement + bad-luck protection**).
 - **Last gate passed:** **Core Movement Gate** + the *automatable* parts of **Combat/Core Loop/Three-Class** gates, and the **automatable scope of the Level 1–10 Gate**. Owner confirmed the 0.3.0 skeleton plays fine.
-- **🚧 In progress — `0.4.0` Expanded Brackets (Lv 11–20)** (checkpoints). Done: interrupt + ground-AoE + hotbar to 10 · choice nodes + dynamic kit · resistance + support/pack-leader archetypes · Sunken Fen (south, blight) + Emberreach (west, fire) zones + elite camps + per-zone Oathstones. **Remaining:** CP5 Epic rarity + Reinforcement + bad-luck protection (closes 0.4.0).
-- **⏳ Awaiting owner playtest:** the two new zones play well (Fen blight + ambush; Ember fire telegraphs + warcamp; resist gear earns its keep; the elite camps want cooldown use); plus the standing 0.3.0 Level 1–10 Gate subjective checks.
-- **▶ Next checkpoint (5):** Epic rarity + Reinforcement (spend materials to upgrade gear) + bad-luck protection v1 — closes 0.4.0. (Confirm with the owner before starting.)
+- **✅ `0.4.0` Expanded Brackets (Lv 11–20) — feature-complete** (all 5 checkpoints). CP5 added: Epic rarity (purple, 3 affixes; elite/named drop tails), Reinforcement (`src/sim/reinforce.ts` — spend gold + whetstones for +1..+5 effective ilvl, save-persisted), and bad-luck protection (`LootLuck` pity counter that boosts rare+ odds, resets on a rare+ drop, save-persisted).
+- **⏳ Awaiting owner playtest (gates the bracket close):** the full Lv 11–20 experience — the two new zones (Fen blight + ambush; Ember fire telegraphs + warcamp; resist gear earns its keep; elite camps want cooldown use), and the **Epic/Reinforcement gear chase + BLP** feeling fair; plus the standing 0.3.0 Level 1–10 Gate subjective checks.
+- **▶ Next phase:** **`0.5.0` — Road to Thirty** (Lv 21–30: Riven Peaks + Gravereach, full kits to 30 + capstones, all families → completes the 1–30 journey → Level 1–30 Content Gate). (Confirm with the owner before starting.)
+  - *Note: CP4 (zones) and CP5 (Epic/Reinforcement/BLP) were built in parallel sessions on separate feature branches → PRs; CP5 came in via `claude/oathbound-cp5-epic-reinforcement-blp`.*
 - **Live progress log:** [`CHANGELOG.md`](./CHANGELOG.md) (every phase, each ending with "Next phase →").
 - **The full plan:** [`docs/production/VERSION_ROADMAP.md`](./docs/production/VERSION_ROADMAP.md) (`0.0.1-INDEV` → `1.0-BETA`).
 
