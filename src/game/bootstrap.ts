@@ -25,7 +25,8 @@ import { SpatialGrid } from '../sim/spatial-grid';
 import { Projectiles } from '../sim/projectiles';
 import { Telemetry, createTelemetrySystem } from '../sim/telemetry';
 import { createPlayer, setPlayerClass, createOathstone, createVendor, PLAYER_HALF } from '../sim/factory';
-import { spawnEnemy, type EnemyTemplateId, type Tier } from '../sim/content/enemies';
+import { spawnEnemy } from '../sim/content/enemies';
+import { WORLD_SPAWNS } from '../sim/content/spawns';
 import { equipItem, recomputeDerived } from '../sim/inventory';
 import { salvageItem, salvageAllBelow } from '../sim/salvage';
 import { reinforceItem } from '../sim/reinforce';
@@ -91,92 +92,8 @@ import { lerp, lerpAngle } from '../core/math';
 const WORLD_SIZE = 100;
 const WORLD_RES = 129;
 
-// Enemy spawns. Greenmarch (Lv 1–2) ahead of spawn; an elite anchor; Thornwood Vale
-// (Lv 6–8) out to the north-east; a rare-named deep in Thornwood.
-interface Spawn {
-  id: EnemyTemplateId;
-  x: number;
-  z: number;
-  level: number;
-  tier?: Tier;
-  name?: string;
-}
-const SPAWNS: Spawn[] = [
-  // Greenmarch camp (+Z).
-  { id: 'bloomhusk', x: 0, z: 6, level: 1 },
-  { id: 'bloomhusk', x: 3, z: 9, level: 1 },
-  { id: 'reaver', x: -3, z: 9, level: 1 },
-  { id: 'bloomhusk', x: 6, z: 12, level: 2 },
-  { id: 'wisp', x: -6, z: 12, level: 2 },
-  { id: 'reaver', x: 0, z: 14, level: 2 },
-  // Greenmarch elite anchor.
-  { id: 'bloomhusk', x: 12, z: 18, level: 3, tier: 'elite', name: 'Bloomhusk Matriarch' },
-  // Thornwood Vale (north-east): fast Weavers + Sporeling swarms + a tanky Bramblekin.
-  { id: 'weaver', x: 30, z: 30, level: 6 },
-  { id: 'weaver', x: 33, z: 32, level: 6 },
-  { id: 'sporeling', x: 28, z: 34, level: 6 },
-  { id: 'sporeling', x: 31, z: 36, level: 6 },
-  { id: 'sporeling', x: 27, z: 31, level: 6 },
-  { id: 'bramblekin', x: 36, z: 34, level: 7 },
-  { id: 'reaver', x: 34, z: 39, level: 7 },
-  // Thornwood support/pack-leader: a Sporemother healing the swarm + a Warchief.
-  { id: 'sporemother', x: 29, z: 33, level: 8 },
-  { id: 'warchief', x: 38, z: 37, level: 9 },
-  // Rare-named, deep in Thornwood.
-  { id: 'bramblekin', x: 41, z: 41, level: 8, tier: 'rare', name: 'Old Thornback' },
-  // ── The Sunken Fen (south): Drudge bruisers + Fenstalker ambushers + Mireling
-  //    casters; blight damage (resist matters). First proper elite camp (Lv 11–15). ──
-  { id: 'drudge', x: 2, z: -26, level: 11 },
-  { id: 'drudge', x: -4, z: -28, level: 11 },
-  { id: 'fenstalker', x: 7, z: -30, level: 12 },
-  { id: 'mireling', x: -8, z: -31, level: 12 },
-  { id: 'fenstalker', x: -2, z: -34, level: 13 },
-  // Fen elite camp (crypt approach): an elite Crypt Drudge backed by a Sporemother.
-  { id: 'drudge', x: 14, z: -34, level: 13, tier: 'elite', name: 'Crypt Drudge' },
-  { id: 'sporemother', x: 16, z: -31, level: 13 },
-  { id: 'drudge', x: 11, z: -33, level: 13 },
-  // Rare: the Henge-Keeper, deep in the bog.
-  { id: 'mireling', x: 0, z: -44, level: 15, tier: 'rare', name: 'The Henge-Keeper' },
-  // ── The Emberreach (west): Magmaw beasts + Ashen Reavers + Cinderborn casters;
-  //    fire damage (resist-check) + a fire-cult warcamp elite camp (Lv 16–20). ──
-  { id: 'magmaw', x: -26, z: -6, level: 16 },
-  { id: 'ashreaver', x: -30, z: 2, level: 16 },
-  { id: 'cinderborn', x: -32, z: -3, level: 17 },
-  { id: 'magmaw', x: -34, z: -9, level: 17 },
-  { id: 'ashreaver', x: -33, z: 8, level: 18 },
-  // Ember elite camp (the warcamp): an Ember Warlord (pack-leader) + an elite caster.
-  { id: 'emberwarlord', x: -38, z: 1, level: 19 },
-  { id: 'cinderborn', x: -36, z: 5, level: 18, tier: 'elite', name: 'Cult Pyremaster' },
-  { id: 'cinderborn', x: -40, z: -3, level: 18 },
-  // Rare: Emberhorn, a roaming Magmaw mini-boss, deep west.
-  { id: 'magmaw', x: -45, z: 0, level: 20, tier: 'rare', name: 'Emberhorn' },
-  // ── The Riven Peaks (east): Rimebound constructs + fast Frostfang packs + Revenant
-  //    casters; frost damage (frost resist matters); Revenants are holy-weak (Lv 21–25). ──
-  { id: 'frostfang', x: 26, z: 6, level: 21 },
-  { id: 'frostfang', x: 29, z: 10, level: 21 },
-  { id: 'rimebound', x: 31, z: 4, level: 22 },
-  { id: 'revenant', x: 34, z: 9, level: 22 },
-  { id: 'frostfang', x: 33, z: 13, level: 23 },
-  { id: 'rimebound', x: 38, z: 6, level: 23 },
-  // Riven elite camp (the frozen battlefield): an elite Frost Revenant Lord + a guard.
-  { id: 'revenant', x: 41, z: 2, level: 24, tier: 'elite', name: 'Frost Revenant Lord' },
-  { id: 'rimebound', x: 43, z: 6, level: 24 },
-  // Rare: Hoarfang, alpha of the Frostfang packs, deep east.
-  { id: 'frostfang', x: 46, z: -4, level: 25, tier: 'rare', name: 'Hoarfang the White' },
-  // ── Gravereach (north): Wraith casters + Bonewrought constructs + Forsworn knights;
-  //    undead/Blight — all holy-weak (Priest shines). Final region (Lv 26–30). ──
-  { id: 'wraith', x: 2, z: 26, level: 26 },
-  { id: 'bonewrought', x: -5, z: 28, level: 26 },
-  { id: 'wraith', x: 6, z: 30, level: 27 },
-  { id: 'bonewrought', x: -9, z: 31, level: 27 },
-  { id: 'forsworn', x: 0, z: 34, level: 28 },
-  // Gravereach inner-court elite camp: a Forsworn Knight-Captain + bone constructs.
-  { id: 'forsworn', x: 11, z: 39, level: 29, tier: 'elite', name: 'Forsworn Knight-Captain' },
-  { id: 'bonewrought', x: 14, z: 36, level: 29 },
-  { id: 'wraith', x: 8, z: 41, level: 29 },
-  // Rare: Gravewarden Sael, a named Forsworn deep in the Hollow Crown.
-  { id: 'forsworn', x: 0, z: 46, level: 30, tier: 'rare', name: 'Gravewarden Sael' },
-];
+// Enemy spawns live in src/sim/content/spawns.ts (pure, testable content).
+const SPAWNS = WORLD_SPAWNS;
 
 // Oathstone waypoint network (~one per region + the hub). The hub sits next to spawn
 // so it auto-activates on the first tick (binding the starting respawn); the others are
