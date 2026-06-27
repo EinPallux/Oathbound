@@ -21,6 +21,7 @@ interface OathboundHandle {
   bagCount: () => number;
   classId: () => string;
   resource: () => { current: number; max: number };
+  oathstones: () => { name: string; activated: boolean }[];
   telemetry: () => { damageDealt: number; kills: number; sessionSeconds: number };
   debugAddXp: (n: number) => void;
   debugSetClass: (id: 'warrior' | 'hunter' | 'priest') => void;
@@ -148,6 +149,26 @@ test('plays as the Priest — holy Smite damages the camp', async ({ page }) => 
   await page.waitForTimeout(400);
   const after = await page.evaluate(totalEnemyHp);
   expect(after).toBeLessThan(before);
+});
+
+test('attunes the spawn Oathstone and opens fast travel with T', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => (window.__oathbound?.oathstones().length ?? 0) >= 1);
+
+  // The hub Oathstone next to spawn attunes on the first tick (binds the respawn).
+  await page.waitForFunction(() =>
+    (window.__oathbound?.oathstones() ?? []).some((o) => o.activated),
+  );
+
+  // T opens the fast-travel panel, listing the discovered hub.
+  await page.keyboard.press('KeyT');
+  await expect(page.locator('.travel-panel')).toBeVisible();
+  await expect(page.locator('.travel-panel')).toContainText('Fast Travel');
+  await expect(page.locator('.travel-panel')).toContainText('Oathhold');
+
+  // T again closes it.
+  await page.keyboard.press('KeyT');
+  await expect(page.locator('.travel-panel')).toBeHidden();
 });
 
 test('progress persists across a reload (save v1)', async ({ page }) => {

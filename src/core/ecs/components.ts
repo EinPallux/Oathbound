@@ -28,6 +28,9 @@ export const C = {
   Trap: 'trap',
   Shield: 'shield',
   CastState: 'castState',
+  Oathstone: 'oathstone',
+  Vendor: 'vendor',
+  Respawn: 'respawn',
 } as const;
 
 /**
@@ -229,6 +232,24 @@ export type ClassId = 'warrior' | 'hunter' | 'priest';
 /** Which class the player is. Drives kit, resource, and primary stat. */
 export interface PlayerClass {
   id: ClassId;
+}
+
+/** A waypoint shrine: activates on first visit, then serves as a respawn + fast-travel node. */
+export interface Oathstone {
+  id: string;
+  name: string;
+  activated: boolean;
+}
+
+/** A vendor you can sell to (interact with F). */
+export interface Vendor {
+  name: string;
+}
+
+/** The player's bound respawn point (set by the last Oathstone visited). */
+export interface Respawn {
+  x: number;
+  z: number;
 }
 
 /** A placed trap (Hunter Snare Trap): roots the first enemy that enters, then expires. */

@@ -24,11 +24,18 @@ Each entry is an **independently testable build**. After each phase, work pauses
 - **Rare** rarity (blue, 2 affixes, ×1.20 budget) + **tier-aware drop tables** (standards lean common/uncommon; elites add Rare; rare-named mostly Rare). Loot beams + inventory show the new colour.
 - Tests: data-driven spawn + tier scaling, Rare item gen, tier loot weights → **108 unit tests**.
 
-### ⏳ Remaining for the Level 1–10 Gate (next checkpoints)
-- **Oathstones** (waypoints) + **fast-travel**; **vendors** (sell/buy).
+### ✅ Checkpoint 3 — Oathstones, fast-travel + vendors
+- **Oathstones** (`Oathstone`/`Respawn` components + `waypoint` system): waypoint shrines that **attune on proximity** and **bind your respawn** to the last one visited (death returns you there, not the world spawn — no XP loss). Activated stones + the bound point **persist in the save**. A hub stone at spawn auto-attunes; one waystation per region (Greenmarch, Thornwood Vale).
+- **Fast travel** (`src/sim/travel.ts`, panel on **T**): hop between **attuned** Oathstones for a **small gold toll**, **out-of-combat only** — the discovered-waypoint network. Travelling rebinds your respawn to the destination.
+- **Vendors** (`src/sim/vendor.ts`, panel on **F** by a stall): **sell** unwanted gear for gold (value scales with ilvl + rarity), with a **Sell all Common** button; locks are respected. A *Quartermaster* sits at the hub. Gold sink (toll) + source (sales) per the economy design.
+- **Centralized interact**: the loot system no longer reads input; **F** is routed in one place — close an open vendor panel → pick up nearby loot → else open a vendor. Loot pickup is now `pickUpNearest` (pure, testable).
+- **World markers**: Oathstone obelisks (dormant grey → bright cyan + pulse once attuned) and vendor posts, scanned from the world each frame.
+- Tests: Oathstone attune/respawn-binding/save round-trip, vendor value/sell/lock/sell-commons/range, fast-travel toll/combat-gate/gold-gate/dormant/here → **123 unit tests**; an Oathstone-attune + fast-travel-panel e2e (9 e2e).
+
+### ⏳ Remaining for the Level 1–10 Gate (next checkpoint)
 - **Onboarding** (teach move/target/ability/loot/equip/recover ≤2 min) + **HUD/map v1**.
 
-**Verified so far:** `typecheck` ✓ · `npm test` → 108/108 ✓ · `build` ✓ (~155 KB gzip) · `test:e2e` → 8/8 ✓.
+**Verified so far:** `typecheck` ✓ · `npm test` → 123/123 ✓ · `build` ✓ (~158 KB gzip) · `test:e2e` → 9/9 ✓.
 
 ---
 

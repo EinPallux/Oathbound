@@ -13,6 +13,7 @@ import {
   type Target,
   type PlayerClass,
   type Shield,
+  type Respawn,
 } from '../../core/ecs/components';
 import type { Heightfield } from '../../world/heightfield';
 import { clamp } from '../../core/math';
@@ -100,11 +101,15 @@ function respawn(
   cs.inCombat = false;
   cs.sinceEventSec = T_OUT_OF_COMBAT;
 
+  // Respawn at the bound Oathstone if one has been visited, else the world spawn.
+  const bound = world.get<Respawn>(e, C.Respawn);
+  const rx = bound ? bound.x : spawnX;
+  const rz = bound ? bound.z : spawnZ;
   const tr = world.get<Transform>(e, C.Transform);
   if (tr) {
-    tr.x = spawnX;
-    tr.z = spawnZ;
-    tr.y = field.sample(spawnX, spawnZ) + PLAYER_HALF;
+    tr.x = rx;
+    tr.z = rz;
+    tr.y = field.sample(rx, rz) + PLAYER_HALF;
     tr.prevX = tr.x;
     tr.prevY = tr.y;
     tr.prevZ = tr.z;

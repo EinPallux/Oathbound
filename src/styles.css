@@ -427,6 +427,23 @@ body {
   color: #6a7a8a;
 }
 
+/* ── Vendor / fast-travel panels (reuse the inv-* row styling) ───────── */
+.shop-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 460px;
+  max-width: 92vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: rgba(8, 11, 16, 0.95);
+  border: 1px solid rgba(120, 200, 255, 0.3);
+  border-radius: 8px;
+  padding: 14px;
+  pointer-events: auto;
+}
+
 /* ── Class select overlay ───────────────────────────────────────────── */
 .class-select {
   position: fixed;

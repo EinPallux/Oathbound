@@ -20,6 +20,9 @@ import {
   type Equipment,
   type PlayerClass,
   type ClassId,
+  type Respawn,
+  type Oathstone,
+  type Vendor,
 } from '../core/ecs/components';
 import type { Heightfield } from '../world/heightfield';
 import { getClass } from './classes';
@@ -88,6 +91,7 @@ export function createPlayer(
     bufferRemaining: 0,
   });
   world.set<Target>(e, C.Target, { entity: null });
+  world.set<Respawn>(e, C.Respawn, { x, z });
 
   recomputeDerived(world, e);
   const h = world.get<Health>(e, C.Health)!;
@@ -127,4 +131,35 @@ export function createReaver(world: World, field: Heightfield, x: number, z: num
 
 export function createWisp(world: World, field: Heightfield, x: number, z: number, level = 1): Entity {
   return spawnEnemy(world, field, 'wisp', x, z, { level });
+}
+
+// ── World props ──────────────────────────────────────────────────────────────
+
+/** Create an Oathstone waypoint (inactive until visited). */
+export function createOathstone(
+  world: World,
+  field: Heightfield,
+  id: string,
+  name: string,
+  x: number,
+  z: number,
+): Entity {
+  const e = world.createEntity();
+  world.set<Transform>(e, C.Transform, transformAt(x, z, field.sample(x, z)));
+  world.set<Oathstone>(e, C.Oathstone, { id, name, activated: false });
+  return e;
+}
+
+/** Create a vendor (interact with F to sell). */
+export function createVendor(
+  world: World,
+  field: Heightfield,
+  name: string,
+  x: number,
+  z: number,
+): Entity {
+  const e = world.createEntity();
+  world.set<Transform>(e, C.Transform, transformAt(x, z, field.sample(x, z) + PLAYER_HALF));
+  world.set<Vendor>(e, C.Vendor, { name });
+  return e;
 }
