@@ -5,7 +5,7 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
-## 0.5.0-INDEV — "Road to Thirty" → Complete Lv 1–30 Progression *(in progress)*
+## 0.5.0-INDEV — "Road to Thirty" → Complete Lv 1–30 Progression *(feature-complete — awaiting playtest)*
 **Goal:** the final two regions and the rest of the kit so a character can run **1 → 30** end-to-end across all six zones (→ Level 1–30 Content Gate). Large phase, built in verified checkpoints. *(Built on the CP5 branch while PR #14 is open, so this PR stacks on it.)*
 
 ### ✅ Checkpoint 1 — Riven Peaks + Gravereach zones + the undead holy-weakness lever
@@ -27,8 +27,18 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 **Verified:** `typecheck` ✓ · `npm test` → 175/175 ✓ · `build` ✓ (~163 KB gzip) · `test:e2e` → 11/11 ✓.
 
-### ⏳ Remaining for the Lv 1–30 journey (final checkpoint)
-- **CP3:** a full **1 → 30 validation** pass (pacing / no blockers across all six zones, all three classes) → the **Level 1–30 Content Gate**.
+### ✅ Checkpoint 3 — full 1→30 validation (the automatable Level 1–30 Content Gate)
+- **Spawn table extracted to pure content** (`src/sim/content/spawns.ts`, `WORLD_SPAWNS`): the world's enemy placements are now testable data (no Three.js), with a few standards added to fill level-band gaps (Lv 4/5/10/14/15/20/25/30).
+- **Automated gate suites** (no new gameplay — verification + light content tuning):
+  - **Spawn coverage**: `WORLD_SPAWNS` spans Lv 1–30, every 5-level band has grindable standards (no XP gaps), every leveling region is populated, and nothing spawns in the safe hub.
+  - **Progression 1→30**: each class reaches the level cap (30) on the real XP curve with its full 10-slot kit unlocked and its Lv-30 capstone active.
+  - **Combat balance 1→30** (18 class×zone sims through the real stat-derivation + damage formula): every class, at each zone's level with level-appropriate gear, can **kill that zone's tankiest standard with no HP wall** (< 60 casts) and **is not one-shot** (< 80% HP from a single hit). Catches genuine scaling blockers (e.g. armor nullifying damage, casters one-shotting).
+- Result: **the 1→30 journey is automatically verified completable + balanced for all three classes** — no blockers surfaced; the content the parallel sessions built holds up.
+- Tests: spawn coverage, progression, and combat-balance suites → **200 unit tests**; e2e green (11).
+
+**Verified:** `typecheck` ✓ · `npm test` → 200/200 ✓ · `build` ✓ (~163 KB gzip) · `test:e2e` → 11/11 ✓.
+
+**0.5.0 is now feature-complete** (all 3 checkpoints). The **automatable** scope of the Level 1–30 Content Gate passes; the **subjective 1→30 playthrough feel** awaits owner playtest. After that, the natural next phase is **0.6.0** (equipment depth + the Lv-30 endgame: Legendary/Relic tiers, world bosses).
 
 ---
 
