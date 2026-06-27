@@ -37,7 +37,15 @@ export type EnemyTemplateId =
   | 'magmaw'
   | 'ashreaver'
   | 'cinderborn'
-  | 'emberwarlord';
+  | 'emberwarlord'
+  // The Riven Peaks (Lv 21–25) — frost theme
+  | 'rimebound'
+  | 'frostfang'
+  | 'revenant'
+  // Gravereach (Lv 26–30) — undead / Blight; holy-weak
+  | 'wraith'
+  | 'bonewrought'
+  | 'forsworn';
 
 export type Tier = 'standard' | 'elite' | 'rare';
 
@@ -440,6 +448,157 @@ const TEMPLATES: Record<EnemyTemplateId, Template> = {
     goldMin: 8,
     goldMax: 14,
     lootTable: 'ember_standard',
+  },
+  // ── The Riven Peaks (Lv 21–25) — frost theme; frost resist matters ──
+  rimebound: {
+    name: 'Rimebound',
+    family: 'Rimebound',
+    archetype: 'melee_bruiser',
+    attackType: 'frost',
+    hpBase: 70,
+    hpPerLevel: 19, // ice construct — tanky/defensive
+    armorBase: 34,
+    armorPerLevel: 8,
+    primaryBase: 11,
+    primaryPerLevel: 2,
+    attackBase: 11,
+    attackCoeff: 0.7,
+    aggroRadius: 9,
+    leashRange: 44,
+    socialRange: 5,
+    moveSpeed: 2.5, // slow
+    attackRange: 2.5,
+    attackCooldown: 2.6,
+    windup: 1.0,
+    goldMin: 8,
+    goldMax: 15,
+    lootTable: 'riven_standard',
+    weakness: { fire: 1.25 }, // ice → weak to fire
+  },
+  frostfang: {
+    name: 'Frostfang',
+    family: 'Frostfang',
+    archetype: 'melee_bruiser',
+    attackType: 'frost',
+    hpBase: 40,
+    hpPerLevel: 13,
+    armorBase: 12,
+    armorPerLevel: 5,
+    primaryBase: 11,
+    primaryPerLevel: 2,
+    attackBase: 9,
+    attackCoeff: 0.6,
+    aggroRadius: 12,
+    leashRange: 44,
+    socialRange: 10, // fast packs
+    moveSpeed: 4.6,
+    attackRange: 2.1,
+    attackCooldown: 1.6,
+    windup: 0.5,
+    goldMin: 8,
+    goldMax: 15,
+    lootTable: 'riven_standard',
+  },
+  revenant: {
+    name: 'Frost Revenant',
+    family: 'Revenants',
+    archetype: 'caster',
+    attackType: 'frost',
+    hpBase: 34,
+    hpPerLevel: 11,
+    armorBase: 8,
+    armorPerLevel: 4,
+    primaryBase: 12,
+    primaryPerLevel: 2.4,
+    attackBase: 11,
+    attackCoeff: 0.8,
+    aggroRadius: 15,
+    leashRange: 44,
+    socialRange: 6,
+    moveSpeed: 2.6,
+    attackRange: 14,
+    attackCooldown: 3.0,
+    windup: 1.2,
+    goldMin: 8,
+    goldMax: 15,
+    lootTable: 'riven_standard',
+    weakness: { holy: 1.25 }, // undead — Priest holy bites
+  },
+  // ── Gravereach (Lv 26–30) — the Hollow Crown; undead/Blight, holy-weak ──
+  wraith: {
+    name: 'Gravereach Wraith',
+    family: 'Wraiths',
+    archetype: 'caster',
+    attackType: 'blight',
+    hpBase: 40,
+    hpPerLevel: 12,
+    armorBase: 8,
+    armorPerLevel: 4,
+    primaryBase: 13,
+    primaryPerLevel: 2.5,
+    attackBase: 12,
+    attackCoeff: 0.8,
+    aggroRadius: 15,
+    leashRange: 46,
+    socialRange: 6,
+    moveSpeed: 2.8,
+    attackRange: 14,
+    attackCooldown: 3.0,
+    windup: 1.2,
+    goldMin: 10,
+    goldMax: 18,
+    lootTable: 'gravereach_standard',
+    weakness: { holy: 1.25 },
+  },
+  bonewrought: {
+    name: 'Bonewrought',
+    family: 'Bonewrought',
+    archetype: 'melee_bruiser',
+    attackType: 'physical',
+    hpBase: 64,
+    hpPerLevel: 18, // bone construct — defensive/pack
+    armorBase: 30,
+    armorPerLevel: 8,
+    primaryBase: 12,
+    primaryPerLevel: 2,
+    attackBase: 12,
+    attackCoeff: 0.7,
+    aggroRadius: 10,
+    leashRange: 46,
+    socialRange: 9, // shambles in packs
+    moveSpeed: 2.8,
+    attackRange: 2.4,
+    attackCooldown: 2.4,
+    windup: 0.9,
+    goldMin: 10,
+    goldMax: 18,
+    lootTable: 'gravereach_standard',
+    weakness: { holy: 1.2 },
+  },
+  forsworn: {
+    name: 'Forsworn Knight',
+    family: 'The Forsworn',
+    archetype: 'pack_leader',
+    attackType: 'physical',
+    hpBase: 78,
+    hpPerLevel: 20, // the signature elite threat
+    armorBase: 28,
+    armorPerLevel: 8,
+    primaryBase: 13,
+    primaryPerLevel: 2.2,
+    attackBase: 13,
+    attackCoeff: 0.75,
+    aggroRadius: 12,
+    leashRange: 46,
+    socialRange: 9, // rallies the dead
+    moveSpeed: 3.2,
+    attackRange: 2.6,
+    attackCooldown: 2.2,
+    windup: 0.9,
+    goldMin: 12,
+    goldMax: 22,
+    lootTable: 'gravereach_standard',
+    weakness: { holy: 1.2 },
   },
 };
 

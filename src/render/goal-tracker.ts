@@ -98,15 +98,20 @@ export class GoalTracker {
     if (level < 6) goals.push('Reach Lv 6 → the Thornwood Vale');
     else if (level < 11) goals.push('Reach Lv 11 → the Sunken Fen');
     else if (level < 16) goals.push('Reach Lv 16 → the Emberreach');
-    else if (level < 20) goals.push('Push to Lv 20 — clear the Emberreach');
-    else goals.push('Push toward Lv 30');
+    else if (level < 21) goals.push('Reach Lv 21 → the Riven Peaks');
+    else if (level < 26) goals.push('Reach Lv 26 → Gravereach');
+    else goals.push('Reach Lv 30 — clear Gravereach, the Hollow Crown');
     goals.push('Upgrade your gear from drops or the vendor (F)');
     goals.push(
       level < 11
         ? 'Attune Oathstones for fast travel (T)'
         : level < 16
           ? 'Bring blight resist into the Sunken Fen'
-          : 'Bring fire resist into the Emberreach',
+          : level < 21
+            ? 'Bring fire resist into the Emberreach'
+            : level < 26
+              ? 'Bring frost resist into the Riven Peaks'
+              : 'Gravereach: the undead are weak to holy (Priests shine)',
     );
     return goals;
   }
