@@ -5,8 +5,10 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
-## 0.5.0-INDEV — "Road to Thirty" → Complete Lv 1–30 Progression *(feature-complete — awaiting playtest)*
-**Goal:** the final two regions and the rest of the kit so a character can run **1 → 30** end-to-end across all six zones (→ Level 1–30 Content Gate). Large phase, built in verified checkpoints. *(Built on the CP5 branch while PR #14 is open, so this PR stacks on it.)*
+## 0.5.0-INDEV — "Road to Thirty" → Complete Lv 1–30 Progression *(✅ merged — awaiting playtest)*
+**Goal:** the final two regions and the rest of the kit so a character can run **1 → 30** end-to-end across all six zones (→ Level 1–30 Content Gate). Large phase, built in verified checkpoints (CP1–CP3, landed via PRs #16/#17/#19). All of `0.0.1`–`0.5.0` is now merged into `claude/game-design-docs-70dim2`.
+
+> **Housekeeping (state sync):** the build's displayed version was bumped **`0.4.0-INDEV` → `0.5.0-INDEV`** (it had never been bumped during the 0.5.0 work) across `package.json`, `index.html`, the perf overlay, and the e2e check. Full health check on the merged HEAD: typecheck ✓ · 200/200 unit ✓ · build ✓ · 11/11 e2e ✓ · no conflict markers / code smells.
 
 ### ✅ Checkpoint 1 — Riven Peaks + Gravereach zones + the undead holy-weakness lever
 - **The Riven Peaks (Lv 21–25)** to the **east** — frozen mountains introducing the **frost** damage school: **Rimebound** ice-construct bruisers (tanky, fire-weak), fast **Frostfang** packs, and **Revenant** casters (holy-weak). A **frozen-battlefield elite camp** (an elite *Frost Revenant Lord* + a Rimebound guard) and the roaming rare **Hoarfang the White**.
