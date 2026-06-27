@@ -56,17 +56,33 @@ export interface BiomeFactors {
 const T = ZONE_THRESHOLD; // 120
 
 /**
+ * Domain warp: nudge the lookup position by low-frequency noise so biome borders are
+ * organic and wiggly instead of straight axis-aligned lines. The warp amplitude grows
+ * with distance from the hub (≈0 within the heartland), so the spawn stays flat and a
+ * small field (the unit-test 100 m world) is unwarped. Pure → deterministic.
+ */
+function warped(x: number, z: number): [number, number] {
+  const amt = smoothstep(40, 180, Math.hypot(x, z)) * 42;
+  if (amt < 0.001) return [x, z];
+  const nx = (Math.sin(z * 0.012 + 1.7) + 0.5 * Math.sin(z * 0.031 - 0.6)) / 1.5;
+  const nz = (Math.sin(x * 0.012 + 4.2) + 0.5 * Math.sin(x * 0.028 + 1.1)) / 1.5;
+  return [x + nx * amt, z + nz * amt];
+}
+
+/**
  * Smooth directional biome membership at a world position. Ramps start a little inside
  * ZONE_THRESHOLD so terrain/colour transition naturally rather than snapping at the
- * crisp region border. The NE (Thornwood) corner suppresses the pure east/north
- * mountains/plateau so it reads as forest hills, not peaks.
+ * crisp region border, and the lookup is domain-warped so the borders are organic. The
+ * NE (Thornwood) corner suppresses the pure east/north mountains/plateau so it reads as
+ * forest hills, not peaks.
  */
 export function biomeFactors(x: number, z: number): BiomeFactors {
-  const west = smoothstep(T * 0.55, T * 1.5, -x);
-  const east = smoothstep(T * 0.55, T * 1.5, x);
-  const south = smoothstep(T * 0.55, T * 1.4, -z);
-  const north = smoothstep(T * 0.6, T * 1.5, z);
-  const ne = smoothstep(T * 0.55, T * 1.35, Math.min(x, z));
+  const [wx, wz] = warped(x, z);
+  const west = smoothstep(T * 0.55, T * 1.5, -wx);
+  const east = smoothstep(T * 0.55, T * 1.5, wx);
+  const south = smoothstep(T * 0.55, T * 1.4, -wz);
+  const north = smoothstep(T * 0.6, T * 1.5, wz);
+  const ne = smoothstep(T * 0.55, T * 1.35, Math.min(wx, wz));
   const frontier = Math.min(1, Math.max(west, east, south, north, ne));
   return { west, east, south, north, ne, greenmarch: 1 - frontier };
 }

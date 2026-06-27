@@ -101,6 +101,22 @@ function instancedFromGeo(
   return mesh;
 }
 
+/** Resample a polyline to roughly even `spacing` so the ribbon hugs the terrain. */
+function resamplePath(pts: { x: number; z: number }[], spacing: number): { x: number; z: number }[] {
+  const out: { x: number; z: number }[] = [pts[0]];
+  let prev = pts[0];
+  for (let i = 1; i < pts.length; i++) {
+    const cur = pts[i];
+    const dx = cur.x - prev.x;
+    const dz = cur.z - prev.z;
+    const seg = Math.hypot(dx, dz);
+    const n = Math.max(1, Math.round(seg / spacing));
+    for (let k = 1; k <= n; k++) out.push({ x: prev.x + (dx * k) / n, z: prev.z + (dz * k) / n });
+    prev = cur;
+  }
+  return out;
+}
+
 /** Build a flat ribbon (water/road) draped over the terrain along a path. */
 function buildRibbon(
   path: SceneryPath,
@@ -109,8 +125,8 @@ function buildRibbon(
   mat: THREE.Material,
   name: string,
 ): THREE.Mesh | null {
-  const pts = path.points;
-  if (pts.length < 2) return null;
+  if (path.points.length < 2) return null;
+  const pts = resamplePath(path.points, 2.5); // dense so the strip follows the ground
   const hw = path.width / 2;
   const left: number[] = [];
   const right: number[] = [];
@@ -135,13 +151,13 @@ function buildRibbon(
   for (let i = 0; i < pts.length - 1; i++) {
     const a = i * 3;
     const b = (i + 1) * 3;
-    // two triangles: L[i], R[i], R[i+1] and L[i], R[i+1], L[i+1]
+    // Two triangles per segment, wound so the face normal points up (+y).
     positions.push(left[a], left[a + 1], left[a + 2]);
+    positions.push(right[b], right[b + 1], right[b + 2]);
     positions.push(right[a], right[a + 1], right[a + 2]);
-    positions.push(right[b], right[b + 1], right[b + 2]);
     positions.push(left[a], left[a + 1], left[a + 2]);
-    positions.push(right[b], right[b + 1], right[b + 2]);
     positions.push(left[b], left[b + 1], left[b + 2]);
+    positions.push(right[b], right[b + 1], right[b + 2]);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -248,27 +264,32 @@ export function buildScenery(scenery: Scenery, field: Heightfield): THREE.Group 
 
   // ── Rivers (translucent water) ───────────────────────────────────────────────
   const waterMat = new THREE.MeshStandardMaterial({
-    color: 0x2f6f8f,
+    color: 0x3a7fa6,
     transparent: true,
-    opacity: 0.78,
-    roughness: 0.3,
-    metalness: 0.1,
+    opacity: 0.82,
+    roughness: 0.25,
+    metalness: 0.15,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
   });
   for (let i = 0; i < scenery.rivers.length; i++) {
-    const m = buildRibbon(scenery.rivers[i], field, 0.08, waterMat, `river-${i}`);
+    const m = buildRibbon(scenery.rivers[i], field, 0.18, waterMat, `river-${i}`);
     if (m) group.add(m);
   }
 
   // ── Roads (draped tan paths from the hub to the frontier) ────────────────────
   const roadMat = new THREE.MeshStandardMaterial({
-    color: 0x8a7a55,
+    color: 0x9c8a5e,
     roughness: 1,
+    side: THREE.DoubleSide,
     polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
+    polygonOffsetFactor: -3,
+    polygonOffsetUnits: -3,
   });
   for (let i = 0; i < scenery.roads.length; i++) {
-    const m = buildRibbon(scenery.roads[i], field, 0.12, roadMat, `road-${i}`);
+    const m = buildRibbon(scenery.roads[i], field, 0.25, roadMat, `road-${i}`);
     if (m) group.add(m);
   }
 
