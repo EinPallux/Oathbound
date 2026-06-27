@@ -42,10 +42,19 @@ export class EnemyView {
     this.scene.add(this.reticle);
   }
 
-  private ensure(e: Entity, tier: Enemy['tier']): EnemyVisual {
+  private ensure(e: Entity, tier: Enemy['tier'], archetype: Enemy['archetype']): EnemyVisual {
     let v = this.visuals.get(e);
     if (v) return v;
-    const color = tier === 'rare' ? 0xb060d0 : tier === 'elite' ? 0xd08a3a : BODY_COLOR;
+    const color =
+      tier === 'rare'
+        ? 0xb060d0
+        : tier === 'elite'
+          ? 0xd08a3a
+          : archetype === 'support'
+            ? 0x46c98a // healer — teal-green
+            : archetype === 'pack_leader'
+              ? 0xc0563c // leader — banner red
+              : BODY_COLOR;
     const scale = tier === 'rare' ? 1.8 : tier === 'elite' ? 1.4 : 1;
     const material = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, HALF * 2 - 0.9, 6, 12), material);
@@ -90,7 +99,7 @@ export class EnemyView {
     for (const e of world.query(C.Enemy, C.Transform, C.Health)) {
       seen.add(e);
       const en = world.get<Enemy>(e, C.Enemy)!;
-      const v = this.ensure(e, en.tier);
+      const v = this.ensure(e, en.tier, en.archetype);
       const tr = world.get<Transform>(e, C.Transform)!;
       const h = world.get<Health>(e, C.Health)!;
 

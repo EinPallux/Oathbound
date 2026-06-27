@@ -19,7 +19,8 @@ import { clamp } from '../../core/math';
 import { resolveCircleVsCylinders } from '../collision';
 import { segmentBlockedByCylinders } from '../combat/targeting';
 import { applyDamage } from '../combat/apply';
-import { hasStatus, Status } from '../combat/statuses';
+import { applyHeal } from '../combat/heal';
+import { addStatus, hasStatus, Status } from '../combat/statuses';
 import { CombatEvent, type PlayerDiedEvent, type RespawnEvent } from '../combat/events';
 import type { SpatialGrid } from '../spatial-grid';
 import type { Projectiles } from '../projectiles';
@@ -31,6 +32,9 @@ const ENEMY_PROJECTILE_SPEED = 22;
 /** Idle enemies past this distance from the player update on a slow cadence. */
 const DEFAULT_SIM_RADIUS = 60;
 const THROTTLE_EVERY = 6;
+/** Pack-leader rally: outgoing-damage buff applied to nearby allies. */
+const EMPOWER_SEC = 6;
+const EMPOWER_MAG = 0.25;
 
 export interface EnemyAiDeps {
   field: Heightfield;
@@ -231,6 +235,14 @@ function fireAttack(
   projectiles: Projectiles | undefined,
   rng: Rng,
 ): void {
+  // Support archetype: tend the most-wounded ally instead of attacking the player.
+  if (en.archetype === 'support') {
+    supportHeal(world, e, en, tr, rng);
+    return;
+  }
+  // Pack-leader: rally nearby allies (outgoing-damage buff), then swing as a bruiser.
+  if (en.archetype === 'pack_leader') empowerAllies(world, en, tr);
+
   // Elites/rares enrage below 30% HP (a readable "real fight" mechanic).
   let base = en.attackBase;
   if (en.tier !== 'standard') {
@@ -264,6 +276,36 @@ function fireAttack(
   );
   markCombat(world, player);
   if (r.killed) world.events.emit<PlayerDiedEvent>(CombatEvent.PlayerDied, { entity: player });
+}
+
+/** Support: heal the most-wounded living ally (incl. self) within social range. */
+function supportHeal(world: World, e: Entity, en: Enemy, tr: Transform, rng: Rng): void {
+  let best: Entity | null = null;
+  let bestRatio = 1;
+  for (const other of world.query(C.Enemy, C.Health, C.Transform)) {
+    const oh = world.get<Health>(other, C.Health)!;
+    if (oh.current <= 0 || oh.current >= oh.max) continue;
+    const ot = world.get<Transform>(other, C.Transform)!;
+    if (Math.hypot(ot.x - tr.x, ot.z - tr.z) > en.socialRange) continue;
+    const ratio = oh.current / oh.max;
+    if (ratio < bestRatio) {
+      bestRatio = ratio;
+      best = other;
+    }
+  }
+  if (best == null) return;
+  applyHeal(world, e, best, en.attackBase, en.attackCoeff, rng);
+}
+
+/** Pack-leader: refresh an outgoing-damage buff on nearby living allies (incl. self). */
+function empowerAllies(world: World, en: Enemy, tr: Transform): void {
+  for (const other of world.query(C.Enemy, C.Statuses, C.Transform, C.Health)) {
+    const oh = world.get<Health>(other, C.Health)!;
+    if (oh.current <= 0) continue;
+    const ot = world.get<Transform>(other, C.Transform)!;
+    if (Math.hypot(ot.x - tr.x, ot.z - tr.z) > en.socialRange) continue;
+    addStatus(world.get<Statuses>(other, C.Statuses)!, Status.Empowered, EMPOWER_SEC, EMPOWER_MAG);
+  }
 }
 
 /** Nearby idle packmates join the fight (social aggro). Uses the grid when present. */

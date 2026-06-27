@@ -117,6 +117,10 @@ const SPAWNS: Spawn[] = [
   { id: 'sporeling', x: 27, z: 31, level: 6 },
   { id: 'bramblekin', x: 36, z: 34, level: 7 },
   { id: 'reaver', x: 34, z: 39, level: 7 },
+  // Support/pack-leader preview: a Sporemother that heals the swarm + a Warchief that
+  // rallies the Bramblekin (proper Fen/Ember camps come in checkpoint 4).
+  { id: 'sporemother', x: 29, z: 33, level: 8 },
+  { id: 'warchief', x: 38, z: 37, level: 9 },
   // Rare-named, deep in Thornwood.
   { id: 'bramblekin', x: 41, z: 41, level: 8, tier: 'rare', name: 'Old Thornback' },
 ];

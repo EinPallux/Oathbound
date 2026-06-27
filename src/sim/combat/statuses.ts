@@ -19,6 +19,8 @@ export const Status = {
   Marked: 'marked',
   /** On an enemy: cannot begin a new attack/cast wind-up (interrupt lockout). */
   Silence: 'silence',
+  /** On an enemy: outgoing damage increased by `magnitude` (pack-leader rally). */
+  Empowered: 'empowered',
 } as const;
 
 /** Add or refresh a status (keeps the longer remaining time). */

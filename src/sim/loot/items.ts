@@ -71,9 +71,9 @@ function pick<T>(rng: Rng, arr: readonly T[]): T {
 }
 
 function rollAffix(rng: Rng, slot: EquipSlot, ilvl: number): Affix {
-  // Bias: armour slots → defensive; weapon/jewelry → offensive.
+  // Bias: armour slots → defensive (incl. typed resists); weapon/jewelry → offensive.
   const pool: AffixId[] = ARMOR_SLOTS.has(slot)
-    ? ['armor', 'vit', 'leech']
+    ? ['armor', 'vit', 'leech', 'resistFire', 'resistBlight']
     : ['crit', 'haste', 'leech'];
   const id = pick(rng, pool);
   switch (id) {
@@ -89,6 +89,9 @@ function rollAffix(rng: Rng, slot: EquipSlot, ilvl: number): Affix {
       return { id, value: Math.round(3 + 0.5 * ilvl) };
     case 'healing':
       return { id, value: Math.round(3 + 0.5 * ilvl) };
+    case 'resistFire':
+    case 'resistBlight':
+      return { id, value: Math.round(15 + 3.5 * ilvl) };
   }
 }
 
@@ -111,6 +114,10 @@ export function scoreItem(item: Item): number {
         break;
       case 'vit':
         s += a.value * 2;
+        break;
+      case 'resistFire':
+      case 'resistBlight':
+        s += a.value * 0.4;
         break;
     }
   }

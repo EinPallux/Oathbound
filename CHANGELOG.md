@@ -24,8 +24,16 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 **Verified:** `typecheck` ✓ · `npm test` → 140/140 ✓ · `build` ✓ (~162 KB gzip) · `test:e2e` → 11/11 ✓.
 
+### ✅ Checkpoint 3 — resistance system live + support/pack-leader archetypes
+- **Resistance live**: typed mitigation (the `damage.ts` formula already had it) now actually flows from gear — two new defensive affixes (**+Fire Resist**, **+Blight Resist**) roll on armour, feed `deriveStats` → `Defense.resist`, and reduce incoming typed hits (e.g. a Wisp's blight bolt). Tuned to *matter but never fully negate* (and never gate content). Resist is scored for upgrade deltas.
+- **Support archetype** — the **Sporemother**: hangs back and **heals the most-wounded nearby ally** on a cadence instead of attacking (kill-the-healer play). Tinted teal-green.
+- **Pack-leader archetype** — the **Bramble Warchief**: a bruiser that **rallies nearby allies** with an `Empowered` buff (+25% outgoing damage) while it fights. Tinted banner-red. New `Status.Empowered` read by the shared damage applier.
+- A preview pair (Sporemother tending the Sporeling swarm + a Warchief rallying the Bramblekin) is dropped into Thornwood now; proper Fen/Ember camps follow in CP4.
+- Tests: resist derives from gear + equipping sets `Defense.resist` + blight resist mitigates; support heals a wounded ally; pack-leader empowers allies; an Empowered attacker hits harder → **146 unit tests**; e2e green (11).
+
+**Verified:** `typecheck` ✓ · `npm test` → 146/146 ✓ · `build` ✓ (~162 KB gzip) · `test:e2e` → 11/11 ✓.
+
 ### ⏳ Remaining for the Lv 11–20 brackets (next checkpoints)
-- **CP3:** **resistance** system live (fire/blight mitigation + resist gear) + **support**/**pack-leader** archetypes.
 - **CP4:** **Sunken Fen** + **Emberreach** zones + elite **camps**.
 - **CP5:** **Epic** rarity + **Reinforcement** + **bad-luck protection v1**.
 

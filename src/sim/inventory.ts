@@ -35,6 +35,9 @@ export function recomputeDerived(world: World, player: Entity): void {
 
   const def = world.get<Defense>(player, C.Defense)!;
   def.armor = d.armor;
+  def.resist.fire = d.resist.fire;
+  def.resist.frost = d.resist.frost;
+  def.resist.blight = d.resist.blight;
 
   const h = world.get<Health>(player, C.Health)!;
   h.max = d.maxHp;
