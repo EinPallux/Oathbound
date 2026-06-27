@@ -16,6 +16,7 @@ import {
 } from '../core/ecs/components';
 import { EQUIP_SLOTS } from '../sim/loot/items';
 import { SALVAGE_LEVEL } from '../sim/salvage';
+import { canReinforce, reinforceCost } from '../sim/reinforce';
 import { getClass } from '../sim/classes';
 
 const SLOT_LABEL: Record<EquipSlot, string> = {
@@ -31,6 +32,12 @@ const SLOT_LABEL: Record<EquipSlot, string> = {
   ring2: 'Ring 2',
 };
 
+/** ` +N` reinforcement suffix for an item name, or '' if unreinforced. */
+function reinSuffix(item: Item): string {
+  const n = item.reinforced ?? 0;
+  return n > 0 ? ` +${n}` : '';
+}
+
 export class InventoryPanel {
   private readonly root: HTMLDivElement;
   private readonly wallet: HTMLDivElement;
@@ -45,6 +52,7 @@ export class InventoryPanel {
   onSalvage: (item: Item) => void = () => {};
   onSalvageCommons: () => void = () => {};
   onToggleLock: (item: Item) => void = () => {};
+  onReinforce: (item: Item) => void = () => {};
   onChooseTalent: (nodeId: string, option: number) => void = () => {};
 
   constructor(parent: HTMLElement) {
@@ -112,9 +120,12 @@ export class InventoryPanel {
     const cs = world.get<CombatState>(player, C.CombatState);
 
     const sig =
-      EQUIP_SLOTS.map((s) => eq.slots[s]?.uid ?? '-').join(',') +
+      EQUIP_SLOTS.map((s) => {
+        const it = eq.slots[s];
+        return it ? `${it.uid}r${it.reinforced ?? 0}` : '-';
+      }).join(',') +
       '|' +
-      inv.items.map((i) => `${i.uid}${i.locked ? 'L' : ''}`).join(',') +
+      inv.items.map((i) => `${i.uid}${i.locked ? 'L' : ''}r${i.reinforced ?? 0}`).join(',') +
       `|${inv.gold}|${inv.materials}|${prog.level}` +
       `|${pc?.id ?? ''}|${JSON.stringify(pc?.choices ?? {})}|${cs?.inCombat ? 'c' : ''}`;
     if (sig === this.lastSig) return;
@@ -148,8 +159,9 @@ export class InventoryPanel {
       row.innerHTML = `<span class="inv-slot">${SLOT_LABEL[slot]}</span>`;
       const name = document.createElement('span');
       name.className = it ? `inv-name ${it.rarity}` : 'inv-name empty';
-      name.textContent = it ? `${it.name} (${it.score})` : '—';
+      name.textContent = it ? `${it.name}${reinSuffix(it)} (${it.score})` : '—';
       row.appendChild(name);
+      if (it) row.appendChild(this.reinforceButton(it, inv.gold, inv.materials));
       this.equipList.appendChild(row);
     }
 
@@ -169,7 +181,7 @@ export class InventoryPanel {
 
       const name = document.createElement('span');
       name.className = `inv-name ${item.rarity}`;
-      name.textContent = `${item.locked ? '🔒 ' : ''}${item.name} · ${SLOT_LABEL[item.slot]}`;
+      name.textContent = `${item.locked ? '🔒 ' : ''}${item.name}${reinSuffix(item)} · ${SLOT_LABEL[item.slot]}`;
       row.appendChild(name);
 
       const d = document.createElement('span');
@@ -178,6 +190,7 @@ export class InventoryPanel {
       row.appendChild(d);
 
       row.appendChild(this.button('Equip', 'inv-equip', () => this.onEquip(item)));
+      row.appendChild(this.reinforceButton(item, inv.gold, inv.materials));
       row.appendChild(
         this.button(item.locked ? 'Unlock' : 'Lock', 'inv-btn small', () => this.onToggleLock(item)),
       );
@@ -242,6 +255,23 @@ export class InventoryPanel {
     b.className = cls;
     b.textContent = label;
     b.onclick = onclick;
+    return b;
+  }
+
+  /** Reinforcement button: shows the next step + cost (in a tooltip), or "Max". */
+  private reinforceButton(item: Item, gold: number, materials: number): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.className = 'inv-btn small reinforce';
+    if (!canReinforce(item)) {
+      b.textContent = '⚒ Max';
+      b.disabled = true;
+      return b;
+    }
+    const cost = reinforceCost(item);
+    b.textContent = `⚒ +${(item.reinforced ?? 0) + 1}`;
+    b.title = `Reinforce: ${cost.gold} gold + ${cost.whetstones} whetstones`;
+    b.disabled = gold < cost.gold || materials < cost.whetstones;
+    b.onclick = () => this.onReinforce(item);
     return b;
   }
 }

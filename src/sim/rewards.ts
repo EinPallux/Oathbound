@@ -11,11 +11,12 @@ import {
   type Progression,
   type PlayerClass,
   type LootDrop,
+  type LootLuck,
 } from '../core/ecs/components';
 import type { Rng } from '../core/rng';
 import { grantXp } from './progression';
 import { conXpMultiplier } from './stats';
-import { rollLoot } from './loot/droptable';
+import { rollLoot, pityMultiplier, isRarePlus } from './loot/droptable';
 import { getClass } from './classes';
 import { CombatEvent, type DeathEvent, type LootDroppedEvent } from './combat/events';
 
@@ -38,7 +39,14 @@ export function rewardKill(world: World, killer: Entity, victim: Entity, rng: Rn
   const tier = enemy?.tier ?? 'standard';
   const primary = getClass(world.get<PlayerClass>(killer, C.PlayerClass)?.id ?? 'warrior').primaryStatId;
   const lootPrimary = primary === 'VIT' ? 'STR' : primary;
-  const roll = rollLoot(rng, enemyLevel, tier, 1, lootPrimary);
+
+  // Bad-luck protection: boost rare+ odds by the killer's pity, then update it.
+  const luck = world.get<LootLuck>(killer, C.LootLuck);
+  const roll = rollLoot(rng, enemyLevel, tier, 1, lootPrimary, luck ? pityMultiplier(luck.pity) : 1);
+  if (luck) {
+    if (roll.item && isRarePlus(roll.item.rarity)) luck.pity = 0;
+    else luck.pity += 1;
+  }
   const gold = enemy ? enemy.goldMin + rng.int(enemy.goldMax - enemy.goldMin + 1) : roll.gold;
 
   const drop = world.createEntity();

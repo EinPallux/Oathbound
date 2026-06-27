@@ -56,14 +56,33 @@ const QUALITY_WORD: Record<Rarity, readonly string[]> = {
   common: ['Worn', 'Plain', 'Crude'],
   uncommon: ['Sturdy', 'Fine', 'Honed'],
   rare: ['Gleaming', 'Runed', 'Vanguard'],
+  epic: ['Resplendent', 'Ascendant', 'Oathforged'],
 };
 
-const RARITY_MULT: Record<Rarity, number> = { common: 1.0, uncommon: 1.1, rare: 1.2 };
-const RARITY_AFFIXES: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2 };
+const RARITY_MULT: Record<Rarity, number> = { common: 1.0, uncommon: 1.1, rare: 1.2, epic: 1.32 };
+const RARITY_AFFIXES: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3 };
 
 /** Chest-equivalent budget at an item level. */
 export function baseBudget(ilvl: number): number {
   return Math.round(10 + 6 * ilvl);
+}
+
+/** Total stat budget for a slot at an item level + rarity (used by gen + reinforce). */
+export function slotBudget(slot: EquipSlot, rarity: Rarity, ilvl: number): number {
+  return Math.round(baseBudget(ilvl) * SLOT_WEIGHT[slot] * RARITY_MULT[rarity]);
+}
+
+/** Split a slot's budget into base armor + primary-stat value. */
+export function baseStatsFromBudget(slot: EquipSlot, budget: number): { armor: number; primaryValue: number } {
+  if (ARMOR_SLOTS.has(slot)) {
+    return { armor: Math.max(1, Math.round(budget * 0.6)), primaryValue: Math.max(1, Math.round(budget * 0.2)) };
+  }
+  return { armor: 0, primaryValue: Math.max(1, Math.round(budget * 0.18)) };
+}
+
+/** An item's effective level: base ilvl + reinforcement steps. */
+export function effectiveIlvl(item: Item): number {
+  return item.ilvl + (item.reinforced ?? 0);
 }
 
 function pick<T>(rng: Rng, arr: readonly T[]): T {
@@ -143,16 +162,12 @@ export function generateItem(rng: Rng, opts: GenerateOpts): Item {
   const slot = opts.slot ?? pick(rng, EQUIP_SLOTS);
   const rarity = opts.rarity ?? 'common';
   const ilvl = Math.max(1, Math.round(opts.ilvl));
-  const budget = Math.round(baseBudget(ilvl) * SLOT_WEIGHT[slot] * RARITY_MULT[rarity]);
-
-  let armor = 0;
-  let primary: Item['primary'];
-  if (ARMOR_SLOTS.has(slot)) {
-    armor = Math.max(1, Math.round(budget * 0.6));
-    primary = { stat: 'VIT', value: Math.max(1, Math.round(budget * 0.2)) };
-  } else {
-    primary = { stat: opts.primaryStat ?? 'STR', value: Math.max(1, Math.round(budget * 0.18)) };
-  }
+  const budget = slotBudget(slot, rarity, ilvl);
+  const bs = baseStatsFromBudget(slot, budget);
+  const armor = bs.armor;
+  const primary: Item['primary'] = ARMOR_SLOTS.has(slot)
+    ? { stat: 'VIT', value: bs.primaryValue }
+    : { stat: opts.primaryStat ?? 'STR', value: bs.primaryValue };
 
   const affixes: Affix[] = [];
   for (let i = 0; i < RARITY_AFFIXES[rarity]; i++) affixes.push(rollAffix(rng, slot, ilvl));
@@ -168,6 +183,7 @@ export function generateItem(rng: Rng, opts: GenerateOpts): Item {
     affixes,
     score: 0,
     locked: false,
+    reinforced: 0,
   };
   item.score = scoreItem(item);
   return item;
