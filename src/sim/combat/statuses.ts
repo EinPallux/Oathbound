@@ -15,6 +15,8 @@ export const Status = {
   Fleet: 'fleet',
   /** On the Priest: a fraction of spell damage dealt heals the caster. */
   Atonement: 'atonement',
+  /** On an enemy: takes `magnitude` extra fraction of damage (Hunter's Mark). */
+  Marked: 'marked',
 } as const;
 
 /** Add or refresh a status (keeps the longer remaining time). */

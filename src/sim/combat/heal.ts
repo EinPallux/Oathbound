@@ -14,6 +14,7 @@ export function applyHeal(
   base: number,
   coeff: number,
   rng: Rng,
+  flatBonus = 0,
 ): number {
   const off = world.get<Offense>(source, C.Offense);
   const h = world.get<Health>(target, C.Health);
@@ -21,7 +22,7 @@ export function applyHeal(
 
   const isCrit = rng.next() < off.critChance;
   const variance = 0.95 + rng.next() * 0.1;
-  let amount = base + coeff * off.primaryStat + off.healPower;
+  let amount = base + coeff * off.primaryStat + off.healPower + flatBonus;
   if (isCrit) amount *= off.critMult;
   amount = Math.max(0, Math.round(amount * variance));
 

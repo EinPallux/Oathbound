@@ -134,6 +134,10 @@ export function createCombatSystem(deps: CombatDeps): System {
 
         if (ab.bufferedIndex < 0 || ab.bufferedIndex >= abilities.length) continue;
         const def = abilities[ab.bufferedIndex];
+        if ((def.unlockLevel ?? 1) > off.level) {
+          ab.bufferedIndex = -1; // not learned yet
+          continue;
+        }
         if (def.triggersGcd && ab.gcdRemaining > 0) continue;
         if (ab.cooldowns[ab.bufferedIndex] > 0) continue;
         if (res.current < def.cost) continue;
@@ -153,10 +157,14 @@ export function createCombatSystem(deps: CombatDeps): System {
           if (hits.length === 0) continue;
           for (const a of hits) hitList.push(a.entity);
           primary = hitList[0];
-        } else if (def.targeting === 'target' || def.targeting === 'projectile') {
+        } else if (
+          def.targeting === 'target' ||
+          def.targeting === 'projectile' ||
+          def.targeting === 'charge'
+        ) {
           primary = resolvePrimary(world, t, input.yaw, def.range, tgt, colliders, candidates);
           if (primary == null) continue;
-          hitList.push(primary);
+          if (def.targeting !== 'charge') hitList.push(primary);
         } else if (def.targeting === 'frontalSplash') {
           primary = resolvePrimary(world, t, input.yaw, def.range, tgt, colliders, candidates);
           if (primary == null) continue;
@@ -205,11 +213,23 @@ export function createCombatSystem(deps: CombatDeps): System {
           markCombat(world, e);
         } else if (def.targeting === 'dash') {
           doDash(t, def, colliders, field, bound, input.yaw);
+        } else if (def.targeting === 'charge' && primary != null) {
+          doCharge(t, primary, world, colliders, field, bound);
+          if (def.debuff) {
+            const vs = world.get<Statuses>(primary, C.Statuses);
+            if (vs) addStatus(vs, def.debuff.id, def.debuff.durationSec, def.debuff.magnitude);
+          }
+          markCombat(world, e);
         } else if (def.targeting === 'trap') {
           placeTrap(world, e, t, def);
           markCombat(world, e);
         } else if (def.targeting === 'heal' && def.heal) {
-          applyHeal(world, e, e, def.heal.base, def.heal.coeff, rng);
+          let flat = 0;
+          if (def.heal.missingHpPct) {
+            const ph = world.get<Health>(e, C.Health);
+            if (ph) flat = def.heal.missingHpPct * (ph.max - ph.current);
+          }
+          applyHeal(world, e, e, def.heal.base, def.heal.coeff, rng, flat);
         } else if (def.targeting === 'shield' && def.shield) {
           world.set<Shield>(e, C.Shield, {
             amount: Math.round(def.shield.coeff * off.primaryStat),
@@ -376,6 +396,29 @@ function doDash(
   t.x = clamp(r.x, -bound, bound);
   t.z = clamp(r.z, -bound, bound);
   t.y = field.sample(t.x, t.z) + PLAYER_HALF;
+}
+
+/** Gap-closer: leap to just short of the target and face it. */
+function doCharge(
+  t: Transform,
+  target: Entity,
+  world: World,
+  cols: readonly CylinderCollider[],
+  field: Heightfield,
+  bound: number,
+): void {
+  const tr = world.get<Transform>(target, C.Transform);
+  if (!tr) return;
+  const dx = tr.x - t.x;
+  const dz = tr.z - t.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist <= 1e-3) return;
+  const stop = Math.max(0, dist - 1.6); // arrive at melee range
+  const r = resolveCircleVsCylinders(t.x + (dx / dist) * stop, t.z + (dz / dist) * stop, PLAYER_RADIUS, cols);
+  t.x = clamp(r.x, -bound, bound);
+  t.z = clamp(r.z, -bound, bound);
+  t.y = field.sample(t.x, t.z) + PLAYER_HALF;
+  t.yaw = Math.atan2(dx, dz);
 }
 
 function placeTrap(world: World, source: Entity, t: Transform, def: AbilityDef): void {

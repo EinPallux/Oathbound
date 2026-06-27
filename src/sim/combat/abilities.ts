@@ -13,6 +13,7 @@ export type Targeting =
   | 'cone' // everything in a forward cone within range (instant)
   | 'dash' // self movement (leap) + optional buff
   | 'trap' // place a trap at the caster
+  | 'charge' // leap to a target (gap-closer) + generate resource + root it
   | 'heal' // restore HP to the caster
   | 'shield' // grant the caster an absorb shield
   | 'toggle'; // flip a sustained self-status (Atonement)
@@ -20,6 +21,8 @@ export type Targeting =
 export interface AbilityDef extends AbilityHit {
   id: string;
   name: string;
+  /** Character level at which this ability becomes usable. */
+  unlockLevel?: number;
   /** Resource cost. */
   cost: number;
   /** Resource generated on use (filler builds resource). */
@@ -47,8 +50,9 @@ export interface AbilityDef extends AbilityHit {
   trapTtl?: number;
   /** Cast time (s) — the ability channels a bar before it resolves; moving cancels. */
   castTime?: number;
-  /** Self-heal for `heal` targeting (and the self-heal rider on Holy Nova). */
-  heal?: { base: number; coeff: number };
+  /** Self-heal for `heal` targeting (and the self-heal rider on Holy Nova).
+   *  `missingHpPct` adds a fraction of the caster's missing HP (Second Wind). */
+  heal?: { base: number; coeff: number; missingHpPct?: number };
   /** Absorb shield for `shield` targeting (amount = coeff*primaryStat). */
   shield?: { coeff: number; durationSec: number };
   /** Status to flip for `toggle` targeting (Atonement). */

@@ -147,20 +147,26 @@ export class Hud {
       this.rebuildHotbar(abilities.map((a) => a.name));
     }
     if (ab && res) {
+      const level = prog?.level ?? 1;
       for (let i = 0; i < this.slots.length; i++) {
         const def = abilities[i];
+        const unlock = def.unlockLevel ?? 1;
+        const locked = unlock > level;
         const cd = ab.cooldowns[i] ?? 0;
         const onGcd = def.triggersGcd && ab.gcdRemaining > 0;
         const unaffordable = res.current < def.cost;
         const slot = this.slots[i];
-        if (cd > 0.05) {
+        if (locked) {
+          slot.cd.textContent = `Lv ${unlock}`;
+          slot.cd.style.opacity = '1';
+        } else if (cd > 0.05) {
           slot.cd.textContent = cd.toFixed(1);
           slot.cd.style.opacity = '1';
         } else {
           slot.cd.textContent = '';
           slot.cd.style.opacity = '0';
         }
-        slot.wrap.classList.toggle('disabled', unaffordable || onGcd);
+        slot.wrap.classList.toggle('disabled', locked || unaffordable || onGcd);
       }
     }
 
