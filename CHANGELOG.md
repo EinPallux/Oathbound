@@ -5,7 +5,7 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
-## 0.3.0-INDEV — "First Ten Levels" → Level 1–10 Gate *(in progress)*
+## 0.3.0-INDEV — "First Ten Levels" → Level 1–10 Gate *(feature-complete — awaiting gate playtest)*
 **Goal:** a polished first bracket for all three classes (the **breadth** band). Large phase, built in verified checkpoints.
 
 ### ✅ Checkpoint 1 — ability unlocks + complete Lv 1–10 kits
@@ -32,10 +32,16 @@ Each entry is an **independently testable build**. After each phase, work pauses
 - **World markers**: Oathstone obelisks (dormant grey → bright cyan + pulse once attuned) and vendor posts, scanned from the world each frame.
 - Tests: Oathstone attune/respawn-binding/save round-trip, vendor value/sell/lock/sell-commons/range, fast-travel toll/combat-gate/gold-gate/dormant/here → **123 unit tests**; an Oathstone-attune + fast-travel-panel e2e (9 e2e).
 
-### ⏳ Remaining for the Level 1–10 Gate (next checkpoint)
-- **Onboarding** (teach move/target/ability/loot/equip/recover ≤2 min) + **HUD/map v1**.
+### ✅ Checkpoint 4 — onboarding + HUD/map v1
+- **Onboarding / Goal Tracker** (`src/sim/onboarding.ts`, pure like Telemetry): a "teach the loop" checklist — **move → select a target → defeat an enemy → loot (F) → equip (I) → recover** — driven by sim events + player state. Completion persists (localStorage) so returning players skip it.
+- **Goal Tracker HUD** (`src/render/goal-tracker.ts`): the dismissible "what now?" panel once onboarding is done — **level + XP to next**, **current zone + level range**, and a few **soft goals** (next bracket/zone, gear upgrade, fast-travel/rare hunt).
+- **Regions** (`src/sim/content/regions.ts`, pure): `regionAt`/`regionLabel` for the canonical bands — **Oathhold** (hub) · **The Greenmarch** (1–5) · **Thornwood Vale** (6–10). Crossing a boundary shows a zone-discovery prompt.
+- **Minimap + Map v1** (`src/render/minimap.ts`): an always-on, player-centred canvas minimap (region tint, Oathstones bright/dim by attune state, vendor, live enemies, a facing player-arrow) with a zone label; **M** toggles a large world-anchored map with named Oathstones. (Fast travel stays on **T** for v1.)
+- Tests: regions point-lookup + labels, onboarding step completion from state/events + skip → **129 unit tests**; a Goal-Tracker/minimap/map-toggle e2e (10 e2e).
 
-**Verified so far:** `typecheck` ✓ · `npm test` → 123/123 ✓ · `build` ✓ (~158 KB gzip) · `test:e2e` → 9/9 ✓.
+**0.3.0 is now feature-complete** — the automatable scope of the **Level 1–10 Gate** is in. The remaining sign-off (each class *feels* solo-viable 1→10; readable/soloable elite + rare; onboarding genuinely ≤2 min) is **owner playtest**.
+
+**Verified:** `typecheck` ✓ · `npm test` → 129/129 ✓ · `build` ✓ (~161 KB gzip) · `test:e2e` → 10/10 ✓.
 
 ---
 

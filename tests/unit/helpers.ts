@@ -68,6 +68,7 @@ export function makeInput(): { ctrl: ControlState; state: InputState } {
     consumeToggleInventory: () => false,
     consumeToggleCharacter: () => false,
     consumeToggleTravel: () => false,
+    consumeToggleMap: () => false,
   };
   return { ctrl, state };
 }

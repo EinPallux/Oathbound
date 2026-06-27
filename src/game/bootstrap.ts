@@ -29,6 +29,8 @@ import { equipItem } from '../sim/inventory';
 import { salvageItem, salvageAllBelow } from '../sim/salvage';
 import { nearestVendor, sellItem, sellAllBelow } from '../sim/vendor';
 import { fastTravel } from '../sim/travel';
+import { regionAt, regionLabel } from '../sim/content/regions';
+import { Onboarding } from '../sim/onboarding';
 import { grantXp } from '../sim/progression';
 import { serialize, applySave } from '../sim/save';
 import { conColor } from '../sim/stats';
@@ -73,6 +75,8 @@ import { TrapView } from '../render/trap-view';
 import { InteractableView } from '../render/interactable-view';
 import { VendorPanel } from '../render/vendor-panel';
 import { TravelPanel } from '../render/travel-panel';
+import { GoalTracker } from '../render/goal-tracker';
+import { Minimap } from '../render/minimap';
 import { ClassSelect } from '../render/class-select';
 import { Sfx } from '../platform/audio';
 import { loadSave, writeSave } from '../platform/save-store';
@@ -192,6 +196,20 @@ export function boot(): Game {
   createVendor(world, field, 'Quartermaster', 3, -3);
   telemetry.attach(world, player);
 
+  // Onboarding: the "teach the loop" checklist. Returning players (flagged in
+  // localStorage) skip it. Completion is persisted in the render loop.
+  const onboarding = new Onboarding();
+  onboarding.attach(world, player);
+  let onboardingSaved = false;
+  try {
+    if (localStorage.getItem('oathbound.onboarded')) {
+      onboarding.skip();
+      onboardingSaved = true;
+    }
+  } catch {
+    // localStorage unavailable → the tutorial simply shows.
+  }
+
   // Systems: spatial → movement → combat → enemy AI → projectiles → traps → loot →
   // waypoint → recovery → telemetry. Waypoint runs after movement so it sees the
   // updated position, and before recovery so respawn binds to the stone just visited.
@@ -217,6 +235,8 @@ export function boot(): Game {
   const damageNumbers = new DamageNumbers(uiRoot);
   const targetFrame = new TargetFrame(uiRoot);
   const hud = new Hud(uiRoot);
+  const goalTracker = new GoalTracker(uiRoot);
+  const minimap = new Minimap(uiRoot, WORLD_SIZE);
   const invPanel = new InventoryPanel(uiRoot);
   const vendorPanel = new VendorPanel(uiRoot);
   const travelPanel = new TravelPanel(uiRoot);
@@ -342,6 +362,7 @@ export function boot(): Game {
 
   let paused = false;
   let lastRender = performance.now();
+  let lastRegionId = '';
 
   const loop = new GameLoop({
     step: (dt) => {
@@ -364,6 +385,7 @@ export function boot(): Game {
         vendorPanel.close();
         travelPanel.toggle();
       }
+      if (input.consumeToggleMap()) minimap.toggleMap();
       // F interact: close an open vendor panel, else grab nearby loot, else open the
       // vendor panel when standing by a vendor. (Centralized interact key.)
       if (input.consumeInteract()) {
@@ -427,6 +449,26 @@ export function boot(): Game {
       vendorPanel.update(world, player);
       travelPanel.update(world, player);
 
+      // Onboarding + Goal Tracker + minimap.
+      onboarding.update(world, player);
+      goalTracker.update(world, player, onboarding);
+      minimap.update(world, player);
+      if (onboarding.isComplete && !onboardingSaved) {
+        onboardingSaved = true;
+        try {
+          localStorage.setItem('oathbound.onboarded', '1');
+        } catch {
+          // ignore — persistence is best-effort
+        }
+      }
+
+      // Zone-discovery prompt on crossing a region boundary.
+      const region = regionAt(playerTransform.x, playerTransform.z);
+      if (region.id !== lastRegionId) {
+        if (lastRegionId !== '') hud.toast(`Entering ${regionLabel(region)}`);
+        lastRegionId = region.id;
+      }
+
       renderer.render();
       damageNumbers.update(renderer.camera, window.innerWidth, window.innerHeight);
     },
@@ -489,6 +531,7 @@ export function boot(): Game {
       loop.stop();
       input.dispose();
       telemetry.detach();
+      onboarding.detach();
       window.clearInterval(saveTimer);
       window.removeEventListener('beforeunload', onHide);
       document.removeEventListener('visibilitychange', onVisibility);
