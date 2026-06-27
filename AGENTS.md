@@ -8,11 +8,11 @@ Entry point for **any coding agent or LLM** working in this repository (Claude C
 ## ▶ Current status — where to continue
 > **Keep this section up to date at the end of every phase.**
 
-- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0`–`0.1.1` loop · `0.2.0`–`0.2.1` three classes · **`0.3.0-INDEV` First Ten Levels — checkpoints 1–3** (full Lv 1–10 kits; data-driven enemies + Thornwood Vale; elite/rare tiers; Rare loot; **Oathstones + fast-travel + vendors**).
-- **Last gate passed:** **Core Movement Gate** + the *automatable* parts of **Combat/Core Loop/Three-Class** gates. Three classes each solo a same-level standard within the **3–6s TTK band**; Lv 1–10 kits unlock by level; two zones' worth of families + elite/rare tiers exist.
-- **🚧 In progress — `0.3.0` toward the Level 1–10 Gate** (checkpoints). Done: ability unlocks + kits · data-driven enemies + Thornwood + elite/rare + Rare loot · Oathstones + fast-travel + vendors. **Remaining:** onboarding · HUD/map v1.
-- **⏳ Awaiting owner playtest:** each class *feels* solo-viable; the first elite/rare are readable + soloable with correct play; Oathstone density/run-back feel; standing Core Loop perf/fun checks.
-- **▶ Next checkpoint (4):** onboarding (teach the loop ≤2 min) + HUD/map v1 — closes the Level 1–10 Gate. (Confirm with the owner before starting.)
+- **Done & verified:** `0.0.1`–`0.0.4` foundations · `0.1.0`–`0.1.1` loop · `0.2.0`–`0.2.1` three classes · **`0.3.0-INDEV` First Ten Levels — feature-complete (checkpoints 1–4)** (full Lv 1–10 kits; data-driven enemies + Thornwood Vale; elite/rare tiers; Rare loot; Oathstones + fast-travel + vendors; **onboarding + Goal Tracker + minimap/map v1**).
+- **Last gate passed:** **Core Movement Gate** + the *automatable* parts of **Combat/Core Loop/Three-Class** gates, and the **automatable scope of the Level 1–10 Gate**. Three classes each solo a same-level standard within the **3–6s TTK band**; Lv 1–10 kits unlock by level; two zones + elite/rare tiers; waypoints/vendors/onboarding/map in.
+- **✅ `0.3.0` is feature-complete** toward the Level 1–10 Gate: ability unlocks + kits · data-driven enemies + Thornwood + elite/rare + Rare loot · Oathstones + fast-travel + vendors · onboarding + HUD/map v1. Awaiting the owner's gate playtest.
+- **⏳ Awaiting owner playtest (Level 1–10 Gate sign-off):** each class *feels* solo-viable 1→10; the first elite/rare are readable + soloable with correct play; onboarding genuinely ≤2 min to first kill; Oathstone density/run-back feel; standing Core Loop perf/fun checks.
+- **▶ Next phase:** `0.4.0` (per [VERSION_ROADMAP](./docs/production/VERSION_ROADMAP.md)) — **only after** the owner signs off the Level 1–10 Gate. (Confirm with the owner before starting.)
 - **Live progress log:** [`CHANGELOG.md`](./CHANGELOG.md) (every phase, each ending with "Next phase →").
 - **The full plan:** [`docs/production/VERSION_ROADMAP.md`](./docs/production/VERSION_ROADMAP.md) (`0.0.1-INDEV` → `1.0-BETA`).
 

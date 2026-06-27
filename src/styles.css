@@ -282,7 +282,7 @@ body {
 /* ── Gold, loot prompt, toasts ──────────────────────────────────────── */
 .gold {
   position: fixed;
-  top: 10px;
+  top: 200px;
   right: 12px;
   font-size: 13px;
   color: #ffcc44;
@@ -442,6 +442,95 @@ body {
   border-radius: 8px;
   padding: 14px;
   pointer-events: auto;
+}
+
+/* ── Minimap (top-right) + full map (M) ─────────────────────────────── */
+.minimap-wrap {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.minimap {
+  width: 150px;
+  height: 150px;
+  border: 1px solid rgba(120, 200, 255, 0.3);
+  border-radius: 6px;
+  background: #10160f;
+}
+.minimap-label {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #bcd6e6;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+.map-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 11, 16, 0.8);
+  pointer-events: auto;
+}
+.map-panel {
+  background: rgba(8, 11, 16, 0.96);
+  border: 1px solid rgba(120, 200, 255, 0.3);
+  border-radius: 8px;
+  padding: 14px;
+}
+.map-canvas {
+  display: block;
+  border: 1px solid rgba(120, 200, 255, 0.18);
+  border-radius: 6px;
+}
+
+/* ── Goal Tracker (top-left, under the perf overlay) ─────────────────── */
+.goal-tracker {
+  position: fixed;
+  top: 92px;
+  left: 8px;
+  width: 250px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(120, 200, 255, 0.25);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  pointer-events: none;
+}
+.goal-title {
+  color: #ffd166;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.goal-head {
+  color: #e8eef5;
+  margin-bottom: 2px;
+}
+.goal-zone {
+  color: #9fb4c8;
+  margin-bottom: 6px;
+}
+.goal-step {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  color: #9fb4c8;
+  line-height: 1.35;
+}
+.goal-step.done {
+  color: #7be08a;
+}
+.goal-step.current {
+  color: #eef3f8;
+}
+.goal-mark {
+  width: 12px;
+  flex: none;
+  text-align: center;
 }
 
 /* ── Class select overlay ───────────────────────────────────────────── */

@@ -171,6 +171,27 @@ test('attunes the spawn Oathstone and opens fast travel with T', async ({ page }
   await expect(page.locator('.travel-panel')).toBeHidden();
 });
 
+test('shows the Goal Tracker + minimap and toggles the full map with M', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__oathbound !== undefined);
+
+  // Fresh character → the onboarding checklist is up.
+  await expect(page.locator('.goal-tracker')).toBeVisible();
+  await expect(page.locator('.goal-tracker')).toContainText('Getting Started');
+  await expect(page.locator('.goal-tracker')).toContainText('Move with WASD');
+
+  // Always-on minimap, labelled with the current region (spawn = the hub).
+  await expect(page.locator('.minimap')).toBeVisible();
+  await expect(page.locator('.minimap-label')).toContainText('Oathhold');
+
+  // M opens the full map; M again closes it.
+  await expect(page.locator('.map-overlay')).toBeHidden();
+  await page.keyboard.press('KeyM');
+  await expect(page.locator('.map-overlay')).toBeVisible();
+  await page.keyboard.press('KeyM');
+  await expect(page.locator('.map-overlay')).toBeHidden();
+});
+
 test('progress persists across a reload (save v1)', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__oathbound !== undefined);
