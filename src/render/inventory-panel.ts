@@ -16,6 +16,7 @@ import {
 } from '../core/ecs/components';
 import { EQUIP_SLOTS } from '../sim/loot/items';
 import { relicEffectDesc } from '../sim/loot/relics';
+import { tierTag } from '../game/settings';
 import { SALVAGE_LEVEL } from '../sim/salvage';
 import { canReinforce, reinforceCost } from '../sim/reinforce';
 import { getClass } from '../sim/classes';
@@ -160,7 +161,7 @@ export class InventoryPanel {
       row.innerHTML = `<span class="inv-slot">${SLOT_LABEL[slot]}</span>`;
       const name = document.createElement('span');
       name.className = it ? `inv-name ${it.rarity}` : 'inv-name empty';
-      name.textContent = it ? `${it.name}${reinSuffix(it)} (${it.score})` : '—';
+      name.textContent = it ? `${tierTag(it.rarity)} ${it.name}${reinSuffix(it)} (${it.score})` : '—';
       if (it?.relic) name.title = relicEffectDesc(it.relic);
       row.appendChild(name);
       if (it) row.appendChild(this.reinforceButton(it, inv.gold, inv.materials));
@@ -183,7 +184,7 @@ export class InventoryPanel {
 
       const name = document.createElement('span');
       name.className = `inv-name ${item.rarity}`;
-      name.textContent = `${item.locked ? '🔒 ' : ''}${item.name}${reinSuffix(item)} · ${SLOT_LABEL[item.slot]}`;
+      name.textContent = `${item.locked ? '🔒 ' : ''}${tierTag(item.rarity)} ${item.name}${reinSuffix(item)} · ${SLOT_LABEL[item.slot]}`;
       if (item.relic) name.title = relicEffectDesc(item.relic);
       row.appendChild(name);
 

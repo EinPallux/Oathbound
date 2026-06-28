@@ -48,7 +48,7 @@ test('boots the vertical slice, renders, and runs the loop', async ({ page }) =>
   await page.goto('/');
 
   await expect(page.locator('#game')).toBeVisible();
-  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.6.0-INDEV');
+  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.7.0-INDEV');
 
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
   const running = await page.evaluate(() => window.__oathbound!.loop.isRunning);
@@ -272,6 +272,41 @@ test('Lv-30 endgame: the Goal Tracker pivots to the relic chase + map renders bo
   await page.keyboard.press('KeyM');
   await expect(page.locator('.map-overlay')).toBeVisible();
   await page.waitForTimeout(300);
+  expect(errors).toEqual([]);
+});
+
+test('Settings (O): accessibility options apply live and persist across reload', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
+  page.on('pageerror', (e) => errors.push(String(e)));
+
+  await page.goto('/');
+  await page.waitForFunction(() => window.__oathbound !== undefined);
+
+  // O opens the settings panel.
+  await expect(page.locator('.settings-panel')).toBeHidden();
+  await page.keyboard.press('KeyO');
+  await expect(page.locator('.settings-panel')).toBeVisible();
+
+  // Toggling "Show damage numbers" off applies live (a class on #ui-root, no restart).
+  await expect(page.locator('#ui-root')).not.toHaveClass(/dmg-off/);
+  await page.locator('.settings-panel input[type="checkbox"]').first().uncheck();
+  await expect(page.locator('#ui-root')).toHaveClass(/dmg-off/);
+
+  // Changing UI scale sets the live CSS variable.
+  await page.locator('.settings-panel select').first().selectOption('1.3');
+  const scale = await page.evaluate(
+    () => document.getElementById('ui-root')!.style.getPropertyValue('--ui-scale'),
+  );
+  expect(scale).toBe('1.3');
+
+  // Settings persist: after a reload the damage-numbers preference is still applied.
+  await page.reload();
+  await page.waitForFunction(() => window.__oathbound !== undefined);
+  await expect(page.locator('#ui-root')).toHaveClass(/dmg-off/);
+
   expect(errors).toEqual([]);
 });
 

@@ -5,6 +5,25 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.7.0-INDEV — "Feel & Finish" → UX, Accessibility & Content Polish *(in progress)*
+**Goal:** make the game *feel finished to use* — full menus, tooltips/comparison, an audio + VFX pass, onboarding polish, and the **accessibility commit list** ([docs/design/UX_AND_ACCESSIBILITY.md](./docs/design/UX_AND_ACCESSIBILITY.md)), all persisting and taking effect without restart. **Gameplay feature-freeze begins** (no new systems). Built in verified checkpoints.
+
+### ✅ Checkpoint 1 — Settings & accessibility core
+- **A persisted Settings panel (`O`)** — device-local preferences (separate from the gameplay save) in `localStorage`, **applied live** to the DOM UI overlay (no restart) via CSS variables/classes (`src/game/settings.ts` + `src/render/settings-panel.ts`). Tolerant load (validates/merges/clamps unknown or old data → defaults), plus a **Reset to defaults**.
+- **Accessibility options (first batch, all live):** **UI scale** (whole HUD/menus zoom together), **damage-number toggle + size**, **reduced effects** (motion & flashing — tones down crit pops + floating-number rise + UI transitions), and **high-contrast rarity**.
+- **Colorblind-safe rarity (baseline, never color-only).** Every item now shows a **text tier tag** (`[C]/[U]/[R]/[E]/[L]/[★]`) **and a per-rarity border *shape*** (solid/dashed/dotted/double) in the inventory, plus the tag on loot toasts — so rarity reads without relying on color ([UX_AND_ACCESSIBILITY](./docs/design/UX_AND_ACCESSIBILITY.md) requirement). High-contrast mode thickens the borders.
+- The framework audio volumes (CP3) and keybind remapping (CP4) will plug into next.
+- Tests: settings merge/validate (defaults, clamping, enum/`NaN` rejection, JSON round-trip) + colorblind-safe tier tags → **276 unit tests**; a new **settings e2e** (open with `O`, toggle damage numbers off → applies live, change UI scale → live CSS var, **persists across reload**) → **14 e2e**. Build version bumped **`0.6.0-INDEV` → `0.7.0-INDEV`**.
+
+**Verified:** `typecheck` ✓ · `npm test` → 276/276 ✓ · `build` ✓ (~176 KB gzip) · `test:e2e` → 14/14 ✓.
+
+### ⏳ Remaining for "Feel & Finish" (next checkpoints)
+- **CP2:** item **tooltips & comparison** (hover affix breakdown + equipped delta) · Character/Skills panels · stat tooltips · **confirmations before destructive actions** (salvage rare+).
+- **CP3:** **audio pass** (Howler) + volume sliders in Settings · VFX/"juice" pass within budgets, respecting reduced-effects.
+- **CP4:** **fully remappable keybinds** + camera/mouse options · onboarding polish (class tutorial cards) · any remaining HUD (buff/debuff durations, cast bar polish, low-HP vignette).
+
+---
+
 ## 0.6.0-INDEV — "The Chase" → Equipment Depth + Lv-30 Endgame *(✅ feature-complete — awaiting playtest)*
 **Goal:** the beta's long tail — the Lv-30 gear chase: **Legendary** + **Relic** tiers, **3 solo world bosses**, and target-farming → the **Endgame Foundation Gate** ([docs/design/ENDGAME_FOUNDATION.md](./docs/design/ENDGAME_FOUNDATION.md)). Built in verified checkpoints.
 

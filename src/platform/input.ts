@@ -37,6 +37,8 @@ export interface ControlState {
   consumeToggleTravel(): boolean;
   /** Returns true once if the map toggle (M) was pressed. */
   consumeToggleMap(): boolean;
+  /** Returns true once if the settings toggle (O) was pressed. */
+  consumeToggleSettings(): boolean;
 }
 
 export class InputController implements ControlState {
@@ -60,6 +62,7 @@ export class InputController implements ControlState {
   private toggleCharQueued = false;
   private toggleTravelQueued = false;
   private toggleMapQueued = false;
+  private toggleSettingsQueued = false;
   private dragging = false;
   private readonly lookSensitivity = 0.0035;
 
@@ -194,6 +197,9 @@ export class InputController implements ControlState {
       case 'KeyM':
         if (down) this.toggleMapQueued = true;
         break;
+      case 'KeyO':
+        if (down) this.toggleSettingsQueued = true;
+        break;
       case 'Tab':
         if (down) this.cycleQueued = true;
         e.preventDefault(); // keep keyboard focus on the game
@@ -269,6 +275,12 @@ export class InputController implements ControlState {
   consumeToggleMap(): boolean {
     const v = this.toggleMapQueued;
     this.toggleMapQueued = false;
+    return v;
+  }
+
+  consumeToggleSettings(): boolean {
+    const v = this.toggleSettingsQueued;
+    this.toggleSettingsQueued = false;
     return v;
   }
 

@@ -95,6 +95,8 @@ import { TravelPanel } from '../render/travel-panel';
 import { GoalTracker } from '../render/goal-tracker';
 import { Minimap } from '../render/minimap';
 import { ClassSelect } from '../render/class-select';
+import { SettingsPanel } from '../render/settings-panel';
+import { loadSettings, saveSettings, applySettings, tierTag } from './settings';
 import { Sfx } from '../platform/audio';
 import { loadSave, writeSave } from '../platform/save-store';
 import { lerp, lerpAngle } from '../core/math';
@@ -170,6 +172,10 @@ export function boot(): Game {
   const input = new InputController(canvas);
   const overlay = new PerfOverlay(uiRoot);
   const sfx = new Sfx();
+
+  // Player settings & accessibility (device-local, persisted) — applied live to the UI.
+  const settings = loadSettings();
+  applySettings(uiRoot, settings);
 
   // World data (pure) + meshes (render).
   const field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337);
@@ -250,7 +256,7 @@ export function boot(): Game {
   const trapView = new TrapView(renderer.scene);
   const groundAoeView = new GroundAoeView(renderer.scene);
   const interactableView = new InteractableView(renderer.scene);
-  const damageNumbers = new DamageNumbers(uiRoot);
+  const damageNumbers = new DamageNumbers(uiRoot, settings);
   const targetFrame = new TargetFrame(uiRoot);
   const hud = new Hud(uiRoot);
   const goalTracker = new GoalTracker(uiRoot);
@@ -259,6 +265,11 @@ export function boot(): Game {
   const vendorPanel = new VendorPanel(uiRoot);
   const travelPanel = new TravelPanel(uiRoot);
   const classSelect = new ClassSelect(uiRoot);
+  const settingsPanel = new SettingsPanel(uiRoot, settings);
+  settingsPanel.onChange = () => {
+    saveSettings(settings);
+    applySettings(uiRoot, settings);
+  };
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
@@ -348,7 +359,8 @@ export function boot(): Game {
   });
   world.events.on<LootPickedEvent>(CombatEvent.LootPicked, (ev) => {
     const r = ev.item.rarity;
-    hud.toast(`Looted ${ev.item.name}`, r === 'common' || r === 'uncommon' ? 'info' : r);
+    // Lead with a colour-independent tier tag so rarity reads without relying on colour.
+    hud.toast(`${tierTag(r)} Looted ${ev.item.name}`, r === 'common' || r === 'uncommon' ? 'info' : r);
     if (ev.item.relic) hud.toast(relicEffectDesc(ev.item.relic), 'relic'); // apex: show its effect
     sfx.loot();
     autosave();
@@ -437,6 +449,7 @@ export function boot(): Game {
         travelPanel.toggle();
       }
       if (input.consumeToggleMap()) minimap.toggleMap();
+      if (input.consumeToggleSettings()) settingsPanel.toggle();
       // F interact: close an open vendor panel, else grab nearby loot, else open the
       // vendor panel when standing by a vendor. (Centralized interact key.)
       if (input.consumeInteract()) {
