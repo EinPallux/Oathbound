@@ -32,7 +32,8 @@ import { spawnEnemy } from '../sim/content/enemies';
 import { WORLD_SPAWNS } from '../sim/content/spawns';
 import { spawnBoss, BOSS_SPAWNS } from '../sim/content/bosses';
 import { relicEffectDesc } from '../sim/loot/relics';
-import { equipItem, recomputeDerived } from '../sim/inventory';
+import { addItem, equipItem, recomputeDerived } from '../sim/inventory';
+import { generateItem } from '../sim/loot/items';
 import { salvageItem, salvageAllBelow } from '../sim/salvage';
 import { reinforceItem } from '../sim/reinforce';
 import { nearestVendor, sellItem, sellAllBelow } from '../sim/vendor';
@@ -55,6 +56,7 @@ import {
   type Resource,
   type PlayerClass,
   type ClassId,
+  type Rarity,
   type Oathstone,
   type AbilityState,
   type Velocity,
@@ -157,6 +159,7 @@ export interface Game {
   debugSetLevel(n: number): void;
   debugTeleport(x: number, z: number): void;
   debugSetClass(id: ClassId): void;
+  debugGiveItem(rarity?: Rarity): void;
   save(): Promise<boolean>;
   stop(): void;
 }
@@ -261,7 +264,7 @@ export function boot(): Game {
   const hud = new Hud(uiRoot);
   const goalTracker = new GoalTracker(uiRoot);
   const minimap = new Minimap(uiRoot, WORLD_SIZE);
-  const invPanel = new InventoryPanel(uiRoot);
+  const invPanel = new InventoryPanel(uiRoot, settings);
   const vendorPanel = new VendorPanel(uiRoot);
   const travelPanel = new TravelPanel(uiRoot);
   const classSelect = new ClassSelect(uiRoot);
@@ -611,6 +614,12 @@ export function boot(): Game {
     debugSetClass: (id) => {
       setPlayerClass(world, player, id);
       classSelect.hide();
+    },
+    debugGiveItem: (rarity = 'rare') => {
+      const prog = world.get<Progression>(player, C.Progression)!;
+      const cls = getClass(world.get<PlayerClass>(player, C.PlayerClass)?.id ?? 'warrior');
+      const primary = cls.primaryStatId === 'VIT' ? 'STR' : cls.primaryStatId;
+      addItem(world, player, generateItem(rng, { ilvl: prog.level, slot: 'weapon', rarity, primaryStat: primary }));
     },
     save: () => writeSave(serialize(world, player)),
     stop: () => {

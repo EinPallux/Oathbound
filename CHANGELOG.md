@@ -17,8 +17,16 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 **Verified:** `typecheck` ✓ · `npm test` → 276/276 ✓ · `build` ✓ (~176 KB gzip) · `test:e2e` → 14/14 ✓.
 
+### ✅ Checkpoint 2 — item tooltips & comparison, character stats, destructive-action confirms
+- **Hover tooltips with comparison** (the headline). Hovering any inventory/equipped item shows a full breakdown — name (rarity-coloured + tier tag), slot · ilvl, every stat line, the **relic effect**, salvage value — and, for a bagged item, a **"vs equipped"** block with per-attribute deltas (green/red) + the score change. The pure formatting/comparison core lives in `src/sim/loot/item-info.ts` (`itemStatLines` / `itemContributions` / `compareItems`); the DOM tooltip (`src/render/item-tooltip.ts`) sits on `<body>` so it isn't clipped or zoom-scaled.
+- **Character stats, in-panel (the C view).** The inventory/character panel now shows a live **derived-stats** strip — primary, Max HP, Armor, Crit, Haste, Leech, Healing, and any typed resists — **each with a tooltip explaining what it does** ("Clarity: tooltips everywhere").
+- **Confirmations before destructive actions.** Salvaging a **Rare-or-better** item is now a **one-click confirm** ("Salvage" → "Confirm?"), gated by a new **Confirm destructive actions** setting (default on). Commons/uncommons still salvage in one click.
+- Added a `debugGiveItem` test hook (mirrors the existing debug hooks) to drive the inventory e2e deterministically.
+- Tests: item-info formatting (percent vs flat, signed), affix labels, stat lines, contributions, and equip-vs-equipped deltas (incl. order + no-change) → **283 unit tests**; an **inventory e2e** (hover → tooltip with stats; Rare salvage asks to confirm before removing the item) → **15 e2e**.
+
+**Verified:** `typecheck` ✓ · `npm test` → 283/283 ✓ · `build` ✓ (~178 KB gzip) · `test:e2e` → 15/15 ✓.
+
 ### ⏳ Remaining for "Feel & Finish" (next checkpoints)
-- **CP2:** item **tooltips & comparison** (hover affix breakdown + equipped delta) · Character/Skills panels · stat tooltips · **confirmations before destructive actions** (salvage rare+).
 - **CP3:** **audio pass** (Howler) + volume sliders in Settings · VFX/"juice" pass within budgets, respecting reduced-effects.
 - **CP4:** **fully remappable keybinds** + camera/mouse options · onboarding polish (class tutorial cards) · any remaining HUD (buff/debuff durations, cast bar polish, low-HP vignette).
 

@@ -13,6 +13,7 @@ export class SettingsPanel {
   private dmgSize!: HTMLSelectElement;
   private reduced!: HTMLInputElement;
   private hcRarity!: HTMLInputElement;
+  private confirmDestructive!: HTMLInputElement;
 
   /** Called after any change (persist + apply). */
   onChange: () => void = () => {};
@@ -68,6 +69,10 @@ export class SettingsPanel {
     });
     this.hcRarity = this.checkRow(groups, 'High-contrast rarity', () => {
       this.settings.highContrastRarity = this.hcRarity.checked;
+      this.onChange();
+    });
+    this.confirmDestructive = this.checkRow(groups, 'Confirm destructive actions', () => {
+      this.settings.confirmDestructive = this.confirmDestructive.checked;
       this.onChange();
     });
 
@@ -142,6 +147,7 @@ export class SettingsPanel {
     this.dmgSize.value = this.settings.damageNumberSize;
     this.reduced.checked = this.settings.reducedEffects;
     this.hcRarity.checked = this.settings.highContrastRarity;
+    this.confirmDestructive.checked = this.settings.confirmDestructive;
   }
 
   toggle(): void {

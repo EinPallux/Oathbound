@@ -7,32 +7,24 @@ import type { World, Entity } from '../core/ecs/world';
 import {
   C,
   type Item,
-  type EquipSlot,
   type Inventory,
   type Equipment,
   type Progression,
   type PlayerClass,
   type CombatState,
+  type Offense,
+  type Defense,
+  type Health,
 } from '../core/ecs/components';
 import { EQUIP_SLOTS } from '../sim/loot/items';
 import { relicEffectDesc } from '../sim/loot/relics';
-import { tierTag } from '../game/settings';
+import { SLOT_LABEL, ATTR_LABEL } from '../sim/loot/item-info';
+import { isRarePlus } from '../sim/loot/droptable';
+import { tierTag, type Settings } from '../game/settings';
 import { SALVAGE_LEVEL } from '../sim/salvage';
 import { canReinforce, reinforceCost } from '../sim/reinforce';
 import { getClass } from '../sim/classes';
-
-const SLOT_LABEL: Record<EquipSlot, string> = {
-  weapon: 'Weapon',
-  offhand: 'Off-hand',
-  head: 'Head',
-  chest: 'Chest',
-  hands: 'Hands',
-  legs: 'Legs',
-  feet: 'Feet',
-  amulet: 'Amulet',
-  ring1: 'Ring 1',
-  ring2: 'Ring 2',
-};
+import { ItemTooltip } from './item-tooltip';
 
 /** ` +N` reinforcement suffix for an item name, or '' if unreinforced. */
 function reinSuffix(item: Item): string {
@@ -43,10 +35,12 @@ function reinSuffix(item: Item): string {
 export class InventoryPanel {
   private readonly root: HTMLDivElement;
   private readonly wallet: HTMLDivElement;
+  private readonly stats: HTMLDivElement;
   private readonly talents: HTMLDivElement;
   private readonly actions: HTMLDivElement;
   private readonly equipList: HTMLDivElement;
   private readonly invList: HTMLDivElement;
+  private readonly tooltip: ItemTooltip;
   private visible = false;
   private lastSig = '';
 
@@ -57,19 +51,26 @@ export class InventoryPanel {
   onReinforce: (item: Item) => void = () => {};
   onChooseTalent: (nodeId: string, option: number) => void = () => {};
 
-  constructor(parent: HTMLElement) {
+  constructor(parent: HTMLElement, private readonly settings?: Settings) {
     this.root = document.createElement('div');
     this.root.className = 'inv-panel';
     this.root.style.display = 'none';
 
     const title = document.createElement('div');
     title.className = 'inv-title';
-    title.textContent = 'Inventory — I/C to close';
+    title.textContent = 'Inventory / Character — I/C to close';
     this.root.appendChild(title);
 
     this.wallet = document.createElement('div');
     this.wallet.className = 'inv-wallet';
     this.root.appendChild(this.wallet);
+
+    this.stats = document.createElement('div');
+    this.stats.className = 'inv-stats';
+    this.root.appendChild(this.stats);
+
+    // Hover tooltips live on <body> so they aren't clipped by the panel or UI zoom.
+    this.tooltip = new ItemTooltip(document.body);
 
     this.talents = document.createElement('div');
     this.talents.className = 'inv-talents';
@@ -105,6 +106,7 @@ export class InventoryPanel {
   toggle(): void {
     this.visible = !this.visible;
     this.root.style.display = this.visible ? 'block' : 'none';
+    if (!this.visible) this.tooltip.hide();
     this.lastSig = '';
   }
 
@@ -132,7 +134,9 @@ export class InventoryPanel {
       `|${pc?.id ?? ''}|${JSON.stringify(pc?.choices ?? {})}|${cs?.inCombat ? 'c' : ''}`;
     if (sig === this.lastSig) return;
     this.lastSig = sig;
+    this.tooltip.hide(); // a rebuild invalidates row anchors
 
+    this.renderStats(world, player, pc);
     this.renderTalents(pc, prog.level, cs?.inCombat ?? false);
 
     const canSalvage = prog.level >= SALVAGE_LEVEL;
@@ -164,7 +168,10 @@ export class InventoryPanel {
       name.textContent = it ? `${tierTag(it.rarity)} ${it.name}${reinSuffix(it)} (${it.score})` : '—';
       if (it?.relic) name.title = relicEffectDesc(it.relic);
       row.appendChild(name);
-      if (it) row.appendChild(this.reinforceButton(it, inv.gold, inv.materials));
+      if (it) {
+        row.appendChild(this.reinforceButton(it, inv.gold, inv.materials));
+        this.hover(row, it, null); // it's equipped → show its own stats, no comparison
+      }
       this.equipList.appendChild(row);
     }
 
@@ -198,10 +205,25 @@ export class InventoryPanel {
       row.appendChild(
         this.button(item.locked ? 'Unlock' : 'Lock', 'inv-btn small', () => this.onToggleLock(item)),
       );
-      const salv = this.button('Salvage', 'inv-btn small danger', () => this.onSalvage(item));
+
+      // Salvage — Rare+ asks for a one-click confirm when "Confirm destructive actions" is on.
+      const needConfirm = (this.settings?.confirmDestructive ?? true) && isRarePlus(item.rarity);
+      const salv = document.createElement('button');
+      salv.className = 'inv-btn small danger';
+      salv.textContent = 'Salvage';
       salv.disabled = !canSalvage || item.locked;
+      let armed = false;
+      salv.onclick = () => {
+        if (needConfirm && !armed) {
+          armed = true;
+          salv.textContent = 'Confirm?';
+          return;
+        }
+        this.onSalvage(item);
+      };
       row.appendChild(salv);
 
+      this.hover(row, item, equipped ?? null);
       this.invList.appendChild(row);
     }
   }
@@ -252,6 +274,46 @@ export class InventoryPanel {
       }
       this.talents.appendChild(row);
     }
+  }
+
+  /** Character stats: the live derived combat stats, each with an explanatory tooltip. */
+  private renderStats(world: World, player: Entity, pc: PlayerClass | undefined): void {
+    this.stats.replaceChildren();
+    const off = world.get<Offense>(player, C.Offense);
+    const def = world.get<Defense>(player, C.Defense);
+    const h = world.get<Health>(player, C.Health);
+    if (!off || !def || !h) return;
+    const primaryId = getClass(pc?.id ?? 'warrior').primaryStatId;
+
+    const chip = (label: string, value: string, tip: string): void => {
+      const el = document.createElement('span');
+      el.className = 'inv-stat';
+      el.title = tip;
+      el.textContent = `${label} ${value}`;
+      this.stats.appendChild(el);
+    };
+
+    chip(ATTR_LABEL[primaryId] ?? 'Power', String(Math.round(off.primaryStat)), 'Scales your ability damage.');
+    chip('Max HP', String(Math.round(h.max)), 'Maximum health (Vitality adds HP).');
+    chip('Armor', String(Math.round(def.armor)), 'Reduces physical damage taken (diminishing returns).');
+    chip('Crit', `${(off.critChance * 100).toFixed(1)}%`, 'Chance for a hit to deal ×1.5 damage.');
+    chip('Haste', `${(off.haste * 100).toFixed(1)}%`, 'Reduces the global cooldown and cast time.');
+    if (off.leech > 0) chip('Leech', `${(off.leech * 100).toFixed(1)}%`, 'Heals you for a fraction of damage dealt.');
+    if (off.healPower > 0) chip('Healing', `+${Math.round(off.healPower)}`, 'Increases the healing you do.');
+    const resists: [keyof Defense['resist'], string][] = [
+      ['fire', 'Fire Resist'],
+      ['frost', 'Frost Resist'],
+      ['blight', 'Blight Resist'],
+    ];
+    for (const [k, label] of resists) {
+      if (def.resist[k] > 0) chip(label, String(Math.round(def.resist[k])), `Reduces ${k} damage taken.`);
+    }
+  }
+
+  /** Show the item tooltip (with comparison vs `equipped`) while hovering `row`. */
+  private hover(row: HTMLElement, item: Item, equipped: Item | null): void {
+    row.addEventListener('mouseenter', () => this.tooltip.show(item, equipped, row.getBoundingClientRect()));
+    row.addEventListener('mouseleave', () => this.tooltip.hide());
   }
 
   private button(label: string, cls: string, onclick: () => void): HTMLButtonElement {

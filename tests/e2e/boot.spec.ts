@@ -27,6 +27,7 @@ interface OathboundHandle {
   debugSetLevel: (n: number) => void;
   debugTeleport: (x: number, z: number) => void;
   debugSetClass: (id: 'warrior' | 'hunter' | 'priest') => void;
+  debugGiveItem: (rarity?: string) => void;
   save: () => Promise<boolean>;
 }
 declare global {
@@ -308,6 +309,37 @@ test('Settings (O): accessibility options apply live and persist across reload',
   await expect(page.locator('#ui-root')).toHaveClass(/dmg-off/);
 
   expect(errors).toEqual([]);
+});
+
+test('Inventory: item hover shows a tooltip; Rare+ salvage asks to confirm', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__oathbound !== undefined);
+  await page.evaluate(() => window.__oathbound!.debugSetClass('warrior'));
+  await page.evaluate(() => window.__oathbound!.debugSetLevel(10)); // past the salvage unlock
+  await page.evaluate(() => window.__oathbound!.debugGiveItem('rare'));
+
+  await page.keyboard.press('KeyI');
+  const panel = page.locator('.inv-panel');
+  await expect(panel).toBeVisible();
+
+  // The granted Rare weapon's backpack row (weapon base name = "Greataxe").
+  const row = panel.locator('.inv-row', { hasText: 'Greataxe' }).first();
+  await expect(row).toBeVisible();
+
+  // Hovering it shows the item tooltip with its stat lines.
+  await row.hover();
+  const tip = page.locator('.item-tooltip');
+  await expect(tip).toBeVisible();
+  await expect(tip).toContainText('Strength'); // warrior weapon → primary STR line
+
+  // Salvaging a Rare item is a two-step confirm (Confirm destructive actions is on).
+  const salv = row.locator('button.danger');
+  await expect(salv).toHaveText('Salvage');
+  await salv.click();
+  await expect(salv).toHaveText('Confirm?');
+  expect(await page.evaluate(() => window.__oathbound!.bagCount())).toBe(1); // not yet salvaged
+  await salv.click();
+  expect(await page.evaluate(() => window.__oathbound!.bagCount())).toBe(0); // confirmed → salvaged
 });
 
 test('progress persists across a reload (save v1)', async ({ page }) => {

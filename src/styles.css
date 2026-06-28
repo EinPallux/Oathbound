@@ -765,3 +765,92 @@ body {
   height: 15px;
   cursor: pointer;
 }
+
+/* ── Character stats (in the inventory/character panel) ──────────────────────── */
+.inv-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 10px;
+  font-size: 11px;
+}
+.inv-stat {
+  color: #b8c6d4;
+  background: rgba(120, 200, 255, 0.08);
+  border: 1px solid rgba(120, 200, 255, 0.18);
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: help;
+}
+
+/* ── Item hover tooltip (on <body>, above everything) ───────────────────────── */
+.item-tooltip {
+  position: fixed;
+  z-index: 50;
+  width: 240px;
+  pointer-events: none;
+  background: rgba(6, 9, 13, 0.97);
+  border: 1px solid rgba(120, 200, 255, 0.35);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #cdd9e5;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
+}
+.tt-title {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.tt-title.common {
+  color: #c9d1d9;
+}
+.tt-title.uncommon {
+  color: #5fd35f;
+}
+.tt-title.rare {
+  color: #5aa0ff;
+}
+.tt-title.epic {
+  color: #b061ff;
+}
+.tt-title.legendary {
+  color: #ff8a3d;
+}
+.tt-title.relic {
+  color: #3fe0d6;
+}
+.tt-sub {
+  color: #7e8ea0;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+.tt-stat {
+  color: #cfe0f0;
+  line-height: 1.45;
+}
+.tt-relic {
+  color: #3fe0d6;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.tt-salvage {
+  color: #8a99a8;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.tt-cmp-head {
+  color: #ffd166;
+  margin-top: 6px;
+  border-top: 1px solid rgba(120, 200, 255, 0.18);
+  padding-top: 4px;
+}
+.tt-cmp {
+  color: #9fb4c8;
+  line-height: 1.4;
+}
+.tt-cmp.up {
+  color: #7be08a;
+}
+.tt-cmp.down {
+  color: #ff7676;
+}
