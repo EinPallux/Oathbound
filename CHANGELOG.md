@@ -37,6 +37,15 @@ The placeholder capsule is replaced by a **procedural low-poly humanoid** (built
 
 **Verified:** `typecheck` ✓ · `npm test` → 222/222 ✓ · `build` ✓ (~172 KB gzip) · `test:e2e` → 11/11 ✓.
 
+### 👹 Enemy models + nameplates (owner-requested)
+Every enemy family now has its **own unique low-poly model** (procedural primitives, no asset files) instead of the shared capsule — keyed by family + role so the three shared families split correctly (Sporeling/Sporemother, Bramblekin/Warchief, Ashen Reaver/Ember Warlord). ~21 distinct looks across 7 body archetypes — plant (Bloomhusks/Bramblekin), humanoid (Reavers/Drudges/Forsworn knights), floating (Wisps/Wraiths/Revenants/Cinderborn), spider (Weavers), mushroom (Sporelings/Sporemother), beast (Magmaw/Frostfang/Fenstalker) and crystalline/bone construct (Rimebound/Bonewrought) — each themed to its zone (magma cracks, frost ice, undead bone, blight glow…).
+- **Name + level nameplate** above each enemy, in addition to the HP bar: a clean billboarded label (baked to a canvas texture) with the **name coloured by tier** (standard pale · elite orange · rare gold) and the level below, outlined for readability on any background.
+- Models **flash on hit / tint during telegraphs** (all body materials, preserving caster/ghost glow), **floating creatures hover**, and the click-to-target raycast hits any part of the model.
+- **Perf**: models + nameplates are created lazily for enemies near the camera and freed when they move far away (the open world holds ~80 spawns but only a camp or two is ever close); off-screen models are frustum-culled.
+- The three CP2 **world bosses** also get unique, oversized models (a fiery Emberhorn beast, a frost Rimewyrm, the crowned Maelgrith), rendered at boss scale with a crimson nameplate.
+
+**Verified (post-merge with CP2):** `typecheck` ✓ · `npm test` → 238/238 ✓ · `build` ✓ (~177 KB gzip) · `test:e2e` → 12/12 ✓.
+
 ### ✅ Checkpoint 2 — three solo world bosses
 - **Three hand-authored open-world bosses**, one deep in each of the three highest frontiers — **Emberhorn, the Cinder Tyrant** (Emberreach, fire, ~Lv 20), **The Rimewyrm** (Riven Peaks, frost, ~Lv 25), and **Maelgrith, the Hollow Crown** (Gravereach, blight/undead, the **Lv-30 capstone fight**). New `boss` enemy tier + a `Boss` component (`src/sim/content/bosses.ts`); they reuse enemy-ai for locomotion/basic swings and add a thin escalation layer.
 - **Multi-phase escalation.** A new **boss-ai** system (`src/sim/systems/boss-ai.ts`) derives the boss's phase from its HP (Emberhorn/Rimewyrm 3 phases at 66 %/33 %; Maelgrith **4 phases** at 75/50/25 %) and announces each shift in the HUD. Later phases throw the heavy attack faster; the existing <30 %-HP enrage gives a desperation finish.
