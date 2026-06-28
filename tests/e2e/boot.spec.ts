@@ -303,10 +303,24 @@ test('Settings (O): accessibility options apply live and persist across reload',
   );
   expect(scale).toBe('1.3');
 
-  // Settings persist: after a reload the damage-numbers preference is still applied.
+  // Audio: mute + set the volume slider (the Audio section).
+  const mute = page.locator('.settings-panel input[type="checkbox"]').nth(4); // 5th: "Mute audio"
+  await mute.check();
+  const range = page.locator('.settings-panel input[type="range"]');
+  await expect(range).toBeVisible();
+  await range.evaluate((el: HTMLInputElement) => {
+    el.value = '30';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+  // Settings persist: after a reload the prefs are still applied.
   await page.reload();
   await page.waitForFunction(() => window.__oathbound !== undefined);
   await expect(page.locator('#ui-root')).toHaveClass(/dmg-off/);
+  await page.keyboard.press('KeyO');
+  await expect(page.locator('.settings-panel')).toBeVisible();
+  expect(await page.locator('.settings-panel input[type="checkbox"]').nth(4).isChecked()).toBe(true);
+  expect(await page.locator('.settings-panel input[type="range"]').inputValue()).toBe('30');
 
   expect(errors).toEqual([]);
 });

@@ -765,6 +765,23 @@ body {
   height: 15px;
   cursor: pointer;
 }
+.settings-row input[type='range'] {
+  width: 140px;
+  cursor: pointer;
+}
+
+/* ── Low-HP vignette (combat feedback; honours reduced-effects via the curve) ──── */
+.low-hp-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(170, 18, 18, 0.85) 100%);
+  transition: opacity 0.25s linear;
+}
+#ui-root.reduced-effects .low-hp-vignette {
+  transition: none;
+}
 
 /* ── Character stats (in the inventory/character panel) ──────────────────────── */
 .inv-stats {

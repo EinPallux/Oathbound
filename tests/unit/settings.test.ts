@@ -56,11 +56,22 @@ describe('settings — merge/validate', () => {
       reducedEffects: true,
       highContrastRarity: true,
       confirmDestructive: false,
+      masterVolume: 0.4,
+      muteAudio: true,
     };
     expect(mergeSettings(JSON.parse(JSON.stringify(custom)))).toEqual(custom);
     // confirmDestructive defaults to on, and validates like the other booleans.
     expect(DEFAULT_SETTINGS.confirmDestructive).toBe(true);
     expect(mergeSettings({ confirmDestructive: false }).confirmDestructive).toBe(false);
+  });
+
+  it('clamps master volume to [0,1] and validates the mute flag', () => {
+    expect(mergeSettings({ masterVolume: 2 }).masterVolume).toBe(1);
+    expect(mergeSettings({ masterVolume: -1 }).masterVolume).toBe(0);
+    expect(mergeSettings({ masterVolume: 0.35 }).masterVolume).toBe(0.35);
+    expect(mergeSettings({ masterVolume: Number.NaN }).masterVolume).toBe(DEFAULT_SETTINGS.masterVolume);
+    expect(mergeSettings({ muteAudio: true }).muteAudio).toBe(true);
+    expect(mergeSettings({ muteAudio: 'yes' }).muteAudio).toBe(DEFAULT_SETTINGS.muteAudio);
   });
 });
 

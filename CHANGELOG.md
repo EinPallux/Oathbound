@@ -26,9 +26,16 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 **Verified:** `typecheck` ✓ · `npm test` → 283/283 ✓ · `build` ✓ (~178 KB gzip) · `test:e2e` → 15/15 ✓.
 
-### ⏳ Remaining for "Feel & Finish" (next checkpoints)
-- **CP3:** **audio pass** (Howler) + volume sliders in Settings · VFX/"juice" pass within budgets, respecting reduced-effects.
-- **CP4:** **fully remappable keybinds** + camera/mouse options · onboarding polish (class tutorial cards) · any remaining HUD (buff/debuff durations, cast bar polish, low-HP vignette).
+### ✅ Checkpoint 3 — audio controls + a light VFX pass *(kept dependency-free)*
+- **Audio volume & mute** (no new dependency — extended the existing procedural WebAudio `Sfx`): all blips now route through a **master GainNode**, driven by two new persisted settings — **Volume** (slider) and **Mute audio** — applied live from the Settings panel's new **Audio** section. Muting skips the synth work entirely. Added a subtle **enemy-death** thud (deaths were previously silent).
+- **Low-HP vignette** (VFX/"juice"): a red screen-edge glow that fades in below 35% HP and deepens toward death — a readability cue that **honours reduced-effects** (its intensity is capped, and the curve is a pure, unit-tested function). 
+- *(Per owner direction, kept simple: no Howler/sampled-audio dependency this pass — that can come later without disturbing this volume/mute plumbing.)*
+- Tests: master-volume clamping + mute validation, and the vignette opacity curve (off above threshold, ramps to a bounded peak, reduced-effects caps it lower) → **287 unit tests**; the Settings e2e now also mutes + sets the volume slider and confirms both **persist across reload** → **15 e2e**.
+
+**Verified:** `typecheck` ✓ · `npm test` → 287/287 ✓ · `build` ✓ (~179 KB gzip) · `test:e2e` → 15/15 ✓.
+
+### ⏳ Remaining for "Feel & Finish" (next checkpoint)
+- **CP4:** **fully remappable keybinds** + camera/mouse options · onboarding polish (class tutorial cards) · any remaining HUD (buff/debuff durations, cast bar polish).
 
 ---
 

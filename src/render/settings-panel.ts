@@ -14,6 +14,8 @@ export class SettingsPanel {
   private reduced!: HTMLInputElement;
   private hcRarity!: HTMLInputElement;
   private confirmDestructive!: HTMLInputElement;
+  private mute!: HTMLInputElement;
+  private volume!: HTMLInputElement;
 
   /** Called after any change (persist + apply). */
   onChange: () => void = () => {};
@@ -73,6 +75,16 @@ export class SettingsPanel {
     });
     this.confirmDestructive = this.checkRow(groups, 'Confirm destructive actions', () => {
       this.settings.confirmDestructive = this.confirmDestructive.checked;
+      this.onChange();
+    });
+
+    groups.appendChild(this.sectionHead('Audio'));
+    this.mute = this.checkRow(groups, 'Mute audio', () => {
+      this.settings.muteAudio = this.mute.checked;
+      this.onChange();
+    });
+    this.volume = this.rangeRow(groups, 'Volume', () => {
+      this.settings.masterVolume = parseInt(this.volume.value, 10) / 100;
       this.onChange();
     });
 
@@ -140,6 +152,22 @@ export class SettingsPanel {
     return select;
   }
 
+  private rangeRow(parent: HTMLElement, label: string, onInput: () => void): HTMLInputElement {
+    const row = document.createElement('label');
+    row.className = 'settings-row';
+    const span = document.createElement('span');
+    span.textContent = label;
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = '0';
+    input.max = '100';
+    input.step = '5';
+    input.oninput = onInput;
+    row.append(span, input);
+    parent.appendChild(row);
+    return input;
+  }
+
   /** Push the current settings values into the controls (open / after reset). */
   private syncControls(): void {
     this.uiScale.value = String(this.settings.uiScale);
@@ -148,6 +176,8 @@ export class SettingsPanel {
     this.reduced.checked = this.settings.reducedEffects;
     this.hcRarity.checked = this.settings.highContrastRarity;
     this.confirmDestructive.checked = this.settings.confirmDestructive;
+    this.mute.checked = this.settings.muteAudio;
+    this.volume.value = String(Math.round(this.settings.masterVolume * 100));
   }
 
   toggle(): void {
