@@ -13,9 +13,9 @@ import { CombatEvent, type ItemSalvagedEvent } from './combat/events';
 
 export const SALVAGE_LEVEL = 3;
 
-const RARITY_ORDER: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
-const SALVAGE_BONUS: Record<Rarity, number> = { common: 0, uncommon: 2, rare: 4, epic: 7, legendary: 11 };
-const GOLD_MULT: Record<Rarity, number> = { common: 1, uncommon: 2, rare: 3, epic: 5, legendary: 8 };
+const RARITY_ORDER: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, relic: 5 };
+const SALVAGE_BONUS: Record<Rarity, number> = { common: 0, uncommon: 2, rare: 4, epic: 7, legendary: 11, relic: 16 };
+const GOLD_MULT: Record<Rarity, number> = { common: 1, uncommon: 2, rare: 3, epic: 5, legendary: 8, relic: 12 };
 
 /** Whetstones + gold returned for salvaging an item (better gear feeds Reinforcement). */
 export function salvageYield(item: Item): { whetstones: number; gold: number } {

@@ -28,7 +28,7 @@ const TIERS: Record<string, TierTable> = {
 
 /** Items of this rarity or better reset the bad-luck-protection pity counter. */
 export function isRarePlus(r: Rarity): boolean {
-  return r === 'rare' || r === 'epic' || r === 'legendary';
+  return r === 'rare' || r === 'epic' || r === 'legendary' || r === 'relic';
 }
 
 /** Bad-luck protection: each unlucky kill raises the rare+ weight (capped). */

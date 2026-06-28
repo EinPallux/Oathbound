@@ -31,6 +31,7 @@ import { createPlayer, setPlayerClass, createOathstone, createVendor, PLAYER_HAL
 import { spawnEnemy } from '../sim/content/enemies';
 import { WORLD_SPAWNS } from '../sim/content/spawns';
 import { spawnBoss, BOSS_SPAWNS } from '../sim/content/bosses';
+import { relicEffectDesc } from '../sim/loot/relics';
 import { equipItem, recomputeDerived } from '../sim/inventory';
 import { salvageItem, salvageAllBelow } from '../sim/salvage';
 import { reinforceItem } from '../sim/reinforce';
@@ -346,6 +347,7 @@ export function boot(): Game {
   world.events.on<LootPickedEvent>(CombatEvent.LootPicked, (ev) => {
     const r = ev.item.rarity;
     hud.toast(`Looted ${ev.item.name}`, r === 'common' || r === 'uncommon' ? 'info' : r);
+    if (ev.item.relic) hud.toast(relicEffectDesc(ev.item.relic), 'relic'); // apex: show its effect
     sfx.loot();
     autosave();
   });

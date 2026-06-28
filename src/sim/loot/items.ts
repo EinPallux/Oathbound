@@ -58,6 +58,8 @@ const QUALITY_WORD: Record<Rarity, readonly string[]> = {
   rare: ['Gleaming', 'Runed', 'Vanguard'],
   epic: ['Resplendent', 'Ascendant', 'Oathforged'],
   legendary: ['Fabled', 'Sovereign', 'Eternal'],
+  // Relics are hand-named uniques (see relics.ts); this is only a fallback.
+  relic: ['Relic'],
 };
 
 const RARITY_MULT: Record<Rarity, number> = {
@@ -66,8 +68,9 @@ const RARITY_MULT: Record<Rarity, number> = {
   rare: 1.2,
   epic: 1.32,
   legendary: 1.45,
+  relic: 1.55,
 };
-const RARITY_AFFIXES: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+const RARITY_AFFIXES: Record<Rarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, relic: 3 };
 
 /** Chest-equivalent budget at an item level. */
 export function baseBudget(ilvl: number): number {

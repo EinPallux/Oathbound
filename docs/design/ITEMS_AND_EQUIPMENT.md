@@ -24,9 +24,11 @@ Weapon/armor **type restrictions** by class: Warrior = heavy armor + melee weapo
 | Rare | Blue | 2 | ×1.20 | the bread-and-butter chase |
 | Epic | Purple | 3 (1 may be high-tier) | ×1.32 | strong build pieces |
 | Legendary | Orange | 4 + a **minor unique mod** | ×1.45 | aspirational drops |
-| **Relic** (Unique) | Gold | fixed, hand-designed effect | ×1.55 | named build-enablers; very rare |
+| **Relic** (Unique) | Teal | fixed, hand-designed effect | ×1.55 | named build-enablers; very rare |
 
 > Color is **never the only signal** — rarity also shows as a tier label + border shape for colorblind safety ([UX_AND_ACCESSIBILITY](./UX_AND_ACCESSIBILITY.md)).
+
+> **Relics — implemented (0.6.0 CP3).** The four beta relics are bespoke uniques (not rolled), defined in `src/sim/loot/relics.ts` with strong fixed stats + one build-enabling effect each (Ashbrand *execute* · Heart of the Rimewyrm *boss-slayer* · Crown of the Hollow King *reaper* · Sael's Bloodroot Sigil *crit-leech*). They drop as an ~8 % tail from world bosses (one pool per boss), auto-locked, counting as rare+ for bad-luck protection. Effects run through a shared hook layer: equipped relics fold into a `RelicMods` bundle (recomputed in `recomputeDerived`) read by `src/sim/combat/apply.ts` (damage) and `src/sim/rewards.ts` (on-kill) — so adding a relic is data + at most one field/hook. Beta relics are class-agnostic combat modifiers; per-ability relic effects are a later extension of the same registry.
 
 ## Stats
 **Primary (scales class power):** STR (Warrior), DEX (Hunter), SPR (Priest), **VIT** (HP, universal). **Secondary affixes:**
