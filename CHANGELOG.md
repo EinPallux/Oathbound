@@ -5,7 +5,7 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
-## 0.6.0-INDEV — "The Chase" → Equipment Depth + Lv-30 Endgame *(in progress)*
+## 0.6.0-INDEV — "The Chase" → Equipment Depth + Lv-30 Endgame *(✅ feature-complete — awaiting playtest)*
 **Goal:** the beta's long tail — the Lv-30 gear chase: **Legendary** + **Relic** tiers, **3 solo world bosses**, and target-farming → the **Endgame Foundation Gate** ([docs/design/ENDGAME_FOUNDATION.md](./docs/design/ENDGAME_FOUNDATION.md)). Built in verified checkpoints.
 
 ### ✅ Checkpoint 1 — Legendary rarity
@@ -79,8 +79,17 @@ Every enemy family now has its **own unique low-poly model** (procedural primiti
 
 **Verified:** `typecheck` ✓ · `npm test` → 253/253 ✓ · `build` ✓ (~174 KB gzip) · `test:e2e` → 12/12 ✓.
 
-### ⏳ Remaining for the endgame (next checkpoint)
-- **CP4:** the Lv-30 endgame loop + target-farming guidance → the **Endgame Foundation Gate** validation.
+### ✅ Checkpoint 4 — the Lv-30 endgame loop + target-farming guidance (Endgame Foundation Gate)
+- **The Lv-30 chase, made legible.** At the cap (XP already stops mattering) the **Goal Tracker pivots to "Endgame"**: it shows **Relic collection progress (N/4)** and points you at the **next relic to hunt** — naming the boss, its zone + direction, and the relic(s) it drops — then rotates to gear goals ("Reinforce toward the cap", "bosses respawn ~5 min"). No new combat systems: it directs the player through the systems CP1–CP3 already built.
+- **A target-farming guide as data** (`src/sim/content/endgame.ts`): composes the bosses + relic pools + loot identities into an ordered **target board** with pure helpers (`relicProgress`, `nextRelicTarget`, `uncollectedRelics`) the UI and tests share.
+- **Relic collection tracking** — a new `RelicCollection` component records every relic you've ever obtained (persists even if one is later salvaged); a picked-up relic is marked discovered (`pickUpNearest`), it's **saved** (a new `relics` field, reconciled from owned relics on load so old saves are correct), and it drives the chase's N/4 progress.
+- **"Locate" the bosses** — the full **map now plots the three world bosses** as distinct crimson diamonds (with names), so the endgame targets are findable, not hidden (a Gate requirement: *locate → attempt → beat*).
+- **Endgame Foundation Gate — automatable scope validated by tests:** every class **beats every world boss solo** with a realistic endgame loadout (full Legendary + that boss's Relic) in a sane time window; the full-Legendary power sits a **bounded** margin above the uncommon baseline (the soft power ceiling stays re-tunable); **target farming yields wanted upgrades within a focused session** (bad-luck protection bounds the dry streak to ≤ ~40 elite kills, and a session accumulates several rare+ candidates); world-boss loot floors at rare+. The **subjective "stays engaging across sessions"** check remains the owner's playtest.
+- Tests: guidance data integrity (one target/boss, full non-overlapping relic coverage, locations match `regionAt`, progress/next-target helpers), relic discovery + save persistence, the every-class-beats-every-boss gate (+ bounded power ratio), and the target-farming/BLP guarantees → **270 unit tests**; a new **Lv-30 endgame e2e** (the tracker pivots to the relic chase; the boss-marked map renders error-free) → **13 e2e**.
+
+**Verified:** `typecheck` ✓ · `npm test` → 270/270 ✓ · `build` ✓ (~175 KB gzip) · `test:e2e` → 13/13 ✓.
+
+> **0.6.0 "The Chase" is feature-complete** (CP1 Legendary · world/biome/player-model pass · CP2 world bosses · CP3 Relics · CP4 endgame loop). The automatable scope of the **Endgame Foundation Gate** passes; the subjective retention/feel check is the owner's playtest. Next: **0.7.x** UX/accessibility polish.
 
 ---
 

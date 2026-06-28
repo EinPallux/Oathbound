@@ -10,6 +10,7 @@ import {
   type Inventory,
   type Item,
   type LootDrop,
+  type RelicCollection,
 } from '../../core/ecs/components';
 import { addItem } from '../inventory';
 import {
@@ -96,6 +97,11 @@ export function pickUpNearest(world: World): Item | null {
   const ld = world.get<LootDrop>(nearest, C.LootDrop)!;
   const item = ld.item!;
   if (!addItem(world, player, item)) return null;
+  // Endgame chase: a picked-up relic is permanently "discovered" (collection progress).
+  if (item.relic) {
+    const coll = world.get<RelicCollection>(player, C.RelicCollection);
+    if (coll && !coll.discovered.includes(item.relic)) coll.discovered.push(item.relic);
+  }
   world.events.emit<LootPickedEvent>(CombatEvent.LootPicked, { item });
   ld.item = null;
   if (ld.gold <= 0) world.destroyEntity(nearest);

@@ -4,8 +4,10 @@
 // few soft goals. Reads sim state; never mutates it. See CORE_GAMEPLAY_LOOP.md.
 
 import type { World, Entity } from '../core/ecs/world';
-import { C, type Progression, type Transform } from '../core/ecs/components';
+import { C, type Progression, type Transform, type RelicCollection } from '../core/ecs/components';
 import { regionAt, regionLabel } from '../sim/content/regions';
+import { LEVEL_CAP } from '../sim/stats';
+import { relicProgress, nextRelicTarget, uncollectedRelics } from '../sim/content/endgame';
 import type { Onboarding } from '../sim/onboarding';
 
 export class GoalTracker {
@@ -60,19 +62,29 @@ export class GoalTracker {
     const tr = world.get<Transform>(player, C.Transform);
     if (!prog || !tr) return;
     const region = regionAt(tr.x, tr.z);
+    const atCap = prog.level >= LEVEL_CAP;
 
-    const goals = this.softGoals(prog.level);
-    const sig = `go|${prog.level}|${Math.round(prog.xp)}|${region.id}|${goals.join('§')}`;
+    const discovered = atCap
+      ? (world.get<RelicCollection>(player, C.RelicCollection)?.discovered ?? [])
+      : [];
+    const goals = atCap ? this.endgameGoals(discovered) : this.softGoals(prog.level);
+    const sig = `go|${prog.level}|${Math.round(prog.xp)}|${region.id}|${discovered.slice().sort().join(',')}|${goals.join('§')}`;
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
-    this.title.textContent = 'Goals';
+    this.title.textContent = atCap ? 'Endgame' : 'Goals';
     this.body.replaceChildren();
 
     const head = document.createElement('div');
     head.className = 'goal-head';
-    const toNext = prog.xpToNext === Infinity ? 'max' : `${Math.max(0, Math.ceil(prog.xpToNext - prog.xp))} XP to next`;
-    head.textContent = `Lv ${prog.level} · ${toNext}`;
+    if (atCap) {
+      const { have, total } = relicProgress(discovered);
+      head.textContent = `Lv 30 · max · Relics ${have}/${total}`;
+    } else {
+      const toNext =
+        prog.xpToNext === Infinity ? 'max' : `${Math.max(0, Math.ceil(prog.xpToNext - prog.xp))} XP to next`;
+      head.textContent = `Lv ${prog.level} · ${toNext}`;
+    }
     this.body.appendChild(head);
 
     const zone = document.createElement('div');
@@ -91,6 +103,24 @@ export class GoalTracker {
       row.append(mark, label);
       this.body.appendChild(row);
     }
+  }
+
+  /** Lv-30 chase guidance: collection progress + the next relic to hunt + gear goals. */
+  private endgameGoals(discovered: readonly string[]): string[] {
+    const goals: string[] = [];
+    const next = nextRelicTarget(discovered);
+    if (next) {
+      const relics = uncollectedRelics(next, discovered)
+        .map((r) => r.name)
+        .join(', ');
+      goals.push(`Hunt ${next.name} — ${next.where}`);
+      goals.push(`↳ for the ${relics}`);
+    } else {
+      goals.push('All Relics claimed — chase perfect Legendary affixes');
+    }
+    goals.push('Reinforce your best gear toward the cap (⚒ in the bag)');
+    goals.push('World bosses respawn ~5 min — farm Relics, Epics & Legendaries');
+    return goals;
   }
 
   private softGoals(level: number): string[] {

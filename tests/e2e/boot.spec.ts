@@ -249,6 +249,32 @@ test('a world boss spawns and its fight runs without errors', async ({ page }) =
   expect(errors).toEqual([]);
 });
 
+test('Lv-30 endgame: the Goal Tracker pivots to the relic chase + map renders bosses', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
+  page.on('pageerror', (e) => errors.push(String(e)));
+
+  // Skip the tutorial so the Goal Tracker shows the goals/endgame view.
+  await page.addInitScript(() => localStorage.setItem('oathbound.onboarded', '1'));
+  await page.goto('/');
+  await page.waitForFunction(() => window.__oathbound !== undefined);
+  await page.evaluate(() => window.__oathbound!.debugSetClass('warrior'));
+  await page.evaluate(() => window.__oathbound!.debugSetLevel(30));
+
+  const tracker = page.locator('.goal-tracker');
+  await expect(tracker).toContainText('Endgame');
+  await expect(tracker).toContainText('Relics 0/4');
+  await expect(tracker).toContainText('Emberhorn'); // the next relic target to hunt
+
+  // The full map (with the crimson world-boss markers + labels) renders error-free.
+  await page.keyboard.press('KeyM');
+  await expect(page.locator('.map-overlay')).toBeVisible();
+  await page.waitForTimeout(300);
+  expect(errors).toEqual([]);
+});
+
 test('progress persists across a reload (save v1)', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__oathbound !== undefined);
