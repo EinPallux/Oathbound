@@ -4,7 +4,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 
 > **Roadmap philosophy (anti-scope-creep).** We do **not** build: a fake dungeon before combat is fun · a raid mockup before enemies work · a guild menu before networking · an auction house without an economy · ten empty zones · three one-ability classes · stat-less equipment · giant empty terrain. We **do** build one satisfying slice and deepen it.
 
-> 📍 **Live progress** (which phases are actually done) is tracked in [`AGENTS.md`](../../AGENTS.md) and [`CHANGELOG.md`](../../CHANGELOG.md), not here — this document is the **static plan**. As of the latest sync: **`0.0.1`–`0.6.0` are ✅ done** (the full Lv 1–30 game + Lv-30 endgame is playable; Level 1–30 Content + Endgame Foundation gate automatable scope passed); **next is `0.7.x`** (UX, accessibility & content polish).
+> 📍 **Live progress** (which phases are actually done) is tracked in [`AGENTS.md`](../../AGENTS.md) and [`CHANGELOG.md`](../../CHANGELOG.md), not here — this document is the **static plan**. As of the latest sync: **`0.0.1`–`0.6.0` are ✅ done** (the full Lv 1–30 game + Lv-30 endgame is playable; Level 1–30 Content + Endgame Foundation gate automatable scope passed); **`0.7.x` is 🚧 in progress** (CP1 Settings & accessibility core done — UX, accessibility & content polish).
 
 ## Milestone band overview
 | Band | Theme | Player-facing outcome | Exit gate |
@@ -133,7 +133,8 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 
 ## 0.7.x — UX, Accessibility & Content Polish
 
-### 0.7.0 — "Feel & Finish"
+### 0.7.0 — "Feel & Finish" 🚧 IN PROGRESS
+> Progress: **CP1 Settings & accessibility core ✓** (persisted Settings panel `O`, applied live: UI scale, damage-number toggle/size, reduced effects, high-contrast + colorblind-safe rarity). Remaining: CP2 tooltips/comparison · CP3 audio + VFX · CP4 keybinds + onboarding polish (live state in AGENTS.md/CHANGELOG.md).
 - **Outcome:** the game *feels finished* to use. · Deps: 0.6.0. · Effort: L · Complexity: M · Risk: L.
 - **Included:** full HUD/menus, map, **Goal Tracker**, tooltips & item comparison, settings; **all accessibility options** ([UX_AND_ACCESSIBILITY](../design/UX_AND_ACCESSIBILITY.md)); audio pass (Howler) + VFX pass within budgets; onboarding polish; pause.
 - **Excluded:** new gameplay systems (feature freeze begins).

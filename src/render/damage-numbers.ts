@@ -4,6 +4,7 @@
 // DOM UI overlay per ADR-002.
 
 import * as THREE from 'three';
+import type { Settings } from '../game/settings';
 
 interface FloatingNumber {
   el: HTMLDivElement;
@@ -25,7 +26,7 @@ export class DamageNumbers {
   private readonly anchor = new THREE.Vector3();
   private lastMs = performance.now();
 
-  constructor(parent: HTMLElement, poolSize = 32) {
+  constructor(parent: HTMLElement, private readonly settings?: Settings, poolSize = 32) {
     this.container = document.createElement('div');
     this.container.className = 'dmg-layer';
     parent.appendChild(this.container);
@@ -40,10 +41,13 @@ export class DamageNumbers {
 
   /** Spawn a number at a world position. Reuses a pooled span (drops if all busy). */
   spawn(x: number, y: number, z: number, amount: number, isCrit: boolean, heal = false): void {
+    if (this.settings && !this.settings.damageNumbers) return; // disabled in settings
     const el = this.pool.pop();
     if (!el) return; // pool exhausted — drop rather than allocate
+    // Reduced-effects tones the crit emphasis down to a normal number (colour kept).
+    const critEmphasis = isCrit && !(this.settings?.reducedEffects ?? false);
     el.textContent = heal ? `+${amount}` : isCrit ? `${amount}!` : String(amount);
-    el.className = heal ? 'dmg-number heal' : isCrit ? 'dmg-number crit' : 'dmg-number';
+    el.className = heal ? 'dmg-number heal' : critEmphasis ? 'dmg-number crit' : 'dmg-number';
     el.style.display = 'block';
     el.style.opacity = '1';
     this.active.push({ el, x, y, z, life: 0, ttl: isCrit ? CRIT_TTL : TTL });
@@ -54,6 +58,7 @@ export class DamageNumbers {
     const dt = Math.min(0.1, (now - this.lastMs) / 1000);
     this.lastMs = now;
 
+    const rise = this.settings?.reducedEffects ? RISE * 0.3 : RISE; // reduced motion
     for (let i = this.active.length - 1; i >= 0; i--) {
       const n = this.active[i];
       n.life += dt;
@@ -64,7 +69,7 @@ export class DamageNumbers {
         this.active.splice(i, 1);
         continue;
       }
-      this.anchor.set(n.x, n.y + RISE * k, n.z).project(camera);
+      this.anchor.set(n.x, n.y + rise * k, n.z).project(camera);
       if (this.anchor.z > 1) {
         n.el.style.display = 'none';
         continue; // behind the camera this frame

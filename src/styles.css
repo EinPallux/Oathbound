@@ -25,6 +25,34 @@ body {
   position: fixed;
   inset: 0;
   pointer-events: none;
+  /* Accessibility: UI scale (Settings → Display). Scales the whole HUD/menus together. */
+  zoom: var(--ui-scale, 1);
+}
+
+/* ── Settings-driven accessibility toggles (applied as classes on #ui-root) ───── */
+#ui-root.dmg-off .dmg-layer {
+  display: none;
+}
+#ui-root.dmg-small .dmg-number {
+  font-size: 14px;
+}
+#ui-root.dmg-small .dmg-number.crit {
+  font-size: 20px;
+}
+#ui-root.dmg-large .dmg-number {
+  font-size: 24px;
+}
+#ui-root.dmg-large .dmg-number.crit {
+  font-size: 34px;
+}
+/* Reduced motion & flashing: drop UI transitions and the crit size pop. */
+#ui-root.reduced-effects .toast,
+#ui-root.reduced-effects .dmg-number {
+  transition: none !important;
+  animation: none !important;
+}
+#ui-root.reduced-effects .dmg-number.crit {
+  font-size: 18px;
 }
 
 .perf-overlay {
@@ -649,4 +677,91 @@ body {
 .inv-equip:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* ── Colorblind-safe rarity (never colour-only): a per-rarity left-border *shape*
+   alongside the colour + the text tier tag the panel/toasts prepend. High-contrast
+   mode thickens it. ─────────────────────────────────────────────────────────────── */
+.inv-name {
+  border-left: 3px solid transparent;
+  padding-left: 6px;
+}
+.inv-name.common {
+  border-left-style: solid;
+  border-left-color: #c9d1d9;
+}
+.inv-name.uncommon {
+  border-left-style: solid;
+  border-left-color: #5fd35f;
+}
+.inv-name.rare {
+  border-left-style: dashed;
+  border-left-color: #5aa0ff;
+}
+.inv-name.epic {
+  border-left-style: dotted;
+  border-left-color: #b061ff;
+}
+.inv-name.legendary {
+  border-left-style: double;
+  border-left-color: #ff8a3d;
+}
+.inv-name.relic {
+  border-left-style: double;
+  border-left-color: #3fe0d6;
+}
+.inv-name.empty {
+  border-left-color: transparent;
+}
+#ui-root.hc-rarity .inv-name {
+  border-left-width: 7px;
+  font-weight: 700;
+}
+
+/* ── Settings panel (O) ─────────────────────────────────────────────────────── */
+.settings-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 420px;
+  max-width: 92vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: rgba(8, 11, 16, 0.96);
+  border: 1px solid rgba(120, 200, 255, 0.3);
+  border-radius: 8px;
+  padding: 14px;
+  pointer-events: auto;
+}
+.settings-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 2px;
+  font-size: 12px;
+  color: #cdd9e5;
+  cursor: pointer;
+}
+.settings-row select {
+  font: inherit;
+  font-size: 12px;
+  color: #cdd9e5;
+  background: #1b222c;
+  border: 1px solid rgba(120, 200, 255, 0.28);
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.settings-row input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
 }
