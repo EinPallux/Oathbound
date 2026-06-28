@@ -34,6 +34,7 @@ export const C = {
   GroundAoe: 'groundAoe',
   LootLuck: 'lootLuck',
   Boss: 'boss',
+  RelicMods: 'relicMods',
 } as const;
 
 /**
@@ -254,7 +255,7 @@ export type EquipSlot =
   | 'ring1'
   | 'ring2';
 
-export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'relic';
 
 export type PrimaryStatId = 'STR' | 'DEX' | 'SPR' | 'VIT';
 
@@ -361,6 +362,9 @@ export interface Item {
   locked: boolean;
   /** Reinforcement steps applied (0..MAX_REINFORCE); boosts effective item level. */
   reinforced?: number;
+  /** For a Relic (rarity `relic`): its `RelicId` (see src/sim/loot/relics.ts), keying
+   *  its fixed build-enabling effect. Absent on ordinary rolled gear. */
+  relic?: string;
 }
 
 export interface Inventory {
@@ -379,6 +383,30 @@ export interface Equipment {
  *  Raises the rare+ chance as it climbs, and resets to 0 when one finally drops. */
 export interface LootLuck {
   pity: number;
+}
+
+/**
+ * Aggregate of the build-enabling effects from the player's equipped Relics, recomputed
+ * (like derived stats) whenever gear changes. Plain numbers so the combat/kill hooks
+ * read them without knowing about specific relics. Zeroed when no relic is equipped.
+ * See src/sim/loot/relics.ts (definitions + aggregation) and the hooks in
+ * src/sim/combat/apply.ts (damage) and src/sim/rewards.ts (on-kill).
+ */
+export interface RelicMods {
+  /** Target HP fraction at/below which `executeMult` applies (0 = no execute relic). */
+  executeThreshold: number;
+  /** Extra outgoing-damage fraction vs targets under the execute threshold. */
+  executeMult: number;
+  /** Extra outgoing-damage fraction vs boss-tier targets. */
+  bossDamageBonus: number;
+  /** Incoming-damage reduction fraction from boss-tier attackers. */
+  bossDamageResist: number;
+  /** Extra leech fraction applied on critical hits. */
+  critLeech: number;
+  /** Fraction of max HP healed to the killer on a kill. */
+  killHealFrac: number;
+  /** Seconds shaved off all the killer's ability cooldowns on a kill. */
+  killCdr: number;
 }
 
 /** A loot drop in the world (corpse pickup). Owner-eligibility is modelled now so

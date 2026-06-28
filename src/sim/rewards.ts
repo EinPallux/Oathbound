@@ -12,11 +12,16 @@ import {
   type PlayerClass,
   type LootDrop,
   type LootLuck,
+  type Boss,
+  type RelicMods,
+  type Health,
+  type AbilityState,
 } from '../core/ecs/components';
 import type { Rng } from '../core/rng';
 import { grantXp } from './progression';
 import { conXpMultiplier } from './stats';
 import { rollLoot, pityMultiplier, isRarePlus } from './loot/droptable';
+import { makeRelic, rollRelicDrop } from './loot/relics';
 import { getClass } from './classes';
 import { CombatEvent, type DeathEvent, type LootDroppedEvent } from './combat/events';
 
@@ -35,16 +40,28 @@ export function rewardKill(world: World, killer: Entity, victim: Entity, rng: Rn
     grantXp(world, killer, xp);
   }
 
+  // Relic on-kill effects (Reaper): heal + shave all cooldowns when the killer kills.
+  applyKillRelicEffects(world, killer);
+
   const tr = world.get<Transform>(victim, C.Transform)!;
   const tier = enemy?.tier ?? 'standard';
   const primary = getClass(world.get<PlayerClass>(killer, C.PlayerClass)?.id ?? 'warrior').primaryStatId;
   const lootPrimary = primary === 'VIT' ? 'STR' : primary;
 
-  // Bad-luck protection: boost rare+ odds by the killer's pity, then update it.
+  // Bad-luck protection: boost rare+ odds by the killer's pity.
   const luck = world.get<LootLuck>(killer, C.LootLuck);
   const roll = rollLoot(rng, enemyLevel, tier, 1, lootPrimary, luck ? pityMultiplier(luck.pity) : 1);
+
+  // World bosses can drop a Relic (the apex), replacing the normal roll.
+  let item = roll.item;
+  const boss = world.get<Boss>(victim, C.Boss);
+  if (boss) {
+    const relicId = rollRelicDrop(rng, boss.bossId);
+    if (relicId) item = makeRelic(rng, relicId);
+  }
+
   if (luck) {
-    if (roll.item && isRarePlus(roll.item.rarity)) luck.pity = 0;
+    if (item && isRarePlus(item.rarity)) luck.pity = 0;
     else luck.pity += 1;
   }
   const gold = enemy ? enemy.goldMin + rng.int(enemy.goldMax - enemy.goldMin + 1) : roll.gold;
@@ -60,10 +77,10 @@ export function rewardKill(world: World, killer: Entity, victim: Entity, rng: Rn
     prevZ: tr.z,
     prevYaw: 0,
   });
-  world.set<LootDrop>(drop, C.LootDrop, { item: roll.item, gold, owner: killer, ttl: LOOT_TTL });
+  world.set<LootDrop>(drop, C.LootDrop, { item, gold, owner: killer, ttl: LOOT_TTL });
   world.events.emit<LootDroppedEvent>(CombatEvent.LootDropped, {
     entity: drop,
-    item: roll.item,
+    item,
     gold,
     x: tr.x,
     y: tr.y,
@@ -75,4 +92,22 @@ export function rewardKill(world: World, killer: Entity, victim: Entity, rng: Rn
     enemy.deadFor = 0;
   }
   world.events.emit<DeathEvent>(CombatEvent.Death, { entity: victim, killer });
+}
+
+/** Reaper relic: on each kill, heal a fraction of max HP and shave all cooldowns. */
+function applyKillRelicEffects(world: World, killer: Entity): void {
+  const relic = world.get<RelicMods>(killer, C.RelicMods);
+  if (!relic) return;
+  if (relic.killHealFrac > 0) {
+    const h = world.get<Health>(killer, C.Health);
+    if (h && h.current > 0) h.current = Math.min(h.max, h.current + h.max * relic.killHealFrac);
+  }
+  if (relic.killCdr > 0) {
+    const ab = world.get<AbilityState>(killer, C.AbilityState);
+    if (ab) {
+      for (let i = 0; i < ab.cooldowns.length; i++) {
+        ab.cooldowns[i] = Math.max(0, ab.cooldowns[i] - relic.killCdr);
+      }
+    }
+  }
 }

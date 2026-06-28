@@ -63,8 +63,23 @@ Every enemy family now has its **own unique low-poly model** (procedural primiti
 
 **Verified:** `typecheck` ✓ · `npm test` → 238/238 ✓ · `build` ✓ (~173 KB gzip) · `test:e2e` → 12/12 ✓.
 
-### ⏳ Remaining for the endgame (next checkpoints)
-- **CP3:** **Relics** — a small set of hand-designed unique items with fixed build-enabling effects (+ the effect-hook plumbing).
+### ✅ Checkpoint 3 — Relics (hand-designed uniques + effect-hook plumbing)
+- **A new apex tier — `relic`** (radiant teal, above Legendary, ×1.55 budget): hand-designed **uniques** with strong fixed stats **and a build-enabling effect**, defined as bespoke data (`src/sim/loot/relics.ts`), not random rolls. Four for the beta, one pool per world boss:
+  - **Ashbrand, the Tyrant's Horn** (Emberhorn) — *Execute:* +50 % damage to targets below 35 % HP.
+  - **Heart of the Rimewyrm** (the Rimewyrm) — *Boss-slayer:* +20 % damage to world bosses, −15 % damage taken from them.
+  - **Crown of the Hollow King** (Maelgrith) — *Reaper:* each kill heals 8 % max HP and cuts all cooldowns by 1.5 s.
+  - **Sael's Bloodroot Sigil** (Maelgrith) — *Bloodroot:* critical hits leech 25 % of damage as health.
+- **Effect-hook plumbing (the reusable part).** Equipped relics aggregate into a plain-number **`RelicMods`** bundle (recomputed in `recomputeDerived`, like derived stats), and a *small, shared* set of hooks reads it — so the sim never hard-codes any specific relic:
+  - `src/sim/combat/apply.ts`: attacker-side **execute** + **boss-slayer** multipliers and **crit-leech**, defender-side **boss damage-reduction** — sitting right beside the existing status multipliers.
+  - `src/sim/rewards.ts`: on-kill **heal + cooldown-shave** (Reaper).
+  Adding a future relic is "add a def (+ at most one `RelicMods` field & hook read)."
+- **Drops & economy.** Relics are the **rarest** drops — an ~8 % tail on a world-boss kill (replacing that kill's normal roll), pulled from that boss's pool. They drop **auto-locked** (no accidental salvage), count as rare+ for **bad-luck protection**, and slot into salvage/vendor/loot-beam/HUD-toast/inventory exactly like any rarity (apex values). Pickup announces the effect; the inventory shows it on hover. **Save-compatible** (a new optional `Item.relic` field; effects re-derive on load).
+- **Scope note (faithful to the plan):** relics are class-agnostic **combat-modifier** uniques (the clean foundation the effect-hooks were built for); per-ability relic effects (e.g. "Holy Nova chains") are a natural next extension of the same registry, not in this checkpoint.
+- Tests: relic instantiation (rarity/effect/locked), the mods-aggregation bundle (incl. stacking), all four effect hooks driven through the **real** damage + kill code (execute ratio, boss-slayer in/out, crit-leech, reaper heal+CDR), boss drop logic (only from the killed boss's pool; a `rewardKill` integration loop), and **save round-trip** of an equipped relic → **253 unit tests**; e2e green (12).
+
+**Verified:** `typecheck` ✓ · `npm test` → 253/253 ✓ · `build` ✓ (~174 KB gzip) · `test:e2e` → 12/12 ✓.
+
+### ⏳ Remaining for the endgame (next checkpoint)
 - **CP4:** the Lv-30 endgame loop + target-farming guidance → the **Endgame Foundation Gate** validation.
 
 ---

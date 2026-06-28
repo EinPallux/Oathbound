@@ -13,6 +13,7 @@ import {
   type Statuses,
   type Enemy,
   type Shield,
+  type RelicMods,
 } from '../../core/ecs/components';
 import type { Rng } from '../../core/rng';
 import { computeDamage, rollDamage, type AbilityHit } from './damage';
@@ -61,6 +62,20 @@ export function applyDamage(
   amount *= 1 + statusMagnitude(sourceStatuses, Status.Empowered);
   amount *= 1 + statusMagnitude(targetStatuses, Status.Marked);
   amount *= 1 - statusMagnitude(targetStatuses, Status.Bulwark);
+
+  // Relic effects (build-enablers): attacker-side execute + boss-slayer bonus, and
+  // defender-side boss damage-reduction. Bundles are precomputed in recomputeDerived.
+  const srcRelic = world.get<RelicMods>(source, C.RelicMods);
+  if (srcRelic) {
+    if (srcRelic.executeThreshold > 0 && h.current <= h.max * srcRelic.executeThreshold)
+      amount *= 1 + srcRelic.executeMult; // h.current is still the pre-hit HP here
+    if (srcRelic.bossDamageBonus > 0 && world.get<unknown>(target, C.Boss) != null)
+      amount *= 1 + srcRelic.bossDamageBonus;
+  }
+  const tgtRelic = world.get<RelicMods>(target, C.RelicMods);
+  if (tgtRelic && tgtRelic.bossDamageResist > 0 && world.get<unknown>(source, C.Boss) != null)
+    amount *= 1 - tgtRelic.bossDamageResist;
+
   amount = Math.max(0, Math.round(amount));
 
   // A shield (Aegis) soaks damage before HP.
@@ -92,10 +107,12 @@ export function applyDamage(
     z: tr.z,
   });
 
-  if (leech > 0 && amount > 0) {
+  // Bloodroot relic: critical hits leech extra (on top of any ability/gear leech).
+  const effLeech = leech + (res.isCrit && srcRelic ? srcRelic.critLeech : 0);
+  if (effLeech > 0 && amount > 0) {
     const sh = world.get<Health>(source, C.Health);
     if (sh && sh.current > 0) {
-      const healed = Math.round(amount * leech);
+      const healed = Math.round(amount * effLeech);
       if (healed > 0) {
         sh.current = Math.min(sh.max, sh.current + healed);
         const str = world.get<Transform>(source, C.Transform);

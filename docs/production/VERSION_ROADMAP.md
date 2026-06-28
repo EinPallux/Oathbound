@@ -4,7 +4,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 
 > **Roadmap philosophy (anti-scope-creep).** We do **not** build: a fake dungeon before combat is fun · a raid mockup before enemies work · a guild menu before networking · an auction house without an economy · ten empty zones · three one-ability classes · stat-less equipment · giant empty terrain. We **do** build one satisfying slice and deepen it.
 
-> 📍 **Live progress** (which phases are actually done) is tracked in [`AGENTS.md`](../../AGENTS.md) and [`CHANGELOG.md`](../../CHANGELOG.md), not here — this document is the **static plan**. As of the latest sync: **`0.0.1`–`0.5.0` are ✅ done** (the full Lv 1–30 game is playable; Level 1–30 Content Gate automatable scope passed); **`0.6.0` is 🚧 in progress** (CP1 Legendary + CP2 three world bosses done; CP3 Relics + CP4 endgame loop remain).
+> 📍 **Live progress** (which phases are actually done) is tracked in [`AGENTS.md`](../../AGENTS.md) and [`CHANGELOG.md`](../../CHANGELOG.md), not here — this document is the **static plan**. As of the latest sync: **`0.0.1`–`0.5.0` are ✅ done** (the full Lv 1–30 game is playable; Level 1–30 Content Gate automatable scope passed); **`0.6.0` is 🚧 in progress** (CP1 Legendary + CP2 three world bosses + CP3 Relics done; CP4 endgame loop remains).
 
 ## Milestone band overview
 | Band | Theme | Player-facing outcome | Exit gate |
@@ -122,7 +122,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 ## 0.6.x — Equipment Depth & Level-30 Farming → **Endgame Foundation Gate**
 
 ### 0.6.0 — "The Chase" 🚧 IN PROGRESS
-> Progress: **CP1 Legendary ✓ · CP2 three world bosses ✓** · CP3 Relics + CP4 Lv-30 endgame loop remain (live state in AGENTS.md/CHANGELOG.md).
+> Progress: **CP1 Legendary ✓ · CP2 three world bosses ✓ · CP3 Relics ✓** · CP4 Lv-30 endgame loop remains (live state in AGENTS.md/CHANGELOG.md).
 - **Outcome:** a real level-30 gear chase. · Deps: 0.5.0. · Effort: L · Complexity: M · Risk: M.
 - **Included:** **Legendary** + **Relic** tiers; full affix depth & tiers; bad-luck protection tuned; Reinforcement to cap; **3 solo world bosses** (Emberhorn, Rimewyrm, Maelgrith); named rares per zone; target-farming sources; loot identities per zone ([ENDGAME_FOUNDATION](../design/ENDGAME_FOUNDATION.md)).
 - **Excluded:** dungeons/raids (deferred), any group content.

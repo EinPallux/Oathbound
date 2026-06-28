@@ -17,6 +17,7 @@ import {
 } from '../core/ecs/components';
 import { deriveStats } from './stats';
 import { getClass } from './classes';
+import { relicModsFromEquipment } from './loot/relics';
 
 /** Recompute the player's combat stats from level + class + equipped gear. */
 export function recomputeDerived(world: World, player: Entity): void {
@@ -48,6 +49,10 @@ export function recomputeDerived(world: World, player: Entity): void {
     r.max = cls.resource.max;
     if (r.current > r.max) r.current = r.max;
   }
+
+  // Relic effects (build-enablers) aggregate from equipped relics; combat + kill hooks
+  // read this bundle. Recomputed here so equip/unequip/load updates it.
+  world.set(player, C.RelicMods, relicModsFromEquipment(eq));
 }
 
 /** Add an item to the inventory if there is room. Returns success. */

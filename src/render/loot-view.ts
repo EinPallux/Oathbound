@@ -11,6 +11,7 @@ const RARITY_COLOR: Record<Rarity, number> = {
   rare: 0x5aa0ff,
   epic: 0xb061ff,
   legendary: 0xff8a3d,
+  relic: 0x3fe0d6, // apex — radiant teal, distinct from Legendary orange
 };
 const GOLD_COLOR = 0xffcc44;
 
