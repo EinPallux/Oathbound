@@ -20,6 +20,7 @@ import {
   type Respawn,
   type Oathstone,
   type LootLuck,
+  type RelicCollection,
 } from '../core/ecs/components';
 import { recomputeDerived } from './inventory';
 import { xpToNext } from './stats';
@@ -41,6 +42,8 @@ export interface SaveData {
   oathstones: string[];
   /** Bad-luck-protection pity counter. */
   pity: number;
+  /** RelicIds ever obtained (endgame collection progress). */
+  relics: string[];
   inventory: Item[];
   equipment: Partial<Record<EquipSlot, Item>>;
 }
@@ -75,6 +78,7 @@ export function serialize(world: World, player: Entity): SaveData {
     respawn: { x: respawn?.x ?? tr.x, z: respawn?.z ?? tr.z },
     oathstones,
     pity: world.get<LootLuck>(player, C.LootLuck)?.pity ?? 0,
+    relics: clone(world.get<RelicCollection>(player, C.RelicCollection)?.discovered ?? []),
     inventory: clone(inv.items),
     equipment: clone(eq.slots),
   };
@@ -115,6 +119,16 @@ export function applySave(world: World, player: Entity, data: SaveData): void {
 
   const luck = world.get<LootLuck>(player, C.LootLuck);
   if (luck) luck.pity = data.pity ?? 0;
+
+  // Relic collection: the saved set, unioned with any relics actually owned (so older
+  // saves without the field — or hand-edited ones — still reflect what you're carrying).
+  const coll = world.get<RelicCollection>(player, C.RelicCollection);
+  if (coll) {
+    const set = new Set<string>(data.relics ?? []);
+    for (const it of inv.items) if (it.relic) set.add(it.relic);
+    for (const it of Object.values(eq.slots)) if (it?.relic) set.add(it.relic);
+    coll.discovered = [...set];
+  }
 
   // Re-mark Oathstones that were activated in the saved run.
   const activated = new Set(data.oathstones ?? []);

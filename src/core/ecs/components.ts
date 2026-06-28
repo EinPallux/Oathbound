@@ -35,6 +35,7 @@ export const C = {
   LootLuck: 'lootLuck',
   Boss: 'boss',
   RelicMods: 'relicMods',
+  RelicCollection: 'relicCollection',
 } as const;
 
 /**
@@ -403,6 +404,15 @@ export interface RelicMods {
   killHealFrac: number;
   /** Seconds shaved off all the killer's ability cooldowns on a kill. */
   killCdr: number;
+}
+
+/**
+ * The Relics the player has ever obtained — the endgame chase's collection progress
+ * (persists even if a relic is later salvaged/sold). Drives the Lv-30 goal guidance.
+ * Holds `RelicId`s (typed as strings to avoid a cycle; see src/sim/loot/relics.ts).
+ */
+export interface RelicCollection {
+  discovered: string[];
 }
 
 /** A loot drop in the world (corpse pickup). Owner-eligibility is modelled now so

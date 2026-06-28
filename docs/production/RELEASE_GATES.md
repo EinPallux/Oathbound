@@ -62,11 +62,12 @@ Performance numbers reference [PERFORMANCE_BUDGETS](../qa/PERFORMANCE_BUDGETS.md
 
 ## 7. Endgame Foundation Gate
 *Validates level-30 open-world equipment farming.*
-- [ ] At Lv 30, each class can **locate, attempt, and defeat each of the 3 world bosses solo** in 2–5 min.
-- [ ] Legendary/Relic drops exist with **bad-luck protection** that demonstrably works.
-- [ ] **Target farming** yields a wanted slot upgrade within a focused session.
-- [ ] Reinforcement upgrade + salvage economy balanced ([ITEMS_AND_EQUIPMENT](../design/ITEMS_AND_EQUIPMENT.md)).
-- [ ] Repeated-session **retention** check passes ([PLAYTEST_PLAN](../qa/PLAYTEST_PLAN.md)).
+> **Status (0.6.0):** automatable scope ✅ passes (`tests/unit/endgame-gate.test.ts` + `bosses.test.ts` + `relics.test.ts`); subjective real-time pacing + retention await the owner's playtest.
+- [x] At Lv 30, each class can **locate, attempt, and defeat each of the 3 world bosses solo** — bosses are map-marked + Goal-Tracker-guided; tests confirm every class beats every boss with an endgame loadout (the "2–5 min" real-time feel is playtest).
+- [x] Legendary/Relic drops exist with **bad-luck protection** that demonstrably works (tested: BLP bounds the dry streak; relics drop from boss pools).
+- [x] **Target farming** yields a wanted slot upgrade within a focused session (tested via the BLP/elite-farming sim).
+- [ ] Reinforcement upgrade + salvage economy balanced ([ITEMS_AND_EQUIPMENT](../design/ITEMS_AND_EQUIPMENT.md)) — revisit in the 0.8.x balance pass.
+- [ ] Repeated-session **retention** check passes ([PLAYTEST_PLAN](../qa/PLAYTEST_PLAN.md)) — owner playtest.
 
 ## 8. Technical Beta Gate
 *Validates: saves, migrations, performance, browser compatibility, Vercel deployment, error handling.*

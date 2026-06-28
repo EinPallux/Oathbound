@@ -9,6 +9,7 @@ import {
   type Transform,
   type Oathstone,
   type Health,
+  type EnemyInfo,
 } from '../core/ecs/components';
 import { regionAt, regionLabel } from '../sim/content/regions';
 
@@ -136,6 +137,34 @@ export class Minimap {
         ctx.fillStyle = os.activated ? '#bfeef2' : '#6a7a8a';
         ctx.font = '11px ui-monospace, monospace';
         ctx.fillText(os.name, x + 8, y + 4);
+      }
+    }
+
+    // World bosses — a distinct crimson diamond (+ name on the big map) so the endgame
+    // targets are easy to locate. Hidden while slain (respawning).
+    for (const e of world.query(C.Boss, C.Transform, C.Health)) {
+      const h = world.get<Health>(e, C.Health)!;
+      if (h.current <= 0) continue;
+      const t = world.get<Transform>(e, C.Transform)!;
+      const [x, y] = project(t.x, t.z);
+      if (!inBounds(x, y)) continue;
+      const r = centered ? 4 : 7;
+      ctx.fillStyle = '#ff3b46';
+      ctx.strokeStyle = '#ffd0d3';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y - r);
+      ctx.lineTo(x + r, y);
+      ctx.lineTo(x, y + r);
+      ctx.lineTo(x - r, y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      if (!centered) {
+        const info = world.get<EnemyInfo>(e, C.EnemyInfo);
+        ctx.fillStyle = '#ffd0d3';
+        ctx.font = '11px ui-monospace, monospace';
+        ctx.fillText(info?.name ?? 'World Boss', x + 9, y + 4);
       }
     }
 

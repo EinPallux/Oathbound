@@ -24,6 +24,7 @@ import {
   type Oathstone,
   type Vendor,
   type LootLuck,
+  type RelicCollection,
 } from '../core/ecs/components';
 import type { Heightfield } from '../world/heightfield';
 import { getClass, kitLength } from './classes';
@@ -94,6 +95,7 @@ export function createPlayer(
   world.set<Target>(e, C.Target, { entity: null });
   world.set<Respawn>(e, C.Respawn, { x, z });
   world.set<LootLuck>(e, C.LootLuck, { pity: 0 });
+  world.set<RelicCollection>(e, C.RelicCollection, { discovered: [] });
 
   recomputeDerived(world, e);
   const h = world.get<Health>(e, C.Health)!;
