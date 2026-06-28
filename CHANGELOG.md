@@ -46,6 +46,13 @@ Every enemy family now has its **own unique low-poly model** (procedural primiti
 
 **Verified (post-merge with CP2):** `typecheck` ✓ · `npm test` → 238/238 ✓ · `build` ✓ (~177 KB gzip) · `test:e2e` → 12/12 ✓.
 
+### 🐦 Living world — enemy wander + ambient wildlife (owner-requested)
+- **Idle enemies now wander.** Out of combat, standard enemies amble to random points within ~4.5 m of their spawn, pause, and repeat (at ~35 % move speed, facing where they walk), so camps feel alive instead of frozen. They stay well within leash range (no drifting between camps); aggro / social / leash are unchanged, and **world bosses loom in place** (no wander). The AI sim-radius widened (60→95 m) to match the enemy view distance so all visible enemies wander smoothly.
+- **Ambient wildlife** (`src/render/ambient-life.ts`, render-only — no sim entities): **birds wheel overhead** (a flock that lazily follows you, flapping pale silhouettes), **critters** (rats/rabbits) scurry on the ground nearby in short dart-and-pause bursts, and **butterflies** flit close by. A small fixed pool follows the player around the open world (relocated off-screen), so there's always life nearby without spawning thousands — purely decorative (no collision, not targetable, not saved).
+- Tests: idle enemies wander but stay near home; bosses don't wander → **240 unit tests**; e2e green (12).
+
+**Verified:** `typecheck` ✓ · `npm test` → 240/240 ✓ · `build` ✓ (~179 KB gzip) · `test:e2e` → 12/12 ✓.
+
 ### ✅ Checkpoint 2 — three solo world bosses
 - **Three hand-authored open-world bosses**, one deep in each of the three highest frontiers — **Emberhorn, the Cinder Tyrant** (Emberreach, fire, ~Lv 20), **The Rimewyrm** (Riven Peaks, frost, ~Lv 25), and **Maelgrith, the Hollow Crown** (Gravereach, blight/undead, the **Lv-30 capstone fight**). New `boss` enemy tier + a `Boss` component (`src/sim/content/bosses.ts`); they reuse enemy-ai for locomotion/basic swings and add a thin escalation layer.
 - **Multi-phase escalation.** A new **boss-ai** system (`src/sim/systems/boss-ai.ts`) derives the boss's phase from its HP (Emberhorn/Rimewyrm 3 phases at 66 %/33 %; Maelgrith **4 phases** at 75/50/25 %) and announces each shift in the HUD. Later phases throw the heavy attack faster; the existing <30 %-HP enrage gives a desperation finish.
