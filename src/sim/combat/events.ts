@@ -1,11 +1,13 @@
 // Sim → render/UI event names + payloads. The sim emits these; render/UI/audio
 // subscribe (the event bus keeps rendering decoupled from sim). Plain data only.
 
-import type { DamageType, Item } from '../../core/ecs/components';
+import type { DamageType, Item, ClassId } from '../../core/ecs/components';
 
 export const CombatEvent = {
   Damage: 'combat/damage',
   Heal: 'combat/heal',
+  /** The player successfully activated an ability (drives the player-model animation). */
+  AbilityUsed: 'combat/abilityUsed',
   /** An enemy died. */
   Death: 'combat/death',
   /** An enemy respawned. */
@@ -43,6 +45,16 @@ export interface HealEvent {
   x: number;
   y: number;
   z: number;
+}
+
+export interface AbilityUsedEvent {
+  entity: number;
+  classId: ClassId;
+  abilityId: string;
+  /** Ability targeting kind (e.g. 'projectile', 'selfAoE', 'heal') — picks the motion. */
+  targeting: string;
+  /** Cast time in seconds (0 = instant); a channel holds the pose for this long. */
+  castTime: number;
 }
 
 export interface DeathEvent {

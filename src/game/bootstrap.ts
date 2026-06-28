@@ -54,11 +54,13 @@ import {
   type ClassId,
   type Oathstone,
   type AbilityState,
+  type Velocity,
 } from '../core/ecs/components';
 import {
   CombatEvent,
   type DamageEvent,
   type HealEvent,
+  type AbilityUsedEvent,
   type LevelUpEvent,
   type LootPickedEvent,
   type PlayerDiedEvent,
@@ -321,6 +323,10 @@ export function boot(): Game {
   world.events.on<HealEvent>(CombatEvent.Heal, (ev) => {
     damageNumbers.spawn(ev.x, ev.y + 1.2, ev.z, ev.amount, false, true);
   });
+  // Play the player-model swing/draw/cast motion when an ability fires.
+  world.events.on<AbilityUsedEvent>(CombatEvent.AbilityUsed, (ev) => {
+    if (ev.entity === player) playerView.triggerAction(ev.targeting, ev.castTime);
+  });
   world.events.on<LevelUpEvent>(CombatEvent.LevelUp, (ev) => {
     hud.toast(`Level ${ev.level}!`, 'good');
     if (ev.level === CAPSTONE_LEVEL) {
@@ -450,7 +456,10 @@ export function boot(): Game {
       const y = lerp(t.prevY, t.y, alpha);
       const z = lerp(t.prevZ, t.z, alpha);
       const yaw = lerpAngle(t.prevYaw, t.yaw, alpha);
-      playerView.update(x, y, z, yaw);
+      const pv = world.get<Velocity>(player, C.Velocity)!;
+      const speed = Math.hypot(pv.x, pv.z);
+      const pcId = world.get<PlayerClass>(player, C.PlayerClass)?.id ?? 'warrior';
+      playerView.update(x, y, z, yaw, rdt, speed, pcId);
       cameraRig.update(x, y, z);
 
       enemyView.update(world, renderer.camera, alpha, rdt, playerTarget.entity);

@@ -27,6 +27,14 @@ A presentation/scale pass on the world (no gameplay-systems change), done at the
 
 **Verified:** `typecheck` ✓ · `npm test` → 220/220 ✓ · `build` ✓ (~169 KB gzip) · `test:e2e` → 11/11 ✓.
 
+### 🧍 Player model + class weapons (owner-requested)
+The placeholder capsule is replaced by a **procedural low-poly humanoid** (built from primitives — no asset files) with **class-distinct weapons so other players can read your class at a glance**: the **Warrior** carries a **sword + round shield** (+ a crested helm and shoulder pads), the **Hunter** a **longbow + nocked arrow** (+ a hood), the **Priest** a **glowing staff** (+ a hood and a holy halo). These are **purely cosmetic class identity** — equipped armour/weapons intentionally don't show on the model, leaving a clean seam for a future "show equipped gear" feature to slot in.
+- **Procedural animation**: a speed-driven **walk cycle** (swinging legs/arms, body bob) + subtle idle breathing, and a one-shot **sword-swing / bow-draw / staff-cast** motion (the Priest's orb flaring on cast) played when an ability fires. All render-side.
+- **Wiring**: a new **additive** sim event `AbilityUsed` — combat emits it the moment a player ability commits (past the target/resource guards), carrying class + targeting + cast time; the renderer subscribes to trigger the matching motion. No gameplay/balance/save change — the only sim touch is the new event.
+- Tests: combat emits `AbilityUsed` on a successful cast (and not when the ability whiffs with no target) → **222 unit tests**; e2e green (11). The per-test e2e timeout was raised 30 s → 60 s: the now-large open world renders slowly in the headless software-GL container (each heavy interaction test passes in ~20 s alone but contends under parallel load); real-hardware FPS is unaffected.
+
+**Verified:** `typecheck` ✓ · `npm test` → 222/222 ✓ · `build` ✓ (~172 KB gzip) · `test:e2e` → 11/11 ✓.
+
 ### ⏳ Remaining for the endgame (next checkpoints)
 - **CP2:** the **3 solo world bosses** (Emberhorn, the Rimewyrm, Maelgrith) — multi-phase, telegraph-heavy, with Legendary/Relic loot tables.
 - **CP3:** **Relics** — a small set of hand-designed unique items with fixed build-enabling effects (+ the effect-hook plumbing).

@@ -43,6 +43,7 @@ import {
 import { applyDamage } from '../combat/apply';
 import { applyHeal } from '../combat/heal';
 import { addStatus, hasStatus, removeStatus, tickStatuses, Status } from '../combat/statuses';
+import { CombatEvent, type AbilityUsedEvent } from '../combat/events';
 import { rewardKill } from '../rewards';
 import type { SpatialGrid } from '../spatial-grid';
 import type { Projectiles } from '../projectiles';
@@ -193,6 +194,16 @@ export function createCombatSystem(deps: CombatDeps): System {
         if (def.triggersGcd) ab.gcdRemaining = effectiveGcd(off.haste);
         ab.cooldowns[firedIndex] = def.cooldown;
         ab.bufferedIndex = -1;
+
+        // The ability is now committed (past all the target/resource guards): tell the
+        // renderer to play the player's swing/draw/cast motion. Purely cosmetic.
+        world.events.emit<AbilityUsedEvent>(CombatEvent.AbilityUsed, {
+          entity: e,
+          classId: pc?.id ?? 'warrior',
+          abilityId: def.id,
+          targeting: def.targeting,
+          castTime: def.castTime ?? 0,
+        });
 
         if (def.selfBuff) {
           const ss = world.get<Statuses>(e, C.Statuses);
