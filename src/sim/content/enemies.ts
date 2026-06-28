@@ -47,7 +47,7 @@ export type EnemyTemplateId =
   | 'bonewrought'
   | 'forsworn';
 
-export type Tier = 'standard' | 'elite' | 'rare';
+export type Tier = 'standard' | 'elite' | 'rare' | 'boss';
 
 interface Template {
   name: string;
@@ -602,13 +602,16 @@ const TEMPLATES: Record<EnemyTemplateId, Template> = {
   },
 };
 
+// World bosses (`boss`) don't use these flat multipliers — they're hand-authored uniques
+// (src/sim/content/bosses.ts, spawnBoss). The entries keep the Record exhaustive.
 const TIER_MULT: Record<Tier, { hp: number; dmg: number; xp: number; gold: number }> = {
   standard: { hp: 1, dmg: 1, xp: 1, gold: 1 },
   elite: { hp: 5, dmg: 1.5, xp: 5, gold: 4 },
   rare: { hp: 8, dmg: 1.8, xp: 12, gold: 8 },
+  boss: { hp: 25, dmg: 2.2, xp: 40, gold: 30 },
 };
 
-const RESPAWN_SEC: Record<Tier, number> = { standard: 30, elite: 180, rare: 600 };
+const RESPAWN_SEC: Record<Tier, number> = { standard: 30, elite: 180, rare: 600, boss: 300 };
 
 export interface SpawnOpts {
   level?: number;

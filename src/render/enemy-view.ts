@@ -46,16 +46,18 @@ export class EnemyView {
     let v = this.visuals.get(e);
     if (v) return v;
     const color =
-      tier === 'rare'
-        ? 0xb060d0
-        : tier === 'elite'
-          ? 0xd08a3a
-          : archetype === 'support'
-            ? 0x46c98a // healer — teal-green
-            : archetype === 'pack_leader'
-              ? 0xc0563c // leader — banner red
-              : BODY_COLOR;
-    const scale = tier === 'rare' ? 1.8 : tier === 'elite' ? 1.4 : 1;
+      tier === 'boss'
+        ? 0x8a1a2a // world boss — deep crimson
+        : tier === 'rare'
+          ? 0xb060d0
+          : tier === 'elite'
+            ? 0xd08a3a
+            : archetype === 'support'
+              ? 0x46c98a // healer — teal-green
+              : archetype === 'pack_leader'
+                ? 0xc0563c // leader — banner red
+                : BODY_COLOR;
+    const scale = tier === 'boss' ? 2.6 : tier === 'rare' ? 1.8 : tier === 'elite' ? 1.4 : 1;
     const material = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, HALF * 2 - 0.9, 6, 12), material);
     body.scale.setScalar(scale);
