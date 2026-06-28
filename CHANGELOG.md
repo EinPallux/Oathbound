@@ -37,6 +37,14 @@ The placeholder capsule is replaced by a **procedural low-poly humanoid** (built
 
 **Verified:** `typecheck` ✓ · `npm test` → 222/222 ✓ · `build` ✓ (~172 KB gzip) · `test:e2e` → 11/11 ✓.
 
+### 👹 Enemy models + nameplates (owner-requested)
+Every enemy family now has its **own unique low-poly model** (procedural primitives, no asset files) instead of the shared capsule — keyed by family + role so the three shared families split correctly (Sporeling/Sporemother, Bramblekin/Warchief, Ashen Reaver/Ember Warlord). ~21 distinct looks across 7 body archetypes — plant (Bloomhusks/Bramblekin), humanoid (Reavers/Drudges/Forsworn knights), floating (Wisps/Wraiths/Revenants/Cinderborn), spider (Weavers), mushroom (Sporelings/Sporemother), beast (Magmaw/Frostfang/Fenstalker) and crystalline/bone construct (Rimebound/Bonewrought) — each themed to its zone (magma cracks, frost ice, undead bone, blight glow…).
+- **Name + level nameplate** above each enemy, in addition to the HP bar: a clean billboarded label (baked to a canvas texture) with the **name coloured by tier** (standard pale · elite orange · rare gold) and the level below, outlined for readability on any background.
+- Models **flash on hit / tint during telegraphs** (all body materials, preserving caster/ghost glow), **floating creatures hover**, and the click-to-target raycast hits any part of the model.
+- **Perf**: models + nameplates are created lazily for enemies near the camera and freed when they move far away (the open world holds ~80 spawns but only a camp or two is ever close); off-screen models are frustum-culled.
+
+**Verified:** `typecheck` ✓ · `npm test` → 222/222 ✓ · `build` ✓ (~175 KB gzip) · `test:e2e` → 11/11 ✓.
+
 ### ⏳ Remaining for the endgame (next checkpoints)
 - **CP2:** the **3 solo world bosses** (Emberhorn, the Rimewyrm, Maelgrith) — multi-phase, telegraph-heavy, with Legendary/Relic loot tables.
 - **CP3:** **Relics** — a small set of hand-designed unique items with fixed build-enabling effects (+ the effect-hook plumbing).
