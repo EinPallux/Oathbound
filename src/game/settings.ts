@@ -22,6 +22,10 @@ export interface Settings {
   highContrastRarity: boolean;
   /** Require a confirm before destructive actions (salvaging Rare-or-better gear). */
   confirmDestructive: boolean;
+  /** Master SFX volume in [0, 1]. */
+  masterVolume: number;
+  /** Mute all audio (independent of the volume level). */
+  muteAudio: boolean;
 }
 
 /** Discrete UI-scale steps offered in the panel (continuous values are clamped to range). */
@@ -34,6 +38,8 @@ export const DEFAULT_SETTINGS: Settings = {
   reducedEffects: false,
   highContrastRarity: false,
   confirmDestructive: true,
+  masterVolume: 0.7,
+  muteAudio: false,
 };
 
 const STORAGE_KEY = 'oathbound.settings';
@@ -59,6 +65,10 @@ function clampScale(n: number): number {
   return Math.min(hi, Math.max(lo, n));
 }
 
+function clamp01(n: number): number {
+  return Math.min(1, Math.max(0, n));
+}
+
 /** Merge unknown/partial/old persisted data over the defaults, validating every field. */
 export function mergeSettings(raw: unknown): Settings {
   const r = (raw ?? {}) as Record<string, unknown>;
@@ -72,6 +82,11 @@ export function mergeSettings(raw: unknown): Settings {
       typeof r.highContrastRarity === 'boolean' ? r.highContrastRarity : DEFAULT_SETTINGS.highContrastRarity,
     confirmDestructive:
       typeof r.confirmDestructive === 'boolean' ? r.confirmDestructive : DEFAULT_SETTINGS.confirmDestructive,
+    masterVolume:
+      typeof r.masterVolume === 'number' && Number.isFinite(r.masterVolume)
+        ? clamp01(r.masterVolume)
+        : DEFAULT_SETTINGS.masterVolume,
+    muteAudio: typeof r.muteAudio === 'boolean' ? r.muteAudio : DEFAULT_SETTINGS.muteAudio,
   };
 }
 

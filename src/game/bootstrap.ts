@@ -97,6 +97,7 @@ import { GoalTracker } from '../render/goal-tracker';
 import { Minimap } from '../render/minimap';
 import { ClassSelect } from '../render/class-select';
 import { SettingsPanel } from '../render/settings-panel';
+import { Vignette } from '../render/vignette';
 import { loadSettings, saveSettings, applySettings, tierTag } from './settings';
 import { Sfx } from '../platform/audio';
 import { loadSave, writeSave } from '../platform/save-store';
@@ -178,6 +179,8 @@ export function boot(): Game {
   // Player settings & accessibility (device-local, persisted) — applied live to the UI.
   const settings = loadSettings();
   applySettings(uiRoot, settings);
+  const applyVolume = (): void => sfx.setVolume(settings.muteAudio ? 0 : settings.masterVolume);
+  applyVolume();
 
   // World data (pure) + meshes (render).
   const field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337);
@@ -260,6 +263,7 @@ export function boot(): Game {
   const damageNumbers = new DamageNumbers(uiRoot, settings);
   const targetFrame = new TargetFrame(uiRoot);
   const hud = new Hud(uiRoot);
+  const vignette = new Vignette(uiRoot);
   const goalTracker = new GoalTracker(uiRoot);
   const minimap = new Minimap(uiRoot, WORLD_SIZE);
   const invPanel = new InventoryPanel(uiRoot, settings);
@@ -270,6 +274,7 @@ export function boot(): Game {
   settingsPanel.onChange = () => {
     saveSettings(settings);
     applySettings(uiRoot, settings);
+    applyVolume();
   };
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -370,6 +375,7 @@ export function boot(): Game {
     hud.toast('You were defeated — respawning…');
     sfx.hurt();
   });
+  world.events.on(CombatEvent.Death, () => sfx.death()); // enemy slain — a short thud
   world.events.on<BossPhaseEvent>(CombatEvent.BossPhase, (ev) => {
     hud.toast(`${ev.name} — Phase ${ev.phase}/${ev.totalPhases}!`, 'epic');
     sfx.crit();
@@ -514,6 +520,8 @@ export function boot(): Game {
       }
 
       hud.update(world, player);
+      const phv = world.get<Health>(player, C.Health)!;
+      vignette.update(phv.max > 0 ? phv.current / phv.max : 0, settings.reducedEffects);
       invPanel.update(world, player);
       vendorPanel.update(world, player);
       travelPanel.update(world, player);
