@@ -53,6 +53,10 @@ const FAMILY_KIND: Record<string, string> = {
   Wraiths: 'wraith',
   Bonewrought: 'bonewrought',
   'The Forsworn': 'forsworn',
+  // World bosses (CP2) — rendered at boss scale (2.5×) in enemy-view.
+  Emberhorn: 'emberhorn',
+  Rimewyrm: 'rimewyrm',
+  Maelgrith: 'maelgrith',
 };
 
 const DEFS: Record<string, Def> = {
@@ -83,6 +87,10 @@ const DEFS: Record<string, Def> = {
   wraith: { type: 'floating', color: 0x4a4656, accent: 0x363143, eyes: 0xd6a0ff, glow: 0xb060d0, variant: 'ghost' },
   bonewrought: { type: 'construct', color: 0xdad2bd, accent: 0x9a917a, eyes: 0x9bff7a, variant: 'bone' },
   forsworn: { type: 'humanoid', color: 0x3a3645, accent: 0x8a3b3b, eyes: 0xff5a3a, glow: 0xff5a3a, variant: 'knight' },
+  // World bosses — huge, themed, and visually distinct from their zone's standards.
+  emberhorn: { type: 'beast', color: 0x3a1f16, accent: 0x1c1410, eyes: 0xffd24a, glow: 0xff7a1a, variant: 'heavy' },
+  rimewyrm: { type: 'beast', color: 0x6a9ec0, accent: 0x3a6a8a, eyes: 0x9fe8ff, glow: 0x7fd0ff, variant: 'heavy' },
+  maelgrith: { type: 'humanoid', color: 0x2e2a3a, accent: 0x6a3a8a, eyes: 0xc08aff, glow: 0xb060d0, variant: 'knight' },
 };
 
 function makeMat(color: number, rough = 0.8, metal = 0.05): THREE.MeshStandardMaterial {

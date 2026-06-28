@@ -23,12 +23,14 @@ import { createSpatialSystem } from '../sim/systems/spatial';
 import { createProjectileSystem } from '../sim/systems/projectile';
 import { createTrapSystem } from '../sim/systems/trap';
 import { createGroundAoeSystem } from '../sim/systems/ground-aoe';
+import { createBossAiSystem } from '../sim/systems/boss-ai';
 import { SpatialGrid } from '../sim/spatial-grid';
 import { Projectiles } from '../sim/projectiles';
 import { Telemetry, createTelemetrySystem } from '../sim/telemetry';
 import { createPlayer, setPlayerClass, createOathstone, createVendor, PLAYER_HALF } from '../sim/factory';
 import { spawnEnemy } from '../sim/content/enemies';
 import { WORLD_SPAWNS } from '../sim/content/spawns';
+import { spawnBoss, BOSS_SPAWNS } from '../sim/content/bosses';
 import { equipItem, recomputeDerived } from '../sim/inventory';
 import { salvageItem, salvageAllBelow } from '../sim/salvage';
 import { reinforceItem } from '../sim/reinforce';
@@ -64,6 +66,7 @@ import {
   type LevelUpEvent,
   type LootPickedEvent,
   type PlayerDiedEvent,
+  type BossPhaseEvent,
   type ItemSalvagedEvent,
   type ItemSoldEvent,
   type ItemReinforcedEvent,
@@ -181,6 +184,7 @@ export function boot(): Game {
   // props clear of camps, waypoints and the vendor so nothing covers an enemy or stall.
   const clearings: Clearing[] = [
     ...SPAWNS.map((s) => ({ x: s.x, z: s.z, r: 7 })),
+    ...BOSS_SPAWNS.map((b) => ({ x: b.x, z: b.z, r: 14 })), // wide arenas for the bosses
     ...OATHSTONES.map((o) => ({ x: o.x, z: o.z, r: 9 })),
     { x: 3, z: -3, r: 7 }, // vendor stall
   ];
@@ -198,6 +202,8 @@ export function boot(): Game {
   for (const s of SPAWNS) {
     spawnEnemy(world, field, s.id, s.x, s.z, { level: s.level, tier: s.tier, name: s.name });
   }
+  // World bosses (0.6.0 CP2): one solo boss deep in each of the three highest frontiers.
+  for (const b of BOSS_SPAWNS) spawnBoss(world, field, b.id, b.x, b.z);
   for (const o of OATHSTONES) createOathstone(world, field, o.id, o.name, o.x, o.z);
   createVendor(world, field, 'Quartermaster', 3, -3);
   telemetry.attach(world, player);
@@ -223,6 +229,7 @@ export function boot(): Game {
   world.addSystem(createMovementSystem({ input, field, colliders }));
   world.addSystem(createCombatSystem({ input, rng, colliders, field, projectiles, grid }));
   world.addSystem(createEnemyAiSystem({ field, colliders, rng, grid, projectiles }));
+  world.addSystem(createBossAiSystem({ field }));
   world.addSystem(createProjectileSystem(projectiles, rng));
   world.addSystem(createTrapSystem(rng));
   world.addSystem(createGroundAoeSystem(rng));
@@ -345,6 +352,10 @@ export function boot(): Game {
   world.events.on<PlayerDiedEvent>(CombatEvent.PlayerDied, () => {
     hud.toast('You were defeated — respawning…');
     sfx.hurt();
+  });
+  world.events.on<BossPhaseEvent>(CombatEvent.BossPhase, (ev) => {
+    hud.toast(`${ev.name} — Phase ${ev.phase}/${ev.totalPhases}!`, 'epic');
+    sfx.crit();
   });
   world.events.on<ItemSalvagedEvent>(CombatEvent.ItemSalvaged, (ev) => {
     hud.toast(`Salvaged ${ev.itemName} (+${ev.whetstones} whetstones)`);

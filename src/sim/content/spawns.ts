@@ -92,8 +92,8 @@ export const WORLD_SPAWNS: Spawn[] = [
   { id: 'emberwarlord', x: -168, z: 4, level: 19 },
   { id: 'cinderborn', x: -160, z: 18, level: 18, tier: 'elite', name: 'Cult Pyremaster' },
   { id: 'cinderborn', x: -176, z: -10, level: 18 },
-  // Rare: Emberhorn, a roaming Magmaw mini-boss, deep west.
-  { id: 'magmaw', x: -202, z: 0, level: 20, tier: 'rare', name: 'Emberhorn' },
+  // Rare: Scorchmaw, a roaming Magmaw alpha, deep west (the road to Emberhorn's caldera).
+  { id: 'magmaw', x: -202, z: 0, level: 20, tier: 'rare', name: 'Scorchmaw' },
   // ── The Riven Peaks (Lv 21–25, far east): Rimebound + Frostfang + Revenant; frost.
   //    Revenants are holy-weak. ──
   { id: 'frostfang', x: 132, z: 16, level: 21 },

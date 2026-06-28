@@ -33,6 +33,7 @@ export const C = {
   Respawn: 'respawn',
   GroundAoe: 'groundAoe',
   LootLuck: 'lootLuck',
+  Boss: 'boss',
 } as const;
 
 /**
@@ -170,7 +171,7 @@ export type EnemyState = 'idle' | 'engage' | 'attack' | 'leash' | 'dead';
 export interface Enemy {
   archetype: 'melee_bruiser' | 'ranged_skirmisher' | 'caster' | 'support' | 'pack_leader';
   family: string;
-  tier: 'standard' | 'elite' | 'rare';
+  tier: 'standard' | 'elite' | 'rare' | 'boss';
   state: EnemyState;
   /** Spawn point — leash + reset returns here. */
   homeX: number;
@@ -200,6 +201,31 @@ export interface Enemy {
   deadFor: number;
   /** Brief invulnerability while returning from a leash. */
   invulnTimer: number;
+}
+
+/**
+ * World-boss state, layered on top of an `Enemy` (the boss is a melee bruiser for
+ * locomotion/basic swings; this drives the fight's *escalation*). The boss-ai system
+ * derives the current phase from HP and, on a per-phase cadence, telegraphs a heavy
+ * ground attack (a `GroundAoe` with `hitsPlayer`). Pure data — see boss-ai.ts.
+ */
+export interface Boss {
+  /** Stable boss identity (loot table key + display). */
+  bossId: string;
+  /** Current phase (0-based), derived from HP vs `phaseThresholds`. */
+  phase: number;
+  /** Descending HP fractions that advance phases (e.g. [0.66, 0.33] ⇒ three phases). */
+  phaseThresholds: number[];
+  /** Seconds between heavy attacks, indexed by phase (length = phaseThresholds.length + 1). */
+  heavyCadence: number[];
+  /** Countdown to the next heavy attack (s). */
+  heavyTimer: number;
+  /** Telegraph lead-in before the heavy lands (s) — the window to step out. */
+  heavyTelegraph: number;
+  heavyRadius: number;
+  heavyBase: number;
+  heavyCoeff: number;
+  heavyType: DamageType;
 }
 
 // ── Progression ─────────────────────────────────────────────────────────────
@@ -256,8 +282,9 @@ export interface Respawn {
   z: number;
 }
 
-/** A persistent ground hazard (the Lv 16 ground-AoE tool): ticks damage to enemies in
- *  radius every `tickEvery` seconds for its lifetime. */
+/** A persistent ground hazard. Two uses share this primitive: the Lv 16 player tool
+ *  (ticks damage to *enemies* in radius), and a boss heavy attack (`hitsPlayer`, a
+ *  single telegraphed tick to the *player*). Ticks every `tickEvery` s for its life. */
 export interface GroundAoe {
   source: number;
   radius: number;
@@ -267,6 +294,10 @@ export interface GroundAoe {
   base: number;
   coeff: number;
   damageType: DamageType;
+  /** Boss heavy attack: damage the player instead of enemies. Default false. */
+  hitsPlayer?: boolean;
+  /** Telegraph lead-in (s) for the render fill animation; 0/undefined = a steady zone. */
+  telegraph?: number;
 }
 
 /** A placed trap (Hunter Snare Trap): roots the first enemy that enters, then expires. */

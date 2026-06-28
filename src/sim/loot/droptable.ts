@@ -22,6 +22,8 @@ const TIERS: Record<string, TierTable> = {
   standard: { dropChance: 0.35, weights: { common: 0.72, uncommon: 0.28, rare: 0, epic: 0, legendary: 0 } },
   elite: { dropChance: 0.7, weights: { common: 0.18, uncommon: 0.45, rare: 0.3, epic: 0.07, legendary: 0.015 } },
   rare: { dropChance: 1.0, weights: { common: 0.08, uncommon: 0.22, rare: 0.5, epic: 0.15, legendary: 0.06 } },
+  // World bosses: always drop, never below Rare, Epic-leaning with a real Legendary tail.
+  boss: { dropChance: 1.0, weights: { common: 0, uncommon: 0, rare: 0.45, epic: 0.4, legendary: 0.15 } },
 };
 
 /** Items of this rarity or better reset the bad-luck-protection pity counter. */

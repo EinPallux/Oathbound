@@ -30,6 +30,8 @@ Each enemy is an archetype + data. Archetypes are simple state machines (Idle �
 
 **Elite extras may require:** better gear, correct ability use, consumables, careful pulling, positioning, higher skill — but **never** for *normal* grind.
 
+> **World bosses — implemented (0.6.0 CP2).** The three solo bosses (Emberhorn · the Rimewyrm · Maelgrith) are hand-authored uniques, not data-scaled mobs: a `boss` enemy tier + a `Boss` component (`src/sim/content/bosses.ts`) layered on the standard `Enemy` (enemy-ai still drives locomotion + basic swings). The **boss-ai** system (`src/sim/systems/boss-ai.ts`) reads HP to advance **phases** (3–4 per boss) and, on a per-phase cadence, telegraphs a **heavy ground attack** — a `GroundAoe` with `hitsPlayer` that drops at your feet, fills over ~1.3–1.5 s, and only lands if you don't step out. HP (~27–53× a same-level standard) is tuned via the real damage formula to a **multi-minute solo fight** for every class; bosses are lone (no rally), leash to a wide arena, and **respawn on a 5-min cooldown** for farming. Loot uses a Legendary-leaning `boss` drop tier (always rare+, ~15 % legendary). Relic drops arrive with CP3.
+
 ## Spawn, density & respawn
 | Parameter | v1 target | Purpose |
 |---|---|---|

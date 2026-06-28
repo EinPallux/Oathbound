@@ -48,7 +48,7 @@ test('boots the vertical slice, renders, and runs the loop', async ({ page }) =>
   await page.goto('/');
 
   await expect(page.locator('#game')).toBeVisible();
-  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.5.0-INDEV');
+  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.6.0-INDEV');
 
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
   const running = await page.evaluate(() => window.__oathbound!.loop.isRunning);
@@ -214,6 +214,39 @@ test('talents: choosing the other option swaps the hotbar ability', async ({ pag
   // Pick the other option → the hotbar slot updates.
   await panel.getByRole('button', { name: 'Bloodthirst' }).click();
   await expect(slotA).toHaveText('Bloodthirst');
+});
+
+test('a world boss spawns and its fight runs without errors', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
+  page.on('pageerror', (e) => errors.push(String(e)));
+
+  await page.goto('/');
+  await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
+
+  // The three world bosses are tracked enemies with vastly more HP than any mob.
+  const boss = await page.evaluate(
+    () => window.__oathbound!.enemies().find((e) => e.max > 5000) ?? null,
+  );
+  expect(boss, 'a boss is present in the world').not.toBeNull();
+  expect(boss!.max).toBeGreaterThan(5000);
+
+  // Drop a max-level character into Emberhorn's arena (deep west) and let the fight run:
+  // this exercises boss-ai (phases + telegraphed heavy → ground-AoE) and the boss/danger
+  // render paths in a real browser. We only assert it stays healthy and error-free.
+  await page.evaluate(() => window.__oathbound!.debugSetLevel(30));
+  await page.evaluate(() => window.__oathbound!.debugTeleport(-213, -20));
+  await page.waitForTimeout(2500);
+
+  const running = await page.evaluate(() => window.__oathbound!.loop.isRunning);
+  expect(running).toBe(true);
+  const stillThere = await page.evaluate(
+    () => (window.__oathbound!.enemies().find((e) => e.max > 5000)?.max ?? 0) > 5000,
+  );
+  expect(stillThere).toBe(true);
+  expect(errors).toEqual([]);
 });
 
 test('progress persists across a reload (save v1)', async ({ page }) => {

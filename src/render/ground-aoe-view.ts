@@ -13,6 +13,9 @@ const TINT: Record<DamageType, number> = {
   holy: 0xffe08a,
 };
 
+/** Boss heavy-attack telegraph — an unambiguous "step out" danger red. */
+const DANGER = 0xff2a2a;
+
 export class GroundAoeView {
   private readonly discs = new Map<Entity, THREE.Mesh>();
 
@@ -44,9 +47,17 @@ export class GroundAoeView {
       seen.add(e);
       const g = world.get<GroundAoe>(e, C.GroundAoe)!;
       const tr = world.get<Transform>(e, C.Transform)!;
-      const m = this.ensure(e, g.radius, TINT[g.damageType]);
+      const danger = g.hitsPlayer === true;
+      const m = this.ensure(e, g.radius, danger ? DANGER : TINT[g.damageType]);
       m.position.set(tr.x, tr.y + 0.03, tr.z);
-      (m.material as THREE.MeshBasicMaterial).opacity = pulse;
+      // A boss telegraph fills toward the strike as its wind-up elapses (a clear cue to
+      // move); a steady player zone just pulses.
+      if (danger && g.telegraph && g.telegraph > 0) {
+        const fill = 1 - Math.min(1, Math.max(0, g.ttl / g.telegraph));
+        (m.material as THREE.MeshBasicMaterial).opacity = 0.22 + 0.5 * fill;
+      } else {
+        (m.material as THREE.MeshBasicMaterial).opacity = pulse;
+      }
     }
     for (const [e, m] of this.discs) {
       if (seen.has(e)) continue;

@@ -45,7 +45,14 @@ function makeNameplate(name: string, level: number, tier: Enemy['tier']): {
   canvas.width = 512;
   canvas.height = 140;
   const ctx = canvas.getContext('2d')!;
-  const nameColor = tier === 'rare' ? '#ffcf5a' : tier === 'elite' ? '#ff9a48' : '#eef1f6';
+  const nameColor =
+    tier === 'boss'
+      ? '#ff5a52' // world boss — crimson
+      : tier === 'rare'
+        ? '#ffcf5a'
+        : tier === 'elite'
+          ? '#ff9a48'
+          : '#eef1f6';
   const font = "'Segoe UI', system-ui, -apple-system, sans-serif";
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -105,8 +112,8 @@ export class EnemyView {
   private ensure(e: Entity, en: Enemy, info: EnemyInfo): EnemyVisual {
     let v = this.visuals.get(e);
     if (v) return v;
-
-    const scale = en.tier === 'rare' ? 1.7 : en.tier === 'elite' ? 1.35 : 1;
+    // World bosses (CP2) are huge; rare/elite are bumped above standards.
+    const scale = en.tier === 'boss' ? 2.5 : en.tier === 'rare' ? 1.7 : en.tier === 'elite' ? 1.35 : 1;
     const model = buildEnemyModel(en.family, en.archetype, e);
     model.root.scale.setScalar(scale);
     this.scene.add(model.root);
