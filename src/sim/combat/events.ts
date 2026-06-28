@@ -12,6 +12,8 @@ export const CombatEvent = {
   Death: 'combat/death',
   /** An enemy respawned. */
   Respawn: 'combat/respawn',
+  /** A world boss advanced to a new (harder) phase. */
+  BossPhase: 'combat/bossPhase',
   PlayerDied: 'combat/playerDied',
   PlayerRespawn: 'combat/playerRespawn',
   LevelUp: 'progress/levelUp',
@@ -64,6 +66,15 @@ export interface DeathEvent {
 
 export interface RespawnEvent {
   entity: number;
+}
+
+export interface BossPhaseEvent {
+  entity: number;
+  name: string;
+  /** New phase (1-based for display: phase 0 → "Phase 1" is the opener, not emitted). */
+  phase: number;
+  /** Total phases in the fight. */
+  totalPhases: number;
 }
 
 export interface PlayerDiedEvent {

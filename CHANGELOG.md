@@ -37,8 +37,17 @@ The placeholder capsule is replaced by a **procedural low-poly humanoid** (built
 
 **Verified:** `typecheck` ✓ · `npm test` → 222/222 ✓ · `build` ✓ (~172 KB gzip) · `test:e2e` → 11/11 ✓.
 
+### ✅ Checkpoint 2 — three solo world bosses
+- **Three hand-authored open-world bosses**, one deep in each of the three highest frontiers — **Emberhorn, the Cinder Tyrant** (Emberreach, fire, ~Lv 20), **The Rimewyrm** (Riven Peaks, frost, ~Lv 25), and **Maelgrith, the Hollow Crown** (Gravereach, blight/undead, the **Lv-30 capstone fight**). New `boss` enemy tier + a `Boss` component (`src/sim/content/bosses.ts`); they reuse enemy-ai for locomotion/basic swings and add a thin escalation layer.
+- **Multi-phase escalation.** A new **boss-ai** system (`src/sim/systems/boss-ai.ts`) derives the boss's phase from its HP (Emberhorn/Rimewyrm 3 phases at 66 %/33 %; Maelgrith **4 phases** at 75/50/25 %) and announces each shift in the HUD. Later phases throw the heavy attack faster; the existing <30 %-HP enrage gives a desperation finish.
+- **Telegraphed heavy attack** (reuses the **`GroundAoe`** primitive, now generalised with a `hitsPlayer` flag): on a per-phase cadence the boss drops a **danger-red zone at your feet that fills as it winds up** (~1.3–1.5 s) — stand in it when it lands and you eat a punishing hit (~27–30 % of a level-geared health bar); **step out and it whiffs.** The readable "move or die" beat that makes a solo boss a fight, not a tank-and-spank.
+- **Big HP, solo-beatable.** Tuned against the real stat-derivation + damage formula so every class clears each boss as a genuine **multi-minute** fight (no HP wall, never trivial) and survives its basics; a heavy hurts hard but won't one-shot from full. Bosses are **lone** (no pack rally), leash to a wide arena, and **respawn on a 5-minute cooldown** for repeat farming.
+- **Legendary-leaning loot.** A new `boss` drop tier **always drops Rare-or-better** (Epic-leaning, ~15 % Legendary) plus big XP/gold — the best *rolled*-gear source in the game (hand-designed **Relics** still come in CP3). Bosses render larger and deep-crimson; the rare Magmaw formerly named "Emberhorn" was renamed **Scorchmaw** so the boss owns the name.
+- Tests: boss spawn shape (tier/HP/well-formed phases), Legendary-leaning loot (always rare+, real Legendary tail), a **solo-balance sim** for all three classes × all three bosses (sane time-to-kill, heavies punish but don't one-shot), phase-event escalation, and the heavy-attack mechanic (lands on a stander, whiffs on a dodger) → **238 unit tests**; a new in-browser **world-boss smoke e2e** (boss spawns huge, the fight runs error-free) → **12 e2e**. Build version bumped **`0.5.0-INDEV` → `0.6.0-INDEV`**.
+
+**Verified:** `typecheck` ✓ · `npm test` → 238/238 ✓ · `build` ✓ (~173 KB gzip) · `test:e2e` → 12/12 ✓.
+
 ### ⏳ Remaining for the endgame (next checkpoints)
-- **CP2:** the **3 solo world bosses** (Emberhorn, the Rimewyrm, Maelgrith) — multi-phase, telegraph-heavy, with Legendary/Relic loot tables.
 - **CP3:** **Relics** — a small set of hand-designed unique items with fixed build-enabling effects (+ the effect-hook plumbing).
 - **CP4:** the Lv-30 endgame loop + target-farming guidance → the **Endgame Foundation Gate** validation.
 
