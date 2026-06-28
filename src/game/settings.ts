@@ -20,6 +20,8 @@ export interface Settings {
   /** Stronger, color-independent rarity borders (colorblind-safe rarity is always on; */
   /*  this turns the baseline tag/border up to high-contrast). */
   highContrastRarity: boolean;
+  /** Require a confirm before destructive actions (salvaging Rare-or-better gear). */
+  confirmDestructive: boolean;
 }
 
 /** Discrete UI-scale steps offered in the panel (continuous values are clamped to range). */
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
   damageNumberSize: 'normal',
   reducedEffects: false,
   highContrastRarity: false,
+  confirmDestructive: true,
 };
 
 const STORAGE_KEY = 'oathbound.settings';
@@ -67,6 +70,8 @@ export function mergeSettings(raw: unknown): Settings {
     reducedEffects: typeof r.reducedEffects === 'boolean' ? r.reducedEffects : DEFAULT_SETTINGS.reducedEffects,
     highContrastRarity:
       typeof r.highContrastRarity === 'boolean' ? r.highContrastRarity : DEFAULT_SETTINGS.highContrastRarity,
+    confirmDestructive:
+      typeof r.confirmDestructive === 'boolean' ? r.confirmDestructive : DEFAULT_SETTINGS.confirmDestructive,
   };
 }
 

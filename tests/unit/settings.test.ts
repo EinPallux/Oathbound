@@ -55,8 +55,12 @@ describe('settings — merge/validate', () => {
       damageNumberSize: 'small',
       reducedEffects: true,
       highContrastRarity: true,
+      confirmDestructive: false,
     };
     expect(mergeSettings(JSON.parse(JSON.stringify(custom)))).toEqual(custom);
+    // confirmDestructive defaults to on, and validates like the other booleans.
+    expect(DEFAULT_SETTINGS.confirmDestructive).toBe(true);
+    expect(mergeSettings({ confirmDestructive: false }).confirmDestructive).toBe(false);
   });
 });
 

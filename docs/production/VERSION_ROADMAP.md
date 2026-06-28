@@ -134,7 +134,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 ## 0.7.x — UX, Accessibility & Content Polish
 
 ### 0.7.0 — "Feel & Finish" 🚧 IN PROGRESS
-> Progress: **CP1 Settings & accessibility core ✓** (persisted Settings panel `O`, applied live: UI scale, damage-number toggle/size, reduced effects, high-contrast + colorblind-safe rarity). Remaining: CP2 tooltips/comparison · CP3 audio + VFX · CP4 keybinds + onboarding polish (live state in AGENTS.md/CHANGELOG.md).
+> Progress: **CP1 Settings & accessibility core ✓ · CP2 tooltips & comparison + character stats + destructive-action confirms ✓.** Remaining: CP3 audio + VFX · CP4 keybinds + onboarding polish (live state in AGENTS.md/CHANGELOG.md).
 - **Outcome:** the game *feels finished* to use. · Deps: 0.6.0. · Effort: L · Complexity: M · Risk: L.
 - **Included:** full HUD/menus, map, **Goal Tracker**, tooltips & item comparison, settings; **all accessibility options** ([UX_AND_ACCESSIBILITY](../design/UX_AND_ACCESSIBILITY.md)); audio pass (Howler) + VFX pass within budgets; onboarding polish; pause.
 - **Excluded:** new gameplay systems (feature freeze begins).
