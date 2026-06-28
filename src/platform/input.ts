@@ -69,6 +69,7 @@ export class InputController implements ControlState {
   private readonly onMouseDown = (e: MouseEvent): void => {
     if (e.button === 2) {
       this.dragging = true;
+      this.el.style.cursor = 'none'; // hide the cursor while looking around
     } else if (e.button === 0) {
       // Left-click selects: stash the click in normalized device coords for the
       // renderer to raycast against enemy meshes.
@@ -80,10 +81,14 @@ export class InputController implements ControlState {
     }
   };
   private readonly onMouseUp = (e: MouseEvent): void => {
-    if (e.button === 2) this.dragging = false;
+    if (e.button === 2) {
+      this.dragging = false;
+      this.el.style.cursor = ''; // restore the cursor when the look ends
+    }
   };
   private readonly onMouseLeave = (): void => {
     this.dragging = false;
+    this.el.style.cursor = '';
   };
   private readonly onMouseMove = (e: MouseEvent): void => {
     if (!this.dragging) return;
@@ -276,5 +281,6 @@ export class InputController implements ControlState {
     this.el.removeEventListener('mouseleave', this.onMouseLeave);
     window.removeEventListener('mousemove', this.onMouseMove);
     this.el.removeEventListener('wheel', this.onWheel);
+    this.el.style.cursor = '';
   }
 }
