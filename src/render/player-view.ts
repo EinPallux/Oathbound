@@ -128,6 +128,7 @@ export class PlayerView {
     blade.position.y = 0.7;
     sword.add(grip, guard, blade);
     sword.position.set(0, -0.84, 0.12);
+    sword.rotation.set(Math.PI / 4, 0, 0.22); // rest angled forward (~45°), clear of the body
     this.armR.add(sword);
 
     // Blocky round-ish shield on the left forearm.
@@ -179,6 +180,7 @@ export class PlayerView {
     orb.position.y = 1.55;
     staff.add(shaft, orb);
     staff.position.set(0, -0.8, 0.08);
+    staff.rotation.set(Math.PI / 4, 0, 0.18); // rest angled forward (~45°), not dead vertical
     this.armR.add(staff);
     this.orb = orb;
   }
