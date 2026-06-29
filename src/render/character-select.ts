@@ -195,25 +195,25 @@ export class CharacterSelect {
       const c = chars[i];
       if (!c) {
         const empty = document.createElement('button');
-        empty.className = 'char-slot empty char-create';
-        empty.innerHTML = `<div class="char-slot-plus">+</div><div class="char-slot-meta">Create Character</div>`;
+        empty.className = 'cs-slot empty char-create';
+        empty.innerHTML = `<div class="cs-slot-plus">+</div><div class="cs-slot-meta">Create Character</div>`;
         empty.onclick = () => this.openCreate(i);
         this.roster.appendChild(empty);
         continue;
       }
       const slot = document.createElement('div');
-      slot.className = 'char-slot filled';
+      slot.className = 'cs-slot filled';
       const ico = document.createElement('div');
-      ico.className = 'char-slot-ico';
+      ico.className = 'cs-slot-ico';
       ico.innerHTML = icon(CLASS_ICON[c.classId] ?? 'sword');
       const name = document.createElement('div');
-      name.className = 'char-slot-name';
+      name.className = 'cs-slot-name';
       name.textContent = c.name;
       const meta = document.createElement('div');
-      meta.className = 'char-slot-meta';
+      meta.className = 'cs-slot-meta';
       meta.textContent = `Level ${c.level} · ${classLabel(c.classId)}`;
       const actions = document.createElement('div');
-      actions.className = 'char-slot-actions';
+      actions.className = 'cs-slot-actions';
       const play = document.createElement('button');
       play.className = 'char-btn char-play';
       play.textContent = 'Enter World';

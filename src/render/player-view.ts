@@ -55,8 +55,42 @@ function disposeTree(obj: THREE.Object3D): void {
   });
 }
 
+/** Draw the player's name + level onto the nameplate canvas (matches the enemy style). */
+function drawNameplate(ctx: CanvasRenderingContext2D, name: string, level: number): void {
+  ctx.clearRect(0, 0, 512, 140);
+  const font = "'Segoe UI', system-ui, -apple-system, sans-serif";
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+
+  // Name (auto-shrink to fit long names), warm gold so "you" reads friendly.
+  let fs = 56;
+  do {
+    ctx.font = `bold ${fs}px ${font}`;
+    fs -= 2;
+  } while (ctx.measureText(name).width > 496 && fs > 26);
+  ctx.lineWidth = 9;
+  ctx.strokeStyle = 'rgba(0,0,0,0.88)';
+  ctx.strokeText(name, 256, 50);
+  ctx.fillStyle = '#f6e7c1';
+  ctx.fillText(name, 256, 50);
+
+  // Level line.
+  ctx.font = `600 36px ${font}`;
+  const lv = `Lv ${level}`;
+  ctx.lineWidth = 8;
+  ctx.strokeText(lv, 256, 104);
+  ctx.fillStyle = '#cdd6e0';
+  ctx.fillText(lv, 256, 104);
+}
+
 export class PlayerView {
   readonly group = new THREE.Group();
+  private readonly scene: THREE.Scene;
+  private nameplate: THREE.Sprite | null = null;
+  private npCtx: CanvasRenderingContext2D | null = null;
+  private npTexture: THREE.CanvasTexture | null = null;
+  private npKey = '';
   private body = new THREE.Group(); // upper body (torso/head/arms) — bobs/leans/spins
   private legL = new THREE.Group();
   private legR = new THREE.Group();
@@ -74,8 +108,40 @@ export class PlayerView {
   private actionKind = '';
 
   constructor(scene: THREE.Scene) {
+    this.scene = scene;
     this.build('warrior');
     scene.add(this.group);
+    this.initNameplate();
+  }
+
+  /** Create the billboarded name+level sprite that floats above the player's head.
+   *  Added to the scene (not the figure group) so a class-switch rebuild can't free it. */
+  private initNameplate(): void {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 140;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    this.npCtx = ctx;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    this.npTexture = texture;
+    const sprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }),
+    );
+    sprite.scale.set(2.8, 0.77, 1);
+    this.nameplate = sprite;
+    this.scene.add(sprite);
+  }
+
+  /** Set the name + level shown on the overhead plate (redraws only when it changes). */
+  setLabel(name: string, level: number): void {
+    const key = `${name}|${level}`;
+    if (key === this.npKey || !this.npCtx || !this.npTexture) return;
+    this.npKey = key;
+    drawNameplate(this.npCtx, name || 'Adventurer', level);
+    this.npTexture.needsUpdate = true;
   }
 
   /** (Re)build the chunky figure for a class — swaps body colour + weapon. */
@@ -260,6 +326,8 @@ export class PlayerView {
 
     this.group.position.set(x, y - FEET, z);
     this.group.rotation.y = yaw;
+    // Float the name+level plate above the head (sprites self-billboard to the camera).
+    if (this.nameplate) this.nameplate.position.set(x, y - FEET + 3.0, z);
 
     // Walk blend + phase from movement speed.
     const target = Math.min(1, speed / 3.5);

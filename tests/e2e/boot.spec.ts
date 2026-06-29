@@ -449,7 +449,7 @@ test('onboarding: login → create a character → enter world → log out → r
   // Enter → character select with three empty slots.
   await page.locator('.login-play').click();
   await expect(page.locator('.char-select')).toBeVisible();
-  await expect(page.locator('.char-slot.empty.char-create')).toHaveCount(3);
+  await expect(page.locator('.cs-slot.empty.char-create')).toHaveCount(3);
 
   // Create a Hunter named "Lyra" in the first slot.
   await page.locator('.char-create').first().click();
@@ -469,12 +469,12 @@ test('onboarding: login → create a character → enter world → log out → r
   // Log out from in-game (micro-bar "Character select / Log out" button) → back to select.
   await page.locator('.micro-bar .micro-btn').last().click();
   await expect(page.locator('.char-select')).toBeVisible();
-  const filled = page.locator('.char-slot.filled');
+  const filled = page.locator('.cs-slot.filled');
   await expect(filled).toHaveCount(1);
   await expect(filled).toContainText('Lyra');
   await expect(filled).toContainText('Hunter');
   // Two empty slots remain (max three characters total).
-  await expect(page.locator('.char-slot.empty.char-create')).toHaveCount(2);
+  await expect(page.locator('.cs-slot.empty.char-create')).toHaveCount(2);
 
   // Re-enter the world with the existing character.
   await filled.locator('.char-play').click();

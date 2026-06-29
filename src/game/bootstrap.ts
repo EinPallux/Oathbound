@@ -105,7 +105,9 @@ import { Vignette } from '../render/vignette';
 import { loadSettings, saveSettings, applySettings, tierTag } from './settings';
 import { loadKeybinds, saveKeybinds } from './keybinds';
 import { Sfx } from '../platform/audio';
-import { loadSave, writeSave } from '../platform/save-store';
+import { Music } from '../platform/music';
+import { loadSave, writeSave, getActiveSlot } from '../platform/save-store';
+import { getCharacterName } from '../platform/account-store';
 import { lerp, lerpAngle } from '../core/math';
 
 // World dimensions + the directional zone layout live in src/world/layout.ts so the
@@ -188,14 +190,28 @@ export function boot(options: BootOptions = {}): Game {
   const input = new InputController(canvas, keybinds);
   const overlay = new PerfOverlay(uiRoot);
   const sfx = new Sfx();
+  const music = new Music();
+
+  // The active character's display name (for the unit-frame + overhead plate). Drawn from
+  // the new-character choice, else the account roster for the active slot.
+  const playerName =
+    (options.newCharacter?.name ?? getCharacterName(getActiveSlot()) ?? 'Adventurer').trim() ||
+    'Adventurer';
 
   // Player settings & accessibility (device-local, persisted) — applied live to the UI.
   const settings = loadSettings();
   applySettings(uiRoot, settings);
   renderer.setMaxPixelRatio(settings.maxPixelRatio);
-  const applyVolume = (): void => sfx.setVolume(settings.muteAudio ? 0 : settings.masterVolume);
+  const applyVolume = (): void => {
+    const v = settings.muteAudio ? 0 : settings.masterVolume;
+    sfx.setVolume(v);
+    music.setVolume(v * 0.5); // background music mixed under the SFX
+  };
   applyVolume();
   input.setLook(settings.mouseSensitivity, settings.invertY);
+  // Background music (optional — plays only if public/bgm.{mp3,ogg,wav} exists). Starts on
+  // the enter-world gesture; if autoplay is blocked it resumes on the next interaction.
+  void music.start();
 
   // World data (pure) + meshes (render).
   const field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337);
@@ -279,6 +295,7 @@ export function boot(options: BootOptions = {}): Game {
   const damageNumbers = new DamageNumbers(uiRoot, settings);
   const targetFrame = new TargetFrame(uiRoot);
   const hud = new Hud(uiRoot);
+  hud.setPlayerName(playerName);
   const vignette = new Vignette(uiRoot);
   const goalTracker = new GoalTracker(uiRoot);
   const minimap = new Minimap(uiRoot, WORLD_SIZE);
@@ -583,6 +600,7 @@ export function boot(options: BootOptions = {}): Game {
       const pv = world.get<Velocity>(player, C.Velocity)!;
       const speed = Math.hypot(pv.x, pv.z);
       const pcId = world.get<PlayerClass>(player, C.PlayerClass)?.id ?? 'warrior';
+      playerView.setLabel(playerName, world.get<Progression>(player, C.Progression)?.level ?? 1);
       playerView.update(x, y, z, yaw, rdt, speed, pcId);
       ambientLife.update(rdt, x, z, field);
       cameraRig.update(x, y, z);
@@ -721,6 +739,7 @@ export function boot(options: BootOptions = {}): Game {
     stop: () => {
       loop.stop();
       input.dispose();
+      music.stop();
       telemetry.detach();
       onboarding.detach();
       window.clearInterval(saveTimer);
