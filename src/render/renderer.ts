@@ -18,10 +18,11 @@ export class Renderer {
     // setting drives this live (Performance renders below native for the most FPS).
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.maxPixelRatio));
 
-    // Open-world depth: distant terrain/mountains fade into haze rather than a near
-    // fog wall, so the enlarged world (layout.ts) reads as a big landscape.
-    this.scene.background = new THREE.Color(0x141a22);
-    this.scene.fog = new THREE.Fog(0x141a22, 120, 620);
+    // Open-world depth: distant terrain/mountains fade into the sky's horizon haze (the
+    // colour is kept in sync with the sky dome's horizon in sky.ts), so the enlarged world
+    // reads as a big landscape under an open sky rather than ending at a dark fog wall.
+    this.scene.background = new THREE.Color(0xc4ddf3);
+    this.scene.fog = new THREE.Fog(0xc4ddf3, 150, 640);
 
     // Far plane sits just past where fog is fully opaque (620): everything beyond is solid
     // background colour anyway, so clipping it there saves rasterising invisible distance.
@@ -29,11 +30,12 @@ export class Renderer {
     this.camera.position.set(0, 9, 16);
     this.camera.lookAt(0, 0, 0);
 
-    // One directional "sun" + hemisphere fill, per the lighting budget.
+    // One directional "sun" + hemisphere fill, per the lighting budget. The hemisphere
+    // sky tint matches the new sky dome so ambient bounce reads as open-sky daylight.
     const sun = new THREE.DirectionalLight(0xfff2e0, 2.2);
     sun.position.set(6, 12, 8);
     this.scene.add(sun);
-    this.scene.add(new THREE.HemisphereLight(0x88aaff, 0x202820, 0.7));
+    this.scene.add(new THREE.HemisphereLight(0xaecdf0, 0x222a20, 0.8));
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
