@@ -4,9 +4,10 @@
 // meshes (src/render/custom-map-view.ts). Loaded only when a map is requested; with none,
 // the procedural world (heightfield.ts / scenery.ts) is unchanged.
 
-import { Heightfield, type CylinderCollider } from './heightfield';
+import { Heightfield, type CylinderCollider, type BoxCollider } from './heightfield';
 import { clamp } from '../core/math';
-import { unpackHeights, ENEMY_IDS, BOSS_IDS, type OathboundMap } from './map-format';
+import { unpackHeights, ENEMY_IDS, BOSS_IDS, type AssetDef, type OathboundMap } from './map-format';
+import { presetById } from './presets';
 import type { Scenery } from './scenery';
 import type { Spawn } from '../sim/content/spawns';
 import type { EnemyTemplateId, Tier } from '../sim/content/enemies';
@@ -20,21 +21,38 @@ export function buildCustomHeightfield(map: OathboundMap): Heightfield {
   return new Heightfield(map.size, map.res, unpackHeights(map));
 }
 
+/** Resolve a placed asset id to its definition (preset library or per-map custom). */
+function defFor(assetId: string, map: OathboundMap): AssetDef | null {
+  if (assetId.startsWith('preset:')) return presetById(assetId.slice('preset:'.length)) ?? null;
+  if (assetId.startsWith('custom:')) return map.customAssets.find((d) => `custom:${d.id}` === assetId) ?? null;
+  return null;
+}
+
 /**
- * Physical colliders for a custom map: built-in boulders + any custom asset that declares
- * a collider radius, each scaled by its placement scale. All other props are visual-only
- * (matching the game's "scenery adds no colliders" rule).
+ * Round colliders for a custom map: built-in boulders + any preset/custom asset that
+ * declares a collider radius, each scaled by its placement scale. Decorative props add no
+ * colliders (matching the game's "scenery is visual" rule).
  */
 export function customColliders(map: OathboundMap): CylinderCollider[] {
   const out: CylinderCollider[] = [];
-  const customRadius = new Map<string, number | null>();
-  for (const d of map.customAssets) customRadius.set(d.id, d.collider);
   for (const a of map.assets) {
     if (a.asset.startsWith('boulder:')) {
       out.push({ x: a.x, z: a.z, radius: BOULDER_COLLIDER * a.scale });
-    } else if (a.asset.startsWith('custom:')) {
-      const r = customRadius.get(a.asset.slice('custom:'.length));
-      if (r && r > 0) out.push({ x: a.x, z: a.z, radius: r * a.scale });
+      continue;
+    }
+    const def = defFor(a.asset, map);
+    if (def && def.collider && def.collider > 0) out.push({ x: a.x, z: a.z, radius: def.collider * a.scale });
+  }
+  return out;
+}
+
+/** Rectangular footprint colliders for placed buildings/walls (preset/custom with a box). */
+export function customBoxColliders(map: OathboundMap): BoxCollider[] {
+  const out: BoxCollider[] = [];
+  for (const a of map.assets) {
+    const def = defFor(a.asset, map);
+    if (def && def.box) {
+      out.push({ x: a.x, z: a.z, hw: def.box.hw * a.scale, hd: def.box.hd * a.scale, rot: a.rot });
     }
   }
   return out;
