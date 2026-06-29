@@ -13,6 +13,12 @@ import { InputController } from '../platform/input';
 import { generateHeightfield, generateColliders } from '../world/heightfield';
 import { WORLD_SIZE, WORLD_RES } from '../world/layout';
 import { generateScenery, type Clearing } from '../world/scenery';
+import {
+  VILLAGE_FLAT,
+  VILLAGE_CLEARING,
+  villageBoxes,
+  villageCylinders,
+} from '../world/village';
 import { createMovementSystem } from '../sim/systems/movement';
 import { createCombatSystem } from '../sim/systems/combat';
 import { createEnemyAiSystem } from '../sim/systems/enemy-ai';
@@ -80,6 +86,7 @@ import { Rng } from '../core/rng';
 import { buildTerrainMesh, buildProps } from '../render/terrain-mesh';
 import { buildScenery } from '../render/scenery-view';
 import { Sky } from '../render/sky';
+import { VillageView } from '../render/village-view';
 import { AmbientLife } from '../render/ambient-life';
 import { PlayerView } from '../render/player-view';
 import { CameraRig } from '../render/camera-rig';
@@ -216,11 +223,12 @@ export function boot(options: BootOptions = {}): Game {
 
   // World data (pure) + meshes (render). Boss arenas are levelled into flat shelves so the
   // giant frontier mountains/plateau don't drop a fight onto an impossible slope.
-  const bossArenas = BOSS_SPAWNS.map((b) => ({ x: b.x, z: b.z, r: 17 }));
-  const field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337, bossArenas);
+  // Boss arenas + the starting village are levelled into flat shelves.
+  const flats = [...BOSS_SPAWNS.map((b) => ({ x: b.x, z: b.z, r: 17 })), VILLAGE_FLAT];
+  const field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337, flats);
   // Collidable rocks (the only physical props — scenery below is purely visual). Count
   // scales with the larger world; the generator keeps them clear of the spawn.
-  const colliders = generateColliders(WORLD_SIZE, 160, 99);
+  const colliders = [...generateColliders(WORLD_SIZE, 160, 99), ...villageCylinders()];
   renderer.scene.add(buildTerrainMesh(field));
   const props = buildProps(colliders, field);
   renderer.scene.add(props);
@@ -233,7 +241,7 @@ export function boot(options: BootOptions = {}): Game {
     ...SPAWNS.map((s) => ({ x: s.x, z: s.z, r: 7 })),
     ...BOSS_SPAWNS.map((b) => ({ x: b.x, z: b.z, r: 14 })), // wide arenas for the bosses
     ...OATHSTONES.map((o) => ({ x: o.x, z: o.z, r: 9 })),
-    { x: 3, z: -3, r: 7 }, // vendor stall
+    VILLAGE_CLEARING, // keep trees/rocks out of the starting town
   ];
   const roadTargets = OATHSTONES.filter((o) => o.road).map((o) => ({ x: o.x, z: o.z }));
   const scenery = generateScenery(WORLD_SIZE, { clearings, roadTargets, seed: 7777 });
@@ -273,7 +281,7 @@ export function boot(options: BootOptions = {}): Game {
   // waypoint → recovery → telemetry. Waypoint runs after movement so it sees the
   // updated position, and before recovery so respawn binds to the stone just visited.
   world.addSystem(createSpatialSystem(grid));
-  world.addSystem(createMovementSystem({ input, field, colliders }));
+  world.addSystem(createMovementSystem({ input, field, colliders, boxes: villageBoxes() }));
   world.addSystem(createCombatSystem({ input, rng, colliders, field, projectiles, grid }));
   world.addSystem(createEnemyAiSystem({ field, colliders, rng, grid, projectiles }));
   world.addSystem(createBossAiSystem({ field }));
@@ -287,9 +295,11 @@ export function boot(options: BootOptions = {}): Game {
 
   // Render / UI.
   const sky = new Sky(renderer.scene);
+  const village = new VillageView(renderer.scene, field);
   const playerView = new PlayerView(renderer.scene);
   const ambientLife = new AmbientLife(renderer.scene);
-  const cameraRig = new CameraRig(renderer.camera, input, [terrain, props]);
+  // Buildings join the camera's occlusion obstacles so the chase camera springs off walls.
+  const cameraRig = new CameraRig(renderer.camera, input, [terrain, props, village.buildings]);
   const enemyView = new EnemyView(renderer.scene);
   const lootView = new LootView(renderer.scene);
   const projectileView = new ProjectileView(renderer.scene, projectiles);
@@ -607,6 +617,7 @@ export function boot(options: BootOptions = {}): Game {
       playerView.setLabel(playerName, world.get<Progression>(player, C.Progression)?.level ?? 1);
       playerView.update(x, y, z, yaw, rdt, speed, pcId);
       ambientLife.update(rdt, x, z, field);
+      village.update(rdt);
       cameraRig.update(x, y, z);
       sky.update(renderer.camera, rdt);
 

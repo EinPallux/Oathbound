@@ -13,6 +13,17 @@ export interface CylinderCollider {
   radius: number;
 }
 
+/** An oriented (rotatable) box footprint on the XZ plane — used for buildings. */
+export interface BoxCollider {
+  x: number;
+  z: number;
+  /** Half-extents along the box's local x / z before rotation. */
+  hw: number;
+  hd: number;
+  /** Y rotation (radians). */
+  rot: number;
+}
+
 /** A spot to level into a flat shelf (boss arenas, the starting village). */
 export interface FlatSpot {
   x: number;

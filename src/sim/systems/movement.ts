@@ -13,7 +13,7 @@ import {
 import { clamp } from '../../core/math';
 import type { ControlState } from '../../platform/input';
 import type { Heightfield, CylinderCollider } from '../../world/heightfield';
-import { resolveCircleVsCylinders } from '../collision';
+import { resolveCircleVsCylinders, resolveCircleVsBoxes, type BoxCollider } from '../collision';
 import { statusMagnitude, Status } from '../combat/statuses';
 
 const GRAVITY = 20;
@@ -22,10 +22,12 @@ export interface MovementDeps {
   input: ControlState;
   field: Heightfield;
   colliders: readonly CylinderCollider[];
+  /** Solid building footprints (the starting village). Resolved after the cylinders. */
+  boxes?: readonly BoxCollider[];
 }
 
 export function createMovementSystem(deps: MovementDeps): System {
-  const { input, field, colliders } = deps;
+  const { input, field, colliders, boxes } = deps;
   const bound = field.size / 2 - 1;
 
   return {
@@ -80,8 +82,9 @@ export function createMovementSystem(deps: MovementDeps): System {
         t.y += v.y * dt;
         t.z += v.z * dt;
 
-        // Resolve against static props, then clamp to world bounds.
-        const r = resolveCircleVsCylinders(t.x, t.z, ch.radius, colliders);
+        // Resolve against static props (cylinders) then buildings (boxes), then clamp.
+        let r = resolveCircleVsCylinders(t.x, t.z, ch.radius, colliders);
+        if (boxes && boxes.length) r = resolveCircleVsBoxes(r.x, r.z, ch.radius, boxes);
         t.x = clamp(r.x, -bound, bound);
         t.z = clamp(r.z, -bound, bound);
 
