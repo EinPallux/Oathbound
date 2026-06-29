@@ -200,7 +200,9 @@ test('talents: choosing the other option swaps the hotbar ability', async ({ pag
   await page.waitForFunction(() => window.__oathbound !== undefined);
   await page.evaluate(() => window.__oathbound!.debugSetClass('warrior'));
   await page.evaluate(() => window.__oathbound!.debugSetLevel(18));
-  await page.evaluate(() => window.__oathbound!.debugTeleport(40, 0)); // empty space, out of combat
+  // A heartland gap ~75 m from any camp, so wandering enemies can't pull us into combat
+  // (talent swaps are out-of-combat only). The click auto-retries while combat decays.
+  await page.evaluate(() => window.__oathbound!.debugTeleport(-90, -70));
 
   // Open the character/talents panel (C).
   await page.keyboard.press('KeyC');
