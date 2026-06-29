@@ -25,11 +25,29 @@ import { SALVAGE_LEVEL } from '../sim/salvage';
 import { canReinforce, reinforceCost } from '../sim/reinforce';
 import { getClass } from '../sim/classes';
 import { ItemTooltip } from './item-tooltip';
+import { icon } from './ui/icons';
 
 /** ` +N` reinforcement suffix for an item name, or '' if unreinforced. */
 function reinSuffix(item: Item): string {
   const n = item.reinforced ?? 0;
   return n > 0 ? ` +${n}` : '';
+}
+
+/** Map an equipment slot label to a game-icon. */
+function slotIcon(label: string): string {
+  const l = label.toLowerCase();
+  if (l.includes('weapon') || l.includes('main')) return 'sword';
+  if (l.includes('off')) return 'shield';
+  if (l.includes('head') || l.includes('helm')) return 'helmet';
+  if (l.includes('chest') || l.includes('body') || l.includes('torso')) return 'chest';
+  if (l.includes('hand') || l.includes('glove')) return 'gauntlet';
+  if (l.includes('feet') || l.includes('boot')) return 'boots';
+  if (l.includes('leg')) return 'belt';
+  if (l.includes('amulet') || l.includes('neck')) return 'amulet';
+  if (l.includes('ring')) return 'ring';
+  if (l.includes('cape') || l.includes('back') || l.includes('shoulder')) return 'cape';
+  if (l.includes('belt') || l.includes('waist')) return 'belt';
+  return 'crossed-swords';
 }
 
 export class InventoryPanel {
@@ -141,12 +159,14 @@ export class InventoryPanel {
 
     const canSalvage = prog.level >= SALVAGE_LEVEL;
 
-    this.wallet.textContent = `${inv.gold} gold   ·   ${inv.materials} whetstones`;
+    this.wallet.innerHTML =
+      `<span class="currency coin">${icon('coin')}${inv.gold} gold</span>` +
+      `<span class="currency mat">${icon('gem')}${inv.materials} whetstones</span>`;
 
     this.actions.replaceChildren();
     const salvageBtn = document.createElement('button');
     salvageBtn.className = 'inv-btn';
-    salvageBtn.textContent = 'Salvage all Common';
+    salvageBtn.innerHTML = `${icon('recycle')}Salvage all Common`;
     salvageBtn.disabled = !canSalvage;
     salvageBtn.onclick = () => this.onSalvageCommons();
     this.actions.appendChild(salvageBtn);
@@ -162,7 +182,9 @@ export class InventoryPanel {
       const it = eq.slots[slot];
       const row = document.createElement('div');
       row.className = 'inv-row';
-      row.innerHTML = `<span class="inv-slot">${SLOT_LABEL[slot]}</span>`;
+      row.innerHTML =
+        `<span class="inv-slot">${icon(slotIcon(SLOT_LABEL[slot]))}</span>` +
+        `<span class="eq-label">${SLOT_LABEL[slot]}</span>`;
       const name = document.createElement('span');
       name.className = it ? `inv-name ${it.rarity}` : 'inv-name empty';
       name.textContent = it ? `${tierTag(it.rarity)} ${it.name}${reinSuffix(it)} (${it.score})` : '—';
@@ -200,17 +222,21 @@ export class InventoryPanel {
       d.textContent = delta > 0 ? `+${delta}` : `${delta}`;
       row.appendChild(d);
 
-      row.appendChild(this.button('Equip', 'inv-equip', () => this.onEquip(item)));
+      row.appendChild(this.button('Equip', 'inv-equip', () => this.onEquip(item), 'check'));
       row.appendChild(this.reinforceButton(item, inv.gold, inv.materials));
-      row.appendChild(
-        this.button(item.locked ? 'Unlock' : 'Lock', 'inv-btn small', () => this.onToggleLock(item)),
-      );
+      const lockBtn = document.createElement('button');
+      lockBtn.className = `inv-btn small iconbtn${item.locked ? ' chosen' : ''}`;
+      lockBtn.innerHTML = icon('lock');
+      lockBtn.title = item.locked ? 'Unlock' : 'Lock';
+      lockBtn.onclick = () => this.onToggleLock(item);
+      row.appendChild(lockBtn);
 
       // Salvage — Rare+ asks for a one-click confirm when "Confirm destructive actions" is on.
       const needConfirm = (this.settings?.confirmDestructive ?? true) && isRarePlus(item.rarity);
       const salv = document.createElement('button');
       salv.className = 'inv-btn small danger';
-      salv.textContent = 'Salvage';
+      salv.innerHTML = icon('recycle');
+      salv.appendChild(Object.assign(document.createElement('span'), { textContent: 'Salvage' }));
       salv.disabled = !canSalvage || item.locked;
       let armed = false;
       salv.onclick = () => {
@@ -316,10 +342,17 @@ export class InventoryPanel {
     row.addEventListener('mouseleave', () => this.tooltip.hide());
   }
 
-  private button(label: string, cls: string, onclick: () => void): HTMLButtonElement {
+  private button(label: string, cls: string, onclick: () => void, iconName?: string): HTMLButtonElement {
     const b = document.createElement('button');
     b.className = cls;
-    b.textContent = label;
+    if (iconName) {
+      b.innerHTML = icon(iconName);
+      const t = document.createElement('span');
+      t.textContent = label;
+      b.appendChild(t);
+    } else {
+      b.textContent = label;
+    }
     b.onclick = onclick;
     return b;
   }
@@ -329,12 +362,12 @@ export class InventoryPanel {
     const b = document.createElement('button');
     b.className = 'inv-btn small reinforce';
     if (!canReinforce(item)) {
-      b.textContent = '⚒ Max';
+      b.innerHTML = `${icon('anvil')}Max`;
       b.disabled = true;
       return b;
     }
     const cost = reinforceCost(item);
-    b.textContent = `⚒ +${(item.reinforced ?? 0) + 1}`;
+    b.innerHTML = `${icon('anvil')}+${(item.reinforced ?? 0) + 1}`;
     b.title = `Reinforce: ${cost.gold} gold + ${cost.whetstones} whetstones`;
     b.disabled = gold < cost.gold || materials < cost.whetstones;
     b.onclick = () => this.onReinforce(item);

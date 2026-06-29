@@ -2,17 +2,19 @@
 // choice is applied to the player and persisted. ADR-002 DOM UI overlay.
 
 import type { ClassId } from '../core/ecs/components';
+import { icon } from './ui/icons';
 
 interface ClassCard {
   id: ClassId;
   name: string;
   blurb: string;
+  ico: string;
 }
 
 const CARDS: ClassCard[] = [
-  { id: 'warrior', name: 'Warrior', blurb: 'Melee brawler · Fury · cleave & survive' },
-  { id: 'hunter', name: 'Hunter', blurb: 'Ranged marksman · Focus · kite & trap' },
-  { id: 'priest', name: 'Priest', blurb: 'Holy caster · Mana · heal, shield & Atonement' },
+  { id: 'warrior', name: 'Warrior', blurb: 'Melee brawler · Fury · cleave & survive', ico: 'sword' },
+  { id: 'hunter', name: 'Hunter', blurb: 'Ranged marksman · Focus · kite & trap', ico: 'bow' },
+  { id: 'priest', name: 'Priest', blurb: 'Holy caster · Mana · heal, shield & Atonement', ico: 'staff' },
 ];
 
 export class ClassSelect {
@@ -34,7 +36,7 @@ export class ClassSelect {
     for (const c of CARDS) {
       const card = document.createElement('button');
       card.className = 'class-card';
-      card.innerHTML = `<div class="class-name">${c.name}</div><div class="class-blurb">${c.blurb}</div>`;
+      card.innerHTML = `<div class="class-ico">${icon(c.ico)}</div><div class="class-name">${c.name}</div><div class="class-blurb">${c.blurb}</div>`;
       card.onclick = () => {
         this.hide();
         this.onChoose(c.id);
