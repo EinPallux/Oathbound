@@ -214,8 +214,10 @@ export function boot(options: BootOptions = {}): Game {
   // the enter-world gesture; if autoplay is blocked it resumes on the next interaction.
   void music.start();
 
-  // World data (pure) + meshes (render).
-  const field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337);
+  // World data (pure) + meshes (render). Boss arenas are levelled into flat shelves so the
+  // giant frontier mountains/plateau don't drop a fight onto an impossible slope.
+  const bossArenas = BOSS_SPAWNS.map((b) => ({ x: b.x, z: b.z, r: 17 }));
+  const field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337, bossArenas);
   // Collidable rocks (the only physical props — scenery below is purely visual). Count
   // scales with the larger world; the generator keeps them clear of the spawn.
   const colliders = generateColliders(WORLD_SIZE, 160, 99);

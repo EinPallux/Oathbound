@@ -35,8 +35,8 @@ function terrainColor(x: number, z: number, h: number, out: THREE.Color): THREE.
   if (f.south > 0) out.lerp(PALETTE.fen, f.south * 0.9);
   if (f.north > 0) out.lerp(PALETTE.grave, f.north * (1 - f.ne));
   if (f.east > 0) {
-    // Riven Peaks: bare rock low, snow on the heights.
-    const snow = THREE.MathUtils.clamp((h - 12) / 16, 0, 1);
+    // Riven Peaks: bare rock on the flanks, snow only capping the high summits.
+    const snow = THREE.MathUtils.clamp((h - 24) / 22, 0, 1);
     tmpB.copy(PALETTE.rivenRock).lerp(PALETTE.snow, snow);
     out.lerp(tmpB, f.east * (1 - f.ne));
   }

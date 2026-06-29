@@ -42,6 +42,12 @@ function ridge(x: number, z: number): number {
   return 1 - Math.abs(n) / 1.5;
 }
 
+/** A second, finer ridge octave (higher frequency) for jagged peak detail. */
+function ridge2(x: number, z: number): number {
+  const n = Math.sin(x * 0.075 + 11) * Math.cos(z * 0.07 - 7) + Math.sin((x + z) * 0.05) * 0.5;
+  return 1 - Math.abs(n) / 1.5;
+}
+
 export interface BiomeFactors {
   /** Direction memberships in [0, 1] — how strongly a point belongs to each frontier. */
   west: number; // Emberreach (scorched highlands)
@@ -110,12 +116,14 @@ export function dominantBiome(x: number, z: number): BiomeId {
   return best;
 }
 
-// Elevation magnitudes (m) — moderate so the kinematic controller stays traversable.
-const MOUNTAIN = 30; // Riven Peaks rise
-const HIGHLAND = 9; // Emberreach scorched highlands
-const PLATEAU = 7; // Gravereach broken plateau
-const BOG = 4; // Sunken Fen depression (lowered)
-const FOREST = 4; // Thornwood rolling hills
+// Elevation magnitudes (m). The frontiers are now far more dramatic — giant Riven Peaks,
+// raised Emberreach highlands, a cliff-edged Gravereach plateau — while the heartland and
+// any small field (the 100 m unit-test world) stay flat because every ramp is ~0 there.
+const MOUNTAIN = 56; // Riven Peaks — the world's giant skyline
+const HIGHLAND = 15; // Emberreach scorched highlands (rough mesas)
+const PLATEAU = 17; // Gravereach broken plateau (steep escarpment edge)
+const BOG = 5; // Sunken Fen depression (deeper — feeds the meres/lakes)
+const FOREST = 6; // Thornwood rolling forested hills
 
 /**
  * Biome-shaped elevation offset (m) added on top of the base hills. ~0 near the hub
@@ -128,15 +136,20 @@ export function biomeElevation(x: number, z: number): number {
   const northM = f.north * (1 - f.ne);
 
   let h = 0;
-  // East: the Riven Peaks — the world's dramatic skyline (ridged).
-  h += eastM * MOUNTAIN * (0.45 + 0.55 * ridge(x, z));
-  // West: Emberreach highlands (rough, raised).
-  h += f.west * HIGHLAND * (0.7 + 0.3 * noise(x * 1.3, z));
-  // North: Gravereach plateau (raised, broken).
-  h += northM * PLATEAU * (0.8 + 0.2 * noise(x, z * 1.2));
-  // NE: Thornwood forested hills (gentle).
+  // East: the Riven Peaks — giant jagged skyline. Two ridge octaves stack into sharp
+  // spines, and a foothill term ramps the rise so the climb from the heartland reads.
+  const r1 = ridge(x, z);
+  const peak = 0.28 + 0.52 * r1 + 0.3 * r1 * ridge2(x, z);
+  h += eastM * MOUNTAIN * peak;
+  // West: Emberreach highlands — rough raised mesas with broken steps.
+  h += f.west * HIGHLAND * (0.6 + 0.4 * Math.abs(noise(x * 1.3, z))) + f.west * 4 * ridge(x * 1.6, z * 1.4);
+  // North: Gravereach plateau — raised and broken, with a steep escarpment where it
+  // meets the heartland (the `edge` term sharpens the lower half of the ramp into a cliff).
+  const edge = smoothstep(0.12, 0.5, northM);
+  h += northM * PLATEAU * (0.7 + 0.3 * noise(x, z * 1.2)) + edge * 7;
+  // NE: Thornwood forested hills (gentle, rolling).
   h += f.ne * FOREST * (0.6 + 0.4 * noise(x * 0.7, z * 0.7));
-  // South: the Sunken Fen sinks below the heartland.
+  // South: the Sunken Fen sinks below the heartland into a broad wetland basin.
   h -= f.south * BOG * (0.7 + 0.3 * Math.abs(noise(x, z)));
   return h;
 }
