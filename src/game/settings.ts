@@ -30,10 +30,23 @@ export interface Settings {
   mouseSensitivity: number;
   /** Invert the vertical mouse-look axis. */
   invertY: boolean;
+  /** Graphics: cap on the render pixel-ratio (resolution scale). Lower = faster (fewer
+   *  pixels shaded), the main FPS lever on integrated GPUs. Clamped by the display's
+   *  own devicePixelRatio, so "Ultra" never upscales past native. */
+  maxPixelRatio: number;
 }
 
 /** Discrete UI-scale steps offered in the panel (continuous values are clamped to range). */
 export const UI_SCALES = [0.85, 1, 1.15, 1.3] as const;
+
+/** Graphics-quality presets → max render pixel-ratio. Default "High" (1.5) is a strong
+ *  perf/quality balance; "Performance" renders below native for the most FPS. */
+export const PIXEL_RATIO_PRESETS = [
+  { label: 'Performance', value: 0.75 },
+  { label: 'Balanced', value: 1 },
+  { label: 'High', value: 1.5 },
+  { label: 'Ultra', value: 2 },
+] as const;
 
 export const DEFAULT_SETTINGS: Settings = {
   uiScale: 1,
@@ -46,6 +59,7 @@ export const DEFAULT_SETTINGS: Settings = {
   muteAudio: false,
   mouseSensitivity: 1,
   invertY: false,
+  maxPixelRatio: 1.5,
 };
 
 const STORAGE_KEY = 'oathbound.settings';
@@ -98,6 +112,10 @@ export function mergeSettings(raw: unknown): Settings {
         ? Math.min(3, Math.max(0.25, r.mouseSensitivity))
         : DEFAULT_SETTINGS.mouseSensitivity,
     invertY: typeof r.invertY === 'boolean' ? r.invertY : DEFAULT_SETTINGS.invertY,
+    maxPixelRatio:
+      typeof r.maxPixelRatio === 'number' && Number.isFinite(r.maxPixelRatio)
+        ? Math.min(2, Math.max(0.5, r.maxPixelRatio))
+        : DEFAULT_SETTINGS.maxPixelRatio,
   };
 }
 

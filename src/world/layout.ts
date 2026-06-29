@@ -11,8 +11,19 @@
 /** World extent (square, centred on the origin): playable area is ±WORLD_SIZE/2. */
 export const WORLD_SIZE = 680;
 
-/** Heightfield grid resolution (samples per side). ~1.57 m per cell at WORLD_SIZE. */
+/** Heightfield grid resolution (samples per side). ~1.57 m per cell at WORLD_SIZE.
+ *  This drives gameplay sampling (ground-snap, collision) and stays high-res. */
 export const WORLD_RES = 433;
+
+/**
+ * Terrain *render* tessellation (vertices per side) — decoupled from WORLD_RES so the
+ * draw mesh isn't forced to the gameplay sampling density. The single world-spanning
+ * terrain mesh is the largest fixed triangle cost (never frustum-culled), so we draw it
+ * at ~half the heightfield density: ~3.1 m cells, 2·216² ≈ 93k triangles instead of
+ * 2·432² ≈ 373k — a ~4× cut with no visible loss at the low-poly art scale (heights are
+ * still sampled from the full-res field at every vertex, so the landforms are identical).
+ */
+export const TERRAIN_RENDER_RES = 217;
 
 /**
  * Radius of the central safe hub (Oathhold) around the origin, in metres. Kept small

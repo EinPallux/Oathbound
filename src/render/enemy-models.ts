@@ -324,11 +324,105 @@ const BUILDERS: Record<BodyType, (r: THREE.Group, d: Def, e: Entity, m: THREE.Me
   construct: buildConstruct,
 };
 
+// ── Draw-call reduction: bake a model's many primitive parts into a few merged meshes ──
+// Each enemy was 7–13 separate meshes (one draw call each). We merge all opaque, non-glow
+// parts into ONE vertex-coloured mesh (the body — also the single flash material), and
+// merge glow/transparent parts that share a material (e.g. the two eyes) so their emissive
+// + alpha survive. A typical enemy drops to ~2–3 draw calls. Done once at model creation.
+const _v = new THREE.Vector3();
+const _n = new THREE.Vector3();
+const _nm = new THREE.Matrix3();
+
+function isGlow(m: THREE.MeshStandardMaterial): boolean {
+  return (m.emissiveIntensity ?? 0) > 0 && m.emissive.r + m.emissive.g + m.emissive.b > 0;
+}
+
+/** Append a mesh's geometry (baked into root-local space, with a per-vertex colour). */
+function bakeMesh(mesh: THREE.Mesh, pos: number[], nor: number[], col: number[], color: THREE.Color): void {
+  mesh.updateMatrix();
+  const src = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry;
+  const p = src.attributes.position as THREE.BufferAttribute;
+  const n = src.attributes.normal as THREE.BufferAttribute;
+  _nm.getNormalMatrix(mesh.matrix);
+  for (let i = 0; i < p.count; i++) {
+    _v.set(p.getX(i), p.getY(i), p.getZ(i)).applyMatrix4(mesh.matrix);
+    _n.set(n.getX(i), n.getY(i), n.getZ(i)).applyMatrix3(_nm).normalize();
+    pos.push(_v.x, _v.y, _v.z);
+    nor.push(_n.x, _n.y, _n.z);
+    col.push(color.r, color.g, color.b);
+  }
+  if (src !== mesh.geometry) src.dispose();
+}
+
+function mergedGeometry(pos: number[], nor: number[], col: number[]): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return g;
+}
+
+/** Collapse a built model's parts into a few merged meshes; returns the body flash mat. */
+function mergeModel(root: THREE.Group, e: Entity): THREE.MeshStandardMaterial[] {
+  const parts = root.children.filter((o) => (o as THREE.Mesh).isMesh) as THREE.Mesh[];
+  const opaque: THREE.Mesh[] = [];
+  const glowByMat = new Map<THREE.MeshStandardMaterial, THREE.Mesh[]>();
+  for (const m of parts) {
+    const mat = m.material as THREE.MeshStandardMaterial;
+    if (mat.transparent || isGlow(mat)) {
+      const list = glowByMat.get(mat) ?? [];
+      list.push(m);
+      glowByMat.set(mat, list);
+    } else {
+      opaque.push(m);
+    }
+  }
+
+  const flashMats: THREE.MeshStandardMaterial[] = [];
+
+  // Body: one vertex-coloured mesh from every opaque part (baked colours), one material.
+  if (opaque.length > 0) {
+    const pos: number[] = [], nor: number[] = [], col: number[] = [];
+    for (const m of opaque) {
+      bakeMesh(m, pos, nor, col, (m.material as THREE.MeshStandardMaterial).color);
+      root.remove(m);
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+    }
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.05 });
+    const body = new THREE.Mesh(mergedGeometry(pos, nor, col), mat);
+    body.userData.entity = e;
+    root.add(body);
+    flashMats.push(mat);
+  }
+
+  // Glow/transparent: merge parts that share a material into one mesh, reusing the material
+  // (keeps emissive colour + alpha). The two eyes share a material → collapse to one mesh.
+  for (const [mat, meshes] of glowByMat) {
+    if (meshes.length < 2) continue; // single-mesh groups are already minimal
+    const pos: number[] = [], nor: number[] = [], col: number[] = [];
+    const white = new THREE.Color(1, 1, 1); // vertexColors off for these → colour is unused
+    for (const m of meshes) {
+      bakeMesh(m, pos, nor, col, white);
+      root.remove(m);
+      m.geometry.dispose();
+    }
+    const merged = new THREE.Mesh(mergedGeometry(pos, nor, col), mat);
+    merged.userData.entity = e;
+    root.add(merged);
+  }
+
+  return flashMats;
+}
+
 /** Build a unique low-poly model for an enemy family/role. Feet at local y=0. */
 export function buildEnemyModel(family: string, archetype: string, e: Entity): EnemyModel {
   const def = DEFS[kindFor(family, archetype)] ?? DEFS.drudge;
   const root = new THREE.Group();
-  const flashMats: THREE.MeshStandardMaterial[] = [];
-  const top = BUILDERS[def.type](root, def, e, flashMats);
-  return { root, flashMats, top, bob: def.type === 'floating' };
+  const built: THREE.MeshStandardMaterial[] = [];
+  const top = BUILDERS[def.type](root, def, e, built);
+  // Merge primitives into a few meshes; the merged body material replaces the per-part
+  // flash list. (Fall back to the per-part mats if nothing merged, which shouldn't happen.)
+  const flashMats = mergeModel(root, e);
+  return { root, flashMats: flashMats.length ? flashMats : built, top, bob: def.type === 'floating' };
 }
