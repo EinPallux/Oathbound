@@ -13,6 +13,7 @@ function iconBtn(parent: HTMLElement, glyph: string, title: string, onClick: () 
 
 export class MicroBar {
   onInventory: () => void = () => {};
+  onCharacter: () => void = () => {};
   onTravel: () => void = () => {};
   onMap: () => void = () => {};
   onSettings: () => void = () => {};
@@ -21,7 +22,8 @@ export class MicroBar {
   constructor(parent: HTMLElement) {
     const bar = document.createElement('div');
     bar.className = 'micro-bar';
-    iconBtn(bar, '🎒', 'Inventory / Character (I)', () => this.onInventory());
+    iconBtn(bar, '🎒', 'Inventory (B)', () => this.onInventory());
+    iconBtn(bar, '👤', 'Character (C)', () => this.onCharacter());
     iconBtn(bar, '🧭', 'Fast travel (T)', () => this.onTravel());
     iconBtn(bar, '🗺', 'Map (M)', () => this.onMap());
     iconBtn(bar, '⚙', 'Settings (Esc)', () => this.onSettings());

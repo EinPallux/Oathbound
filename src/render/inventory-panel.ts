@@ -1,29 +1,24 @@
-// Inventory + equipment panel (DOM, interactive — toggled with I/C). Lists equipped
-// gear and bagged items (sorted by power) with upgrade deltas, equip / lock / salvage
-// actions, a salvage-commons button, and the gold + whetstone wallet. Rebuilds only
-// when contents change. Mutations go through callbacks so the sim stays authoritative.
+// Inventory bag (DOM, interactive — toggled with B). A grid of item cells sorted by
+// power: hover for a comparison tooltip, left-click to equip, right-click for a context
+// menu (reinforce / lock / salvage). A filter box narrows the grid, a salvage-commons
+// button clears clutter, and the footer holds the gold + whetstone wallet. Equipment,
+// stats and talents now live in the Character panel. Mutations go through callbacks so
+// the sim stays authoritative; rebuilds only when contents (or the filter) change.
 
 import type { World, Entity } from '../core/ecs/world';
 import {
   C,
   type Item,
+  type EquipSlot,
   type Inventory,
   type Equipment,
   type Progression,
-  type PlayerClass,
-  type CombatState,
-  type Offense,
-  type Defense,
-  type Health,
 } from '../core/ecs/components';
-import { EQUIP_SLOTS } from '../sim/loot/items';
-import { relicEffectDesc } from '../sim/loot/relics';
-import { SLOT_LABEL, ATTR_LABEL } from '../sim/loot/item-info';
+import { SLOT_LABEL } from '../sim/loot/item-info';
 import { isRarePlus } from '../sim/loot/droptable';
 import { tierTag, type Settings } from '../game/settings';
 import { SALVAGE_LEVEL } from '../sim/salvage';
 import { canReinforce, reinforceCost } from '../sim/reinforce';
-import { getClass } from '../sim/classes';
 import { ItemTooltip } from './item-tooltip';
 import { icon } from './ui/icons';
 
@@ -33,32 +28,32 @@ function reinSuffix(item: Item): string {
   return n > 0 ? ` +${n}` : '';
 }
 
-/** Map an equipment slot label to a game-icon. */
-function slotIcon(label: string): string {
-  const l = label.toLowerCase();
-  if (l.includes('weapon') || l.includes('main')) return 'sword';
-  if (l.includes('off')) return 'shield';
-  if (l.includes('head') || l.includes('helm')) return 'helmet';
-  if (l.includes('chest') || l.includes('body') || l.includes('torso')) return 'chest';
-  if (l.includes('hand') || l.includes('glove')) return 'gauntlet';
-  if (l.includes('feet') || l.includes('boot')) return 'boots';
-  if (l.includes('leg')) return 'belt';
-  if (l.includes('amulet') || l.includes('neck')) return 'amulet';
-  if (l.includes('ring')) return 'ring';
-  if (l.includes('cape') || l.includes('back') || l.includes('shoulder')) return 'cape';
-  if (l.includes('belt') || l.includes('waist')) return 'belt';
-  return 'crossed-swords';
+/** Map an equipment slot to a game-icon (used as the bag-cell artwork). */
+function slotIcon(slot: EquipSlot): string {
+  switch (slot) {
+    case 'weapon': return 'sword';
+    case 'offhand': return 'shield';
+    case 'head': return 'helmet';
+    case 'chest': return 'chest';
+    case 'hands': return 'gauntlet';
+    case 'feet': return 'boots';
+    case 'legs': return 'belt';
+    case 'amulet': return 'amulet';
+    case 'ring1':
+    case 'ring2': return 'ring';
+    default: return 'crossed-swords';
+  }
 }
 
 export class InventoryPanel {
   private readonly root: HTMLDivElement;
-  private readonly wallet: HTMLDivElement;
-  private readonly stats: HTMLDivElement;
-  private readonly talents: HTMLDivElement;
+  private readonly grid: HTMLDivElement;
+  private readonly filterInput: HTMLInputElement;
+  private readonly foot: HTMLDivElement;
   private readonly actions: HTMLDivElement;
-  private readonly equipList: HTMLDivElement;
-  private readonly invList: HTMLDivElement;
   private readonly tooltip: ItemTooltip;
+  private menu: HTMLDivElement | null = null;
+  private filter = '';
   private visible = false;
   private lastSig = '';
 
@@ -67,65 +62,88 @@ export class InventoryPanel {
   onSalvageCommons: () => void = () => {};
   onToggleLock: (item: Item) => void = () => {};
   onReinforce: (item: Item) => void = () => {};
-  onChooseTalent: (nodeId: string, option: number) => void = () => {};
+  onSettings: () => void = () => {};
 
-  constructor(parent: HTMLElement, private readonly settings?: Settings) {
+  constructor(parent: HTMLElement, tooltip: ItemTooltip, private readonly settings?: Settings) {
+    this.tooltip = tooltip;
     this.root = document.createElement('div');
-    this.root.className = 'inv-panel';
+    this.root.className = 'inv-panel bag';
     this.root.style.display = 'none';
 
+    // Header: title + gear (→ settings) + close.
+    const header = document.createElement('div');
+    header.className = 'bag-head';
     const title = document.createElement('div');
-    title.className = 'inv-title';
-    title.textContent = 'Inventory / Character — I/C to close';
-    this.root.appendChild(title);
+    title.className = 'bag-title';
+    title.innerHTML = `${icon('bag')}<span>Inventory</span>`;
+    const spacer = document.createElement('div');
+    spacer.className = 'bag-spacer';
+    const gear = document.createElement('button');
+    gear.className = 'bag-icon-btn';
+    gear.title = 'Settings';
+    gear.innerHTML = icon('gears');
+    gear.onclick = () => this.onSettings();
+    const close = document.createElement('button');
+    close.className = 'bag-icon-btn';
+    close.title = 'Close (B)';
+    close.textContent = '✕';
+    close.onclick = () => this.close();
+    header.append(title, spacer, gear, close);
+    this.root.appendChild(header);
 
-    this.wallet = document.createElement('div');
-    this.wallet.className = 'inv-wallet';
-    this.root.appendChild(this.wallet);
+    // Filter box.
+    const filterRow = document.createElement('div');
+    filterRow.className = 'bag-filter';
+    this.filterInput = document.createElement('input');
+    this.filterInput.type = 'text';
+    this.filterInput.placeholder = 'Filter';
+    this.filterInput.spellcheck = false;
+    this.filterInput.oninput = () => {
+      this.filter = this.filterInput.value.trim().toLowerCase();
+      this.lastSig = ''; // force a rebuild on the next update tick
+    };
+    filterRow.appendChild(this.filterInput);
+    this.root.appendChild(filterRow);
 
-    this.stats = document.createElement('div');
-    this.stats.className = 'inv-stats';
-    this.root.appendChild(this.stats);
+    // Item grid.
+    this.grid = document.createElement('div');
+    this.grid.className = 'bag-grid';
+    this.root.appendChild(this.grid);
 
-    // Hover tooltips live on <body> so they aren't clipped by the panel or UI zoom.
-    this.tooltip = new ItemTooltip(document.body);
-
-    this.talents = document.createElement('div');
-    this.talents.className = 'inv-talents';
-    this.root.appendChild(this.talents);
-
+    // Actions (salvage all Common).
     this.actions = document.createElement('div');
-    this.actions.className = 'inv-actions';
+    this.actions.className = 'bag-actions';
     this.root.appendChild(this.actions);
 
-    const cols = document.createElement('div');
-    cols.className = 'inv-cols';
-    const left = document.createElement('div');
-    left.className = 'inv-col';
-    const leftH = document.createElement('div');
-    leftH.className = 'inv-col-head';
-    leftH.textContent = 'Equipped';
-    this.equipList = document.createElement('div');
-    left.append(leftH, this.equipList);
+    // Footer wallet + item count.
+    this.foot = document.createElement('div');
+    this.foot.className = 'bag-foot';
+    this.root.appendChild(this.foot);
 
-    const right = document.createElement('div');
-    right.className = 'inv-col';
-    const rightH = document.createElement('div');
-    rightH.className = 'inv-col-head';
-    rightH.textContent = 'Backpack';
-    this.invList = document.createElement('div');
-    right.append(rightH, this.invList);
-
-    cols.append(left, right);
-    this.root.appendChild(cols);
+    // Hover tooltips + context menu live on <body> so they aren't clipped or zoomed.
     parent.appendChild(this.root);
+    // Dismiss the context menu on any outside interaction.
+    window.addEventListener('pointerdown', (e) => {
+      if (this.menu && !this.menu.contains(e.target as Node)) this.closeMenu();
+    });
   }
 
   toggle(): void {
     this.visible = !this.visible;
     this.root.style.display = this.visible ? 'block' : 'none';
-    if (!this.visible) this.tooltip.hide();
+    if (!this.visible) {
+      this.tooltip.hide();
+      this.closeMenu();
+    }
     this.lastSig = '';
+  }
+
+  close(): void {
+    if (!this.visible) return;
+    this.visible = false;
+    this.root.style.display = 'none';
+    this.tooltip.hide();
+    this.closeMenu();
   }
 
   get isOpen(): boolean {
@@ -138,31 +156,61 @@ export class InventoryPanel {
     const eq = world.get<Equipment>(player, C.Equipment);
     const prog = world.get<Progression>(player, C.Progression);
     if (!inv || !eq || !prog) return;
-    const pc = world.get<PlayerClass>(player, C.PlayerClass);
-    const cs = world.get<CombatState>(player, C.CombatState);
 
     const sig =
-      EQUIP_SLOTS.map((s) => {
-        const it = eq.slots[s];
-        return it ? `${it.uid}r${it.reinforced ?? 0}` : '-';
-      }).join(',') +
-      '|' +
       inv.items.map((i) => `${i.uid}${i.locked ? 'L' : ''}r${i.reinforced ?? 0}`).join(',') +
-      `|${inv.gold}|${inv.materials}|${prog.level}` +
-      `|${pc?.id ?? ''}|${JSON.stringify(pc?.choices ?? {})}|${cs?.inCombat ? 'c' : ''}`;
+      '|' +
+      Object.values(eq.slots).map((it) => (it ? `${it.uid}r${it.reinforced ?? 0}` : '-')).join(',') +
+      `|${inv.gold}|${inv.materials}|${inv.capacity}|${prog.level}|${this.filter}`;
     if (sig === this.lastSig) return;
     this.lastSig = sig;
-    this.tooltip.hide(); // a rebuild invalidates row anchors
-
-    this.renderStats(world, player, pc);
-    this.renderTalents(pc, prog.level, cs?.inCombat ?? false);
+    this.tooltip.hide(); // a rebuild invalidates cell anchors
+    this.closeMenu();
 
     const canSalvage = prog.level >= SALVAGE_LEVEL;
 
-    this.wallet.innerHTML =
-      `<span class="currency coin">${icon('coin')}${inv.gold} gold</span>` +
-      `<span class="currency mat">${icon('gem')}${inv.materials} whetstones</span>`;
+    // ── Grid ────────────────────────────────────────────────────────────────
+    this.grid.replaceChildren();
+    const sorted = [...inv.items].sort((a, b) => b.score - a.score);
+    const shown = this.filter
+      ? sorted.filter(
+          (i) => i.name.toLowerCase().includes(this.filter) || SLOT_LABEL[i.slot].toLowerCase().includes(this.filter),
+        )
+      : sorted;
 
+    for (const item of shown) {
+      const equipped = eq.slots[item.slot] ?? null;
+      const delta = item.score - (equipped?.score ?? 0);
+      const cell = document.createElement('div');
+      cell.className = `bag-cell ${item.rarity}`;
+      cell.innerHTML = `<span class="bag-cell-ico">${icon(slotIcon(item.slot))}</span>`;
+      if (item.locked) cell.appendChild(badge('bag-lock', icon('lock')));
+      if ((item.reinforced ?? 0) > 0) cell.appendChild(badge('bag-rein', `+${item.reinforced}`));
+      if (delta > 0) cell.appendChild(badge('bag-up', '▲'));
+      if (item.relic) cell.classList.add('relic-glow');
+
+      this.hover(cell, item, equipped);
+      cell.onclick = () => this.onEquip(item);
+      cell.oncontextmenu = (e) => {
+        e.preventDefault();
+        this.openMenu(e.clientX, e.clientY, item, inv, canSalvage);
+      };
+      this.grid.appendChild(cell);
+    }
+
+    // Pad with empty slots up to capacity (only in the unfiltered view).
+    if (!this.filter) {
+      for (let i = shown.length; i < inv.capacity; i++) {
+        this.grid.appendChild(Object.assign(document.createElement('div'), { className: 'bag-cell empty' }));
+      }
+    } else if (shown.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'bag-none';
+      empty.textContent = 'No items match the filter.';
+      this.grid.appendChild(empty);
+    }
+
+    // ── Actions ─────────────────────────────────────────────────────────────
     this.actions.replaceChildren();
     const salvageBtn = document.createElement('button');
     salvageBtn.className = 'inv-btn';
@@ -177,200 +225,117 @@ export class InventoryPanel {
       this.actions.appendChild(hint);
     }
 
-    this.equipList.replaceChildren();
-    for (const slot of EQUIP_SLOTS) {
-      const it = eq.slots[slot];
-      const row = document.createElement('div');
-      row.className = 'inv-row';
-      row.innerHTML =
-        `<span class="inv-slot">${icon(slotIcon(SLOT_LABEL[slot]))}</span>` +
-        `<span class="eq-label">${SLOT_LABEL[slot]}</span>`;
-      const name = document.createElement('span');
-      name.className = it ? `inv-name ${it.rarity}` : 'inv-name empty';
-      name.textContent = it ? `${tierTag(it.rarity)} ${it.name}${reinSuffix(it)} (${it.score})` : '—';
-      if (it?.relic) name.title = relicEffectDesc(it.relic);
-      row.appendChild(name);
-      if (it) {
-        row.appendChild(this.reinforceButton(it, inv.gold, inv.materials));
-        this.hover(row, it, null); // it's equipped → show its own stats, no comparison
-      }
-      this.equipList.appendChild(row);
-    }
-
-    this.invList.replaceChildren();
-    if (inv.items.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'inv-empty';
-      empty.textContent = 'Empty — kill Bloomhusks and press F on drops.';
-      this.invList.appendChild(empty);
-    }
-    const sorted = [...inv.items].sort((a, b) => b.score - a.score);
-    for (const item of sorted) {
-      const equipped = eq.slots[item.slot];
-      const delta = item.score - (equipped?.score ?? 0);
-      const row = document.createElement('div');
-      row.className = 'inv-row';
-
-      const name = document.createElement('span');
-      name.className = `inv-name ${item.rarity}`;
-      name.textContent = `${item.locked ? '🔒 ' : ''}${tierTag(item.rarity)} ${item.name}${reinSuffix(item)} · ${SLOT_LABEL[item.slot]}`;
-      if (item.relic) name.title = relicEffectDesc(item.relic);
-      row.appendChild(name);
-
-      const d = document.createElement('span');
-      d.className = `inv-delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}`;
-      d.textContent = delta > 0 ? `+${delta}` : `${delta}`;
-      row.appendChild(d);
-
-      row.appendChild(this.button('Equip', 'inv-equip', () => this.onEquip(item), 'check'));
-      row.appendChild(this.reinforceButton(item, inv.gold, inv.materials));
-      const lockBtn = document.createElement('button');
-      lockBtn.className = `inv-btn small iconbtn${item.locked ? ' chosen' : ''}`;
-      lockBtn.innerHTML = icon('lock');
-      lockBtn.title = item.locked ? 'Unlock' : 'Lock';
-      lockBtn.onclick = () => this.onToggleLock(item);
-      row.appendChild(lockBtn);
-
-      // Salvage — Rare+ asks for a one-click confirm when "Confirm destructive actions" is on.
-      const needConfirm = (this.settings?.confirmDestructive ?? true) && isRarePlus(item.rarity);
-      const salv = document.createElement('button');
-      salv.className = 'inv-btn small danger';
-      salv.innerHTML = icon('recycle');
-      salv.appendChild(Object.assign(document.createElement('span'), { textContent: 'Salvage' }));
-      salv.disabled = !canSalvage || item.locked;
-      let armed = false;
-      salv.onclick = () => {
-        if (needConfirm && !armed) {
-          armed = true;
-          salv.textContent = 'Confirm?';
-          return;
-        }
-        this.onSalvage(item);
-      };
-      row.appendChild(salv);
-
-      this.hover(row, item, equipped ?? null);
-      this.invList.appendChild(row);
-    }
+    // ── Footer wallet ───────────────────────────────────────────────────────
+    this.foot.innerHTML =
+      `<span class="bag-cur coin" title="Gold">${icon('coin')}${inv.gold.toLocaleString()}</span>` +
+      `<span class="bag-cur gem" title="Whetstones">${icon('gem')}${inv.materials}</span>` +
+      `<span class="bag-cur count" title="Bag space">${icon('bag')}${inv.items.length}/${inv.capacity}</span>`;
   }
 
-  /** Choice-node talents: pick one of two per node (out of combat). */
-  private renderTalents(pc: PlayerClass | undefined, level: number, inCombat: boolean): void {
-    this.talents.replaceChildren();
-    if (!pc) return;
-    const nodes = getClass(pc.id).choiceNodes;
-    if (nodes.length === 0) return;
+  // ── Right-click context menu ────────────────────────────────────────────────
+  private openMenu(x: number, y: number, item: Item, inv: Inventory, canSalvage: boolean): void {
+    this.closeMenu();
+    const menu = document.createElement('div');
+    menu.className = 'bag-menu';
 
     const head = document.createElement('div');
-    head.className = 'inv-col-head';
-    head.textContent = 'Talents';
-    this.talents.appendChild(head);
+    head.className = `bag-menu-head ${item.rarity}`;
+    head.textContent = `${tierTag(item.rarity)} ${item.name}${reinSuffix(item)}`;
+    menu.appendChild(head);
 
-    for (const node of nodes) {
-      const row = document.createElement('div');
-      row.className = 'inv-row';
+    // Equip.
+    menu.appendChild(
+      menuItem(icon('check'), 'Equip', false, () => {
+        this.onEquip(item);
+        this.closeMenu();
+      }),
+    );
 
-      if (level < node.unlockLevel) {
-        const lbl = document.createElement('span');
-        lbl.className = 'inv-name empty';
-        lbl.textContent = `${node.options[0].name} / ${node.options[1].name}`;
-        row.appendChild(lbl);
-        const hint = document.createElement('span');
-        hint.className = 'inv-hint';
-        hint.textContent = `Lv ${node.unlockLevel}`;
-        row.appendChild(hint);
-        this.talents.appendChild(row);
-        continue;
-      }
-
-      const picked = pc.choices?.[node.id] === 1 ? 1 : 0;
-      for (let i = 0; i < node.options.length; i++) {
-        const b = document.createElement('button');
-        b.className = `inv-btn small${picked === i ? ' chosen' : ''}`;
-        b.textContent = node.options[i].name;
-        b.disabled = inCombat || picked === i;
-        b.onclick = () => this.onChooseTalent(node.id, i);
-        row.appendChild(b);
-      }
-      if (inCombat) {
-        const hint = document.createElement('span');
-        hint.className = 'inv-hint';
-        hint.textContent = 'Out of combat only';
-        row.appendChild(hint);
-      }
-      this.talents.appendChild(row);
-    }
-  }
-
-  /** Character stats: the live derived combat stats, each with an explanatory tooltip. */
-  private renderStats(world: World, player: Entity, pc: PlayerClass | undefined): void {
-    this.stats.replaceChildren();
-    const off = world.get<Offense>(player, C.Offense);
-    const def = world.get<Defense>(player, C.Defense);
-    const h = world.get<Health>(player, C.Health);
-    if (!off || !def || !h) return;
-    const primaryId = getClass(pc?.id ?? 'warrior').primaryStatId;
-
-    const chip = (label: string, value: string, tip: string): void => {
-      const el = document.createElement('span');
-      el.className = 'inv-stat';
-      el.title = tip;
-      el.textContent = `${label} ${value}`;
-      this.stats.appendChild(el);
-    };
-
-    chip(ATTR_LABEL[primaryId] ?? 'Power', String(Math.round(off.primaryStat)), 'Scales your ability damage.');
-    chip('Max HP', String(Math.round(h.max)), 'Maximum health (Vitality adds HP).');
-    chip('Armor', String(Math.round(def.armor)), 'Reduces physical damage taken (diminishing returns).');
-    chip('Crit', `${(off.critChance * 100).toFixed(1)}%`, 'Chance for a hit to deal ×1.5 damage.');
-    chip('Haste', `${(off.haste * 100).toFixed(1)}%`, 'Reduces the global cooldown and cast time.');
-    if (off.leech > 0) chip('Leech', `${(off.leech * 100).toFixed(1)}%`, 'Heals you for a fraction of damage dealt.');
-    if (off.healPower > 0) chip('Healing', `+${Math.round(off.healPower)}`, 'Increases the healing you do.');
-    const resists: [keyof Defense['resist'], string][] = [
-      ['fire', 'Fire Resist'],
-      ['frost', 'Frost Resist'],
-      ['blight', 'Blight Resist'],
-    ];
-    for (const [k, label] of resists) {
-      if (def.resist[k] > 0) chip(label, String(Math.round(def.resist[k])), `Reduces ${k} damage taken.`);
-    }
-  }
-
-  /** Show the item tooltip (with comparison vs `equipped`) while hovering `row`. */
-  private hover(row: HTMLElement, item: Item, equipped: Item | null): void {
-    row.addEventListener('mouseenter', () => this.tooltip.show(item, equipped, row.getBoundingClientRect()));
-    row.addEventListener('mouseleave', () => this.tooltip.hide());
-  }
-
-  private button(label: string, cls: string, onclick: () => void, iconName?: string): HTMLButtonElement {
-    const b = document.createElement('button');
-    b.className = cls;
-    if (iconName) {
-      b.innerHTML = icon(iconName);
-      const t = document.createElement('span');
-      t.textContent = label;
-      b.appendChild(t);
+    // Reinforce (with the next step's cost).
+    if (canReinforce(item)) {
+      const cost = reinforceCost(item);
+      const affordable = inv.gold >= cost.gold && inv.materials >= cost.whetstones;
+      const label = `Reinforce +${(item.reinforced ?? 0) + 1}  ·  ${cost.gold}g, ${cost.whetstones} whetstones`;
+      menu.appendChild(
+        menuItem(icon('anvil'), label, !affordable, () => {
+          this.onReinforce(item);
+          this.closeMenu();
+        }),
+      );
     } else {
-      b.textContent = label;
+      menu.appendChild(menuItem(icon('anvil'), 'Reinforced (max)', true, () => {}));
     }
-    b.onclick = onclick;
-    return b;
+
+    // Lock / Unlock.
+    menu.appendChild(
+      menuItem(icon('lock'), item.locked ? 'Unlock' : 'Lock', false, () => {
+        this.onToggleLock(item);
+        this.closeMenu();
+      }),
+    );
+
+    // Salvage — Rare+ asks for a one-click confirm when "Confirm destructive actions" is on.
+    const needConfirm = (this.settings?.confirmDestructive ?? true) && isRarePlus(item.rarity);
+    const salv = menuItem(icon('recycle'), 'Salvage', !canSalvage || item.locked, () => {});
+    salv.classList.add('danger');
+    let armed = false;
+    salv.onclick = () => {
+      if (item.locked || !canSalvage) return;
+      if (needConfirm && !armed) {
+        armed = true;
+        const lbl = salv.querySelector('span');
+        if (lbl) lbl.textContent = 'Confirm salvage?';
+        salv.classList.add('armed');
+        return;
+      }
+      this.onSalvage(item);
+      this.closeMenu();
+    };
+    menu.appendChild(salv);
+
+    document.body.appendChild(menu);
+    // Clamp to the viewport so the menu never spills off-screen.
+    const r = menu.getBoundingClientRect();
+    const px = Math.min(x, window.innerWidth - r.width - 8);
+    const py = Math.min(y, window.innerHeight - r.height - 8);
+    menu.style.left = `${Math.max(8, px)}px`;
+    menu.style.top = `${Math.max(8, py)}px`;
+    this.menu = menu;
+    this.tooltip.hide();
   }
 
-  /** Reinforcement button: shows the next step + cost (in a tooltip), or "Max". */
-  private reinforceButton(item: Item, gold: number, materials: number): HTMLButtonElement {
-    const b = document.createElement('button');
-    b.className = 'inv-btn small reinforce';
-    if (!canReinforce(item)) {
-      b.innerHTML = `${icon('anvil')}Max`;
-      b.disabled = true;
-      return b;
-    }
-    const cost = reinforceCost(item);
-    b.innerHTML = `${icon('anvil')}+${(item.reinforced ?? 0) + 1}`;
-    b.title = `Reinforce: ${cost.gold} gold + ${cost.whetstones} whetstones`;
-    b.disabled = gold < cost.gold || materials < cost.whetstones;
-    b.onclick = () => this.onReinforce(item);
-    return b;
+  private closeMenu(): void {
+    this.menu?.remove();
+    this.menu = null;
   }
+
+  /** Show the item tooltip (with comparison vs `equipped`) while hovering `cell`. */
+  private hover(cell: HTMLElement, item: Item, equipped: Item | null): void {
+    cell.addEventListener('mouseenter', () => {
+      if (this.menu) return;
+      this.tooltip.show(item, equipped, cell.getBoundingClientRect());
+    });
+    cell.addEventListener('mouseleave', () => this.tooltip.hide());
+  }
+}
+
+/** A small corner badge on a bag cell. */
+function badge(cls: string, html: string): HTMLSpanElement {
+  const b = document.createElement('span');
+  b.className = `bag-badge ${cls}`;
+  b.innerHTML = html;
+  return b;
+}
+
+/** One row of the right-click context menu. */
+function menuItem(iconHtml: string, label: string, disabled: boolean, onclick: () => void): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.className = 'bag-menu-item';
+  b.disabled = disabled;
+  b.innerHTML = iconHtml;
+  const t = document.createElement('span');
+  t.textContent = label;
+  b.appendChild(t);
+  b.onclick = onclick;
+  return b;
 }

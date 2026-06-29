@@ -49,7 +49,7 @@ export const DEFAULT_KEYBINDS: Keybinds = {
   ability9: 'Digit9',
   ability10: 'Digit0',
   interact: 'KeyF',
-  inventory: 'KeyI',
+  inventory: 'KeyB',
   character: 'KeyC',
   travel: 'KeyT',
   map: 'KeyM',

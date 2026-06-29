@@ -88,6 +88,8 @@ import { DamageNumbers } from '../render/damage-numbers';
 import { TargetFrame } from '../render/target-frame';
 import { Hud } from '../render/hud';
 import { InventoryPanel } from '../render/inventory-panel';
+import { CharacterPanel } from '../render/character-panel';
+import { ItemTooltip } from '../render/item-tooltip';
 import { ProjectileView } from '../render/projectile-view';
 import { TrapView } from '../render/trap-view';
 import { GroundAoeView } from '../render/ground-aoe-view';
@@ -272,7 +274,11 @@ export function boot(): Game {
   const vignette = new Vignette(uiRoot);
   const goalTracker = new GoalTracker(uiRoot);
   const minimap = new Minimap(uiRoot, WORLD_SIZE);
-  const invPanel = new InventoryPanel(uiRoot, settings);
+  // One shared item tooltip on <body> (outside the zoom-scaled #ui-root), used by both
+  // the inventory bag and the character sheet — only one panel is open at a time.
+  const itemTooltip = new ItemTooltip(document.body);
+  const invPanel = new InventoryPanel(uiRoot, itemTooltip, settings);
+  const charPanel = new CharacterPanel(uiRoot, itemTooltip);
   const vendorPanel = new VendorPanel(uiRoot);
   const travelPanel = new TravelPanel(uiRoot);
   const classSelect = new ClassSelect(uiRoot);
@@ -291,12 +297,20 @@ export function boot(): Game {
   // Micro-bar (bottom-right): click-to-open shortcuts mirroring the hotkeys.
   const microBar = new MicroBar(uiRoot);
   microBar.onInventory = () => {
+    charPanel.close();
     vendorPanel.close();
     travelPanel.close();
     invPanel.toggle();
   };
+  microBar.onCharacter = () => {
+    invPanel.close();
+    vendorPanel.close();
+    travelPanel.close();
+    charPanel.toggle();
+  };
   microBar.onTravel = () => {
-    if (invPanel.isOpen) invPanel.toggle();
+    invPanel.close();
+    charPanel.close();
     vendorPanel.close();
     travelPanel.toggle();
   };
@@ -330,7 +344,12 @@ export function boot(): Game {
   invPanel.onReinforce = (item) => {
     if (reinforceItem(world, player, item.uid)) autosave();
   };
-  invPanel.onChooseTalent = (nodeId, option) => {
+  invPanel.onSettings = () => settingsPanel.toggle();
+
+  charPanel.onReinforce = (item) => {
+    if (reinforceItem(world, player, item.uid)) autosave();
+  };
+  charPanel.onChooseTalent = (nodeId, option) => {
     const pc = world.get<PlayerClass>(player, C.PlayerClass);
     if (!pc) return;
     if (!pc.choices) pc.choices = {};
@@ -475,14 +494,22 @@ export function boot(): Game {
       const rdt = Math.min(0.1, (now - lastRender) / 1000);
       lastRender = now;
 
-      // Centre panels are mutually exclusive (inventory / vendor / travel).
-      if (input.consumeToggleInventory() || input.consumeToggleCharacter()) {
+      // Centre panels are mutually exclusive (inventory / character / vendor / travel).
+      if (input.consumeToggleInventory()) {
+        charPanel.close();
         vendorPanel.close();
         travelPanel.close();
         invPanel.toggle();
       }
+      if (input.consumeToggleCharacter()) {
+        invPanel.close();
+        vendorPanel.close();
+        travelPanel.close();
+        charPanel.toggle();
+      }
       if (input.consumeToggleTravel()) {
-        if (invPanel.isOpen) invPanel.toggle();
+        invPanel.close();
+        charPanel.close();
         vendorPanel.close();
         travelPanel.toggle();
       }
@@ -491,7 +518,8 @@ export function boot(): Game {
       // Esc, layered: close the topmost panel → else clear the target → else open the menu.
       if (input.consumeEscape()) {
         if (settingsPanel.isOpen) settingsPanel.close();
-        else if (invPanel.isOpen) invPanel.toggle();
+        else if (invPanel.isOpen) invPanel.close();
+        else if (charPanel.isOpen) charPanel.close();
         else if (vendorPanel.isOpen) vendorPanel.close();
         else if (travelPanel.isOpen) travelPanel.close();
         else if (minimap.isMapOpen) minimap.closeMap();
@@ -504,7 +532,8 @@ export function boot(): Game {
         if (vendorPanel.isOpen) {
           vendorPanel.close();
         } else if (!pickUpNearest(world) && nearestVendor(world, player) != null) {
-          if (invPanel.isOpen) invPanel.toggle();
+          invPanel.close();
+          charPanel.close();
           travelPanel.close();
           vendorPanel.open();
         }
@@ -565,6 +594,7 @@ export function boot(): Game {
       const phv = world.get<Health>(player, C.Health)!;
       vignette.update(phv.max > 0 ? phv.current / phv.max : 0, settings.reducedEffects);
       invPanel.update(world, player);
+      charPanel.update(world, player);
       vendorPanel.update(world, player);
       travelPanel.update(world, player);
 
