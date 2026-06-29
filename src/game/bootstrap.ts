@@ -10,9 +10,17 @@ import { GameLoop } from '../core/loop';
 import { PerfOverlay } from '../devtools/perf-overlay';
 import { GameState } from './states';
 import { InputController } from '../platform/input';
-import { generateHeightfield, generateColliders } from '../world/heightfield';
+import { generateHeightfield, generateColliders, type Heightfield, type CylinderCollider } from '../world/heightfield';
 import { WORLD_SIZE, WORLD_RES } from '../world/layout';
-import { generateScenery, type Clearing } from '../world/scenery';
+import { generateScenery, type Clearing, type Scenery } from '../world/scenery';
+import { getActiveMap } from '../world/active-map';
+import {
+  buildCustomHeightfield,
+  customColliders,
+  customSpawns,
+  customBosses,
+  customSceneryForMinimap,
+} from '../world/custom-map';
 import {
   VILLAGE_FLAT,
   VILLAGE_CLEARING,
@@ -85,6 +93,7 @@ import type { TelemetrySnapshot } from '../sim/telemetry';
 import { Rng } from '../core/rng';
 import { buildTerrainMesh, buildProps } from '../render/terrain-mesh';
 import { buildScenery } from '../render/scenery-view';
+import { buildCustomTerrainMesh, buildCustomScenery } from '../render/custom-map-view';
 import { Sky } from '../render/sky';
 import { VillageView } from '../render/village-view';
 import { AmbientLife } from '../render/ambient-life';
@@ -223,29 +232,62 @@ export function boot(options: BootOptions = {}): Game {
 
   // World data (pure) + meshes (render). Boss arenas are levelled into flat shelves so the
   // giant frontier mountains/plateau don't drop a fight onto an impossible slope.
-  // Boss arenas + the starting village are levelled into flat shelves.
-  const flats = [...BOSS_SPAWNS.map((b) => ({ x: b.x, z: b.z, r: 17 })), VILLAGE_FLAT];
-  const field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337, flats);
-  // Collidable rocks (the only physical props — scenery below is purely visual). Count
-  // scales with the larger world; the generator keeps them clear of the spawn.
-  const colliders = [...generateColliders(WORLD_SIZE, 160, 99), ...villageCylinders()];
-  renderer.scene.add(buildTerrainMesh(field));
-  const props = buildProps(colliders, field);
-  renderer.scene.add(props);
-  const terrain = renderer.scene.getObjectByName('terrain')!;
+  // World data (pure) + meshes (render). A custom map (authored in the Admin Tools Map
+  // Builder, selected via ?map=) replaces the procedural world *non-destructively*: with no
+  // ?map=, getActiveMap() is null and the default world below is built exactly as before.
+  const customMap = getActiveMap();
+  let field: Heightfield;
+  let colliders: CylinderCollider[];
+  let scenery: Scenery;
+  let props: THREE.Object3D;
+  let movementBoxes = villageBoxes();
+  let villageEnabled = true;
+  let mapSize = WORLD_SIZE;
+  const playerStart = customMap ? customMap.playerSpawn : { x: 0, z: 0 };
 
-  // Decorative scenery (pure data → instanced meshes): trees, boulders, pebbles, bushes,
-  // grass, flowers, rivers, roads — biome-aware, deterministic, no colliders. Keep large
-  // props clear of camps, waypoints and the vendor so nothing covers an enemy or stall.
-  const clearings: Clearing[] = [
-    ...SPAWNS.map((s) => ({ x: s.x, z: s.z, r: 7 })),
-    ...BOSS_SPAWNS.map((b) => ({ x: b.x, z: b.z, r: 14 })), // wide arenas for the bosses
-    ...OATHSTONES.map((o) => ({ x: o.x, z: o.z, r: 9 })),
-    VILLAGE_CLEARING, // keep trees/rocks out of the starting town
-  ];
-  const roadTargets = OATHSTONES.filter((o) => o.road).map((o) => ({ x: o.x, z: o.z }));
-  const scenery = generateScenery(WORLD_SIZE, { clearings, roadTargets, seed: 7777 });
-  renderer.scene.add(buildScenery(scenery, field));
+  if (customMap) {
+    field = buildCustomHeightfield(customMap);
+    const assetCols = customColliders(customMap);
+    renderer.scene.add(buildCustomTerrainMesh(field, customMap));
+    renderer.scene.add(buildCustomScenery(customMap, field));
+    scenery = customSceneryForMinimap(customMap);
+    props = new THREE.Group(); // custom maps add no separate collidable-rock mesh
+    mapSize = customMap.size;
+    if (customMap.village != null) {
+      // Town included: the standard Oathhold town renders at the world origin (v1 — the
+      // marker's position/rotation isn't applied yet). Keep the player spawn near origin.
+      colliders = [...assetCols, ...villageCylinders()];
+      movementBoxes = villageBoxes();
+    } else {
+      colliders = assetCols;
+      movementBoxes = [];
+      villageEnabled = false;
+    }
+  } else {
+    // Boss arenas + the starting village are levelled into flat shelves.
+    const flats = [...BOSS_SPAWNS.map((b) => ({ x: b.x, z: b.z, r: 17 })), VILLAGE_FLAT];
+    field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337, flats);
+    // Collidable rocks (the only physical props — scenery below is purely visual). Count
+    // scales with the larger world; the generator keeps them clear of the spawn.
+    colliders = [...generateColliders(WORLD_SIZE, 160, 99), ...villageCylinders()];
+    renderer.scene.add(buildTerrainMesh(field));
+    const rocks = buildProps(colliders, field);
+    renderer.scene.add(rocks);
+    props = rocks;
+    // Decorative scenery (pure data → instanced meshes): trees, boulders, pebbles, bushes,
+    // grass, flowers, rivers, roads — biome-aware, deterministic, no colliders. Keep large
+    // props clear of camps, waypoints and the vendor so nothing covers an enemy or stall.
+    const clearings: Clearing[] = [
+      ...SPAWNS.map((s) => ({ x: s.x, z: s.z, r: 7 })),
+      ...BOSS_SPAWNS.map((b) => ({ x: b.x, z: b.z, r: 14 })), // wide arenas for the bosses
+      ...OATHSTONES.map((o) => ({ x: o.x, z: o.z, r: 9 })),
+      VILLAGE_CLEARING, // keep trees/rocks out of the starting town
+    ];
+    const roadTargets = OATHSTONES.filter((o) => o.road).map((o) => ({ x: o.x, z: o.z }));
+    scenery = generateScenery(WORLD_SIZE, { clearings, roadTargets, seed: 7777 });
+    renderer.scene.add(buildScenery(scenery, field));
+  }
+  const terrain = renderer.scene.getObjectByName('terrain')!;
 
   // Entities.
   const world = new World();
@@ -253,14 +295,28 @@ export function boot(options: BootOptions = {}): Game {
   const grid = new SpatialGrid(8);
   const projectiles = new Projectiles();
   const telemetry = new Telemetry();
-  const player = createPlayer(world, field, 0, 0);
-  for (const s of SPAWNS) {
+  const player = createPlayer(world, field, playerStart.x, playerStart.z);
+  const spawnList = customMap ? customSpawns(customMap) : SPAWNS;
+  for (const s of spawnList) {
     spawnEnemy(world, field, s.id, s.x, s.z, { level: s.level, tier: s.tier, name: s.name });
   }
   // World bosses (0.6.0 CP2): one solo boss deep in each of the three highest frontiers.
-  for (const b of BOSS_SPAWNS) spawnBoss(world, field, b.id, b.x, b.z);
-  for (const o of OATHSTONES) createOathstone(world, field, o.id, o.name, o.x, o.z);
-  createVendor(world, field, 'Quartermaster', 3, -3);
+  const bossList = customMap ? customBosses(customMap) : BOSS_SPAWNS;
+  for (const b of bossList) spawnBoss(world, field, b.id, b.x, b.z);
+  // Oathstones (fast-travel network). For a custom map with none placed, drop a "Home"
+  // stone at the spawn so the player's respawn binds and travel still works.
+  const stoneList = customMap
+    ? customMap.oathstones.length
+      ? customMap.oathstones
+      : [{ id: 'home', name: 'Home', x: playerStart.x, z: playerStart.z }]
+    : OATHSTONES;
+  for (const o of stoneList) createOathstone(world, field, o.id, o.name, o.x, o.z);
+  // Vendor: at the town when present; otherwise just beside the player spawn so the
+  // sell/buy loop works on a wilderness map.
+  const vendorPos = customMap && customMap.village == null
+    ? { x: playerStart.x + 3, z: playerStart.z - 3 }
+    : { x: 3, z: -3 };
+  createVendor(world, field, 'Quartermaster', vendorPos.x, vendorPos.z);
   telemetry.attach(world, player);
 
   // Onboarding: the "teach the loop" checklist. Returning players (flagged in
@@ -281,7 +337,7 @@ export function boot(options: BootOptions = {}): Game {
   // waypoint → recovery → telemetry. Waypoint runs after movement so it sees the
   // updated position, and before recovery so respawn binds to the stone just visited.
   world.addSystem(createSpatialSystem(grid));
-  world.addSystem(createMovementSystem({ input, field, colliders, boxes: villageBoxes() }));
+  world.addSystem(createMovementSystem({ input, field, colliders, boxes: movementBoxes }));
   world.addSystem(createCombatSystem({ input, rng, colliders, field, projectiles, grid }));
   world.addSystem(createEnemyAiSystem({ field, colliders, rng, grid, projectiles }));
   world.addSystem(createBossAiSystem({ field }));
@@ -290,16 +346,16 @@ export function boot(options: BootOptions = {}): Game {
   world.addSystem(createGroundAoeSystem(rng));
   world.addSystem(createLootSystem());
   world.addSystem(createWaypointSystem());
-  world.addSystem(createRecoverySystem({ field, spawnX: 0, spawnZ: 0 }));
+  world.addSystem(createRecoverySystem({ field, spawnX: playerStart.x, spawnZ: playerStart.z }));
   world.addSystem(createTelemetrySystem(telemetry));
 
   // Render / UI.
   const sky = new Sky(renderer.scene);
-  const village = new VillageView(renderer.scene, field);
+  const village = villageEnabled ? new VillageView(renderer.scene, field) : null;
   const playerView = new PlayerView(renderer.scene);
   const ambientLife = new AmbientLife(renderer.scene);
   // Buildings join the camera's occlusion obstacles so the chase camera springs off walls.
-  const cameraRig = new CameraRig(renderer.camera, input, [terrain, props, village.buildings]);
+  const cameraRig = new CameraRig(renderer.camera, input, [terrain, props, ...(village ? [village.buildings] : [])]);
   const enemyView = new EnemyView(renderer.scene);
   const lootView = new LootView(renderer.scene);
   const projectileView = new ProjectileView(renderer.scene, projectiles);
@@ -312,7 +368,7 @@ export function boot(options: BootOptions = {}): Game {
   hud.setPlayerName(playerName);
   const vignette = new Vignette(uiRoot);
   const goalTracker = new GoalTracker(uiRoot);
-  const minimap = new Minimap(uiRoot, WORLD_SIZE, field, scenery);
+  const minimap = new Minimap(uiRoot, mapSize, field, scenery);
   // One shared item tooltip on <body> (outside the zoom-scaled #ui-root), used by both
   // the inventory bag and the character sheet — only one panel is open at a time.
   const itemTooltip = new ItemTooltip(document.body);
@@ -617,7 +673,7 @@ export function boot(options: BootOptions = {}): Game {
       playerView.setLabel(playerName, world.get<Progression>(player, C.Progression)?.level ?? 1);
       playerView.update(x, y, z, yaw, rdt, speed, pcId);
       ambientLife.update(rdt, x, z, field);
-      village.update(rdt);
+      village?.update(rdt);
       cameraRig.update(x, y, z);
       sky.update(renderer.camera, rdt);
 

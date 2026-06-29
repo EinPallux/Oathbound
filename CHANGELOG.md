@@ -5,6 +5,18 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Map loader — load custom maps from the Admin Tools Map Builder (owner-requested, additive)
+**Goal:** let maps designed in the new web **Map Builder** (the separate `Oathbound-AdminTools` repo) load straight into the game. **Non-destructive:** with no `?map=`, `getActiveMap()` is null and the procedural world boots exactly as before (all 18 e2e unchanged).
+- **Map format** (`src/world/map-format.ts`, byte-for-byte mirror of the builder's `src/format/map.ts`): a versioned JSON — base64 Int16-centimetre heightfield + per-cell biome grid, lakes/rivers/roads, placed assets (built-in props + custom primitive-built assets), enemy spawns/bosses/Oathstones, player spawn, optional town. Pure (no `three`/DOM).
+- **Loader** — pure `src/world/custom-map.ts` (heightfield, colliders from boulders + custom assets that declare one, valid spawns/bosses, biome sampler, a minimap Scenery) + render `src/render/custom-map-view.ts` (biome-tinted terrain mesh, instanced props, lake discs, river/road ribbons) reusing the game's **exact** prop geometry (`src/render/asset-geometry.ts`) so authored maps read the same in-engine. Respects the sim/render split.
+- **Boot:** `src/main.ts` reads `?map=<name>`, fetches `public/maps/<name>.oathbound-map.json` and sets the active map **before** `runApp()`; `bootstrap` branches the world build on it. On a town-less map the vendor relocates beside the player spawn and a `Home` Oathstone is auto-added if none was placed, so the sell loop / respawn / fast-travel all work. *(v1 note: including the town renders the standard Oathhold at the world origin — the marker's position/rotation isn't applied yet.)*
+- A playable **demo** ships at `public/maps/sample.oathbound-map.json` → run with `?map=sample`.
+- Tests: new `tests/unit/custom-map.ts` (height pack round-trip, collider/spawn/boss derivation, biome sampling, minimap scenery) → **308 unit**.
+
+**Verified:** `typecheck` ✓ · `npm test` → 308/308 ✓ · `build` ✓ · `test:e2e` → 18/18 ✓ · headless boot of `?map=sample` builds the custom world (player spawn, the map's enemies in combat, draped road, props, lake, minimap) with **zero console errors**; default boot (no `?map=`) unchanged.
+
+---
+
 ## 0.7.2-INDEV — ⚡ Performance pass (owner-requested: 20–30 → 60-70+ FPS, no content cut)
 **Goal:** lift the framerate to a smooth 60-70+ without removing any world, enemies, or detail. A scene profile (via `renderer.info`) found the cost in three places — a huge fixed triangle load, a per-enemy draw-call explosion, and PBR fill cost — so the fixes target each. Headless software-GL numbers (no GPU) at the starter camp: **draw calls 214 → ~120**, **triangles 537k → 258k**, frame time **−40%**; the fill-rate wins below help real GPUs even more than the software rasteriser shows. Pure rendering — the sim, world data, and gameplay are untouched.
 - **Terrain render tessellation decoupled from the heightfield.** The single world-spanning terrain mesh was drawn at the full gameplay sampling density (433² → ~373k triangles, never culled — ~70% of the whole frame). It now draws at ~half density (`TERRAIN_RENDER_RES`, ~93k triangles, a 4× cut) while still sampling heights from the full-res field at every vertex, so the landforms are pixel-identical at the low-poly art scale. Ground-snap/collision (which read the field, not the mesh) are unchanged.
