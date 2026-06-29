@@ -42,7 +42,7 @@ export class SettingsPanel {
 
     const title = document.createElement('div');
     title.className = 'inv-title';
-    title.textContent = 'Settings — O to close';
+    title.textContent = 'Settings — Esc / O to close';
     this.root.appendChild(title);
 
     const groups = document.createElement('div');

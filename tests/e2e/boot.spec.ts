@@ -49,7 +49,7 @@ test('boots the vertical slice, renders, and runs the loop', async ({ page }) =>
   await page.goto('/');
 
   await expect(page.locator('#game')).toBeVisible();
-  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.7.0-INDEV');
+  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.7.1-INDEV');
 
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
   const running = await page.evaluate(() => window.__oathbound!.loop.isRunning);
@@ -385,6 +385,32 @@ test('Controls: rebinding a key takes effect in-game and persists across reload'
   await expect(
     page.locator('.keybind-row', { hasText: 'Inventory' }).locator('.keybind-key'),
   ).toHaveText('J');
+});
+
+test('UI pass: unit frames, Esc menu (layered), and the micro-bar', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
+  await page.evaluate(() => window.__oathbound!.debugSetClass('warrior'));
+
+  // The floating controls hint is gone; the player unit-frame is present.
+  await expect(page.locator('.controls-hint')).toHaveCount(0);
+  await expect(page.locator('.unit-frame.player')).toBeVisible();
+
+  // Tab shows the target unit-frame (right of the player frame).
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.unit-frame.target')).toBeVisible();
+
+  // Layered Esc: first clears the target, then opens the settings menu, then closes it.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.unit-frame.target')).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.settings-panel')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.settings-panel')).toBeHidden();
+
+  // The micro-bar's first button opens the inventory.
+  await page.locator('.micro-bar .micro-btn').first().click();
+  await expect(page.locator('.inv-panel')).toBeVisible();
 });
 
 test('progress persists across a reload (save v1)', async ({ page }) => {

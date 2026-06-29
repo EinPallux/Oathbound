@@ -98,6 +98,7 @@ import { GoalTracker } from '../render/goal-tracker';
 import { Minimap } from '../render/minimap';
 import { ClassSelect } from '../render/class-select';
 import { SettingsPanel } from '../render/settings-panel';
+import { MicroBar } from '../render/micro-bar';
 import { Vignette } from '../render/vignette';
 import { loadSettings, saveSettings, applySettings, tierTag } from './settings';
 import { loadKeybinds, saveKeybinds } from './keybinds';
@@ -286,6 +287,26 @@ export function boot(): Game {
     saveKeybinds(keybinds);
     input.setKeybinds(keybinds);
   };
+
+  // Micro-bar (bottom-right): click-to-open shortcuts mirroring the hotkeys.
+  const microBar = new MicroBar(uiRoot);
+  microBar.onInventory = () => {
+    vendorPanel.close();
+    travelPanel.close();
+    invPanel.toggle();
+  };
+  microBar.onTravel = () => {
+    if (invPanel.isOpen) invPanel.toggle();
+    vendorPanel.close();
+    travelPanel.toggle();
+  };
+  microBar.onMap = () => minimap.toggleMap();
+  microBar.onSettings = () => settingsPanel.toggle();
+  microBar.onFullscreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    else void document.documentElement.requestFullscreen().catch(() => {});
+  };
+
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
@@ -467,6 +488,16 @@ export function boot(): Game {
       }
       if (input.consumeToggleMap()) minimap.toggleMap();
       if (input.consumeToggleSettings()) settingsPanel.toggle();
+      // Esc, layered: close the topmost panel → else clear the target → else open the menu.
+      if (input.consumeEscape()) {
+        if (settingsPanel.isOpen) settingsPanel.close();
+        else if (invPanel.isOpen) invPanel.toggle();
+        else if (vendorPanel.isOpen) vendorPanel.close();
+        else if (travelPanel.isOpen) travelPanel.close();
+        else if (minimap.isMapOpen) minimap.closeMap();
+        else if (playerTarget.entity != null) playerTarget.entity = null;
+        else settingsPanel.open();
+      }
       // F interact: close an open vendor panel, else grab nearby loot, else open the
       // vendor panel when standing by a vendor. (Centralized interact key.)
       if (input.consumeInteract()) {

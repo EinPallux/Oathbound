@@ -5,6 +5,19 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.7.1-INDEV — "UI Pass" → HUD restyle (owner-requested, after the 0.7.0 playtest)
+**Goal:** a focused HUD/UX pass from playtest feedback — a proper unit-frame look, an Esc menu, and mouse-friendly access. **Reconciled onto the parallel "Launch UI" overhaul (PR #36): this layers the new layout/features on top of #36's design system + game-icons rather than replacing them** (the hud.ts/styles.css merge conflicts were resolved that way). No gameplay change.
+- **Player + target unit-frames** (top-centre, facing each other), rebuilt to a classic MMO look — using **#36's design tokens + SVG icons**: a gold-framed portrait (your **class icon**, a skull for the target), the name (Cinzel display), a level, and bars — your **HP in green + a gold resource bar** (with #36's heart/resource icons) + a slim XP sliver, the target's **HP in red**. Replaces the old bottom-left player panel + plain target strip.
+- **Esc opens the menu.** Esc is now layered: **close the topmost open panel → else clear the target → else open the Settings menu** (it was previously only "clear target", and Settings had no obvious opener). Settings still opens with `O` too.
+- **Micro-bar** (bottom-right): a compact row of icon buttons — **Inventory · Fast travel · Map · Settings · Fullscreen** — styled in the launch design, mirroring the hotkeys.
+- **Removed the floating controls hint** that overlapped the cast bar (controls now live in **Settings → Controls**, rebindable).
+- Internal: Esc handling moved out of the combat sim into the central bootstrap input layer (`consumeClearTarget` → `consumeEscape`).
+- Tests: full suites green after the #36 reconciliation → **295 unit**; a new **UI-pass e2e** (controls hint gone, player + target unit-frames, layered Esc clears→menu, micro-bar opens the bag) → **17 e2e**. Version → `0.7.1-INDEV`.
+
+**Verified:** `typecheck` ✓ · `npm test` → 295/295 ✓ · `build` ✓ · `test:e2e` → 17/17 ✓.
+
+---
+
 ## 0.7.0-INDEV — "Feel & Finish" → UX, Accessibility & Content Polish *(✅ feature-complete — awaiting playtest)*
 **Goal:** make the game *feel finished to use* — full menus, tooltips/comparison, an audio + VFX pass, onboarding polish, and the **accessibility commit list** ([docs/design/UX_AND_ACCESSIBILITY.md](./docs/design/UX_AND_ACCESSIBILITY.md)), all persisting and taking effect without restart. **Gameplay feature-freeze begins** (no new systems). Built in verified checkpoints.
 

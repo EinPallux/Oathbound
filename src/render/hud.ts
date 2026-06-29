@@ -24,7 +24,7 @@ import { icon } from './ui/icons';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 const PICKUP_RADIUS = 2.5;
-
+/** Class portrait icon for the unit-frame (game-icons SVG). */
 const CLASS_ICON: Record<string, string> = { warrior: 'sword', hunter: 'bow', priest: 'staff' };
 const RES_ICON: Record<string, string> = { Fury: 'flame', Focus: 'focus', Mana: 'droplet' };
 const RES_MOD: Record<string, string> = { Fury: 'fury', Focus: 'focus', Mana: 'mana' };
@@ -89,6 +89,8 @@ export class Hud {
   private readonly goldVal: HTMLSpanElement;
   private resIcoKey = '';
   private readonly nameEl: HTMLDivElement;
+  private readonly levelEl: HTMLDivElement;
+  private readonly portraitEl: HTMLDivElement;
   private readonly stateEl: HTMLDivElement;
   private readonly hotbar: HTMLDivElement;
   private slots: { wrap: HTMLDivElement; cd: HTMLDivElement }[] = [];
@@ -102,20 +104,25 @@ export class Hud {
   private lastMs = performance.now();
 
   constructor(parent: HTMLElement) {
-    const frame = div('player-frame', parent);
-    const header = div('player-header', frame);
-    this.nameEl = div('player-name', header);
-    this.stateEl = div('player-state', header);
+    // Player unit-frame (top-centre, left of the target): portrait + name/level + bars.
+    const frame = div('unit-frame player', parent);
+    this.portraitEl = div('unit-portrait', frame);
+    const body = div('unit-body', frame);
 
-    const hp = div('bar hp', frame);
+    const top = div('unit-top', body);
+    this.nameEl = div('unit-name', top);
+    this.stateEl = div('player-state', top);
+
+    const hp = div('bar hp', body);
     this.hpFill = div('bar-fill', hp);
     div('bar-ico', hp).innerHTML = icon('heart');
     this.hpText = div('bar-text', hp);
-    this.resBar = div('bar fury', frame);
+    this.levelEl = div('unit-level', body);
+    this.resBar = div('bar fury', body);
     this.resFill = div('bar-fill', this.resBar);
     this.resIco = div('bar-ico', this.resBar);
     this.resText = div('bar-text', this.resBar);
-    const xp = div('bar xp', frame);
+    const xp = div('bar xp', body);
     this.xpFill = div('bar-fill', xp);
 
     this.castBar = div('cast-bar', parent);
@@ -172,12 +179,14 @@ export class Hud {
     const cs = world.get<CombatState>(player, C.CombatState);
     const st = world.get<Statuses>(player, C.Statuses);
 
+    this.portraitEl.innerHTML = icon(CLASS_ICON[cls.id] ?? 'sword');
+    this.nameEl.textContent = cls.name;
     const shield = world.get<Shield>(player, C.Shield);
     if (h) {
       const r = h.max > 0 ? h.current / h.max : 0;
       this.hpFill.style.width = `${Math.max(0, r) * 100}%`;
       const shieldTxt = shield && shield.amount > 0 ? ` (+${Math.ceil(shield.amount)})` : '';
-      this.hpText.textContent = `${Math.ceil(Math.max(0, h.current))} / ${h.max}${shieldTxt}`;
+      this.hpText.textContent = `${Math.ceil(Math.max(0, h.current))}/${h.max}${shieldTxt}`;
     }
     if (res) {
       const rname = cls.resource.name;
@@ -187,12 +196,12 @@ export class Hud {
         this.resIco.innerHTML = icon(RES_ICON[rname] ?? 'flame');
       }
       this.resFill.style.width = `${(res.current / res.max) * 100}%`;
-      this.resText.textContent = `${Math.floor(res.current)} ${rname}`;
+      this.resText.textContent = `${Math.floor(res.current)}/${res.max}`;
     }
     if (prog) {
       const r = prog.xpToNext === Infinity ? 1 : prog.xp / prog.xpToNext;
       this.xpFill.style.width = `${Math.min(1, r) * 100}%`;
-      this.nameEl.innerHTML = `${icon(CLASS_ICON[pc?.id ?? 'warrior'] ?? 'sword')}${cls.name}<span class="lvl">Lv ${prog.level}</span>`;
+      this.levelEl.textContent = `Lv ${prog.level}`;
     }
     if (cs) {
       const shaken = hasStatus(st, Status.Shaken);
