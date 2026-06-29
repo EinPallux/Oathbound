@@ -79,6 +79,7 @@ import type { TelemetrySnapshot } from '../sim/telemetry';
 import { Rng } from '../core/rng';
 import { buildTerrainMesh, buildProps } from '../render/terrain-mesh';
 import { buildScenery } from '../render/scenery-view';
+import { Sky } from '../render/sky';
 import { AmbientLife } from '../render/ambient-life';
 import { PlayerView } from '../render/player-view';
 import { CameraRig } from '../render/camera-rig';
@@ -283,6 +284,7 @@ export function boot(options: BootOptions = {}): Game {
   world.addSystem(createTelemetrySystem(telemetry));
 
   // Render / UI.
+  const sky = new Sky(renderer.scene);
   const playerView = new PlayerView(renderer.scene);
   const ambientLife = new AmbientLife(renderer.scene);
   const cameraRig = new CameraRig(renderer.camera, input, [terrain, props]);
@@ -604,6 +606,7 @@ export function boot(options: BootOptions = {}): Game {
       playerView.update(x, y, z, yaw, rdt, speed, pcId);
       ambientLife.update(rdt, x, z, field);
       cameraRig.update(x, y, z);
+      sky.update(renderer.camera, rdt);
 
       enemyView.update(world, renderer.camera, alpha, rdt, playerTarget.entity);
       lootView.update(world);
