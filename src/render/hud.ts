@@ -1,6 +1,6 @@
-// The heads-up display (DOM overlay): player frame (HP/resource/XP/level), the class
-// ability hotbar with cooldown + affordability state, a gold counter, a loot prompt,
-// and a transient toast stack. Reads sim state each frame; never mutates it. ADR-002.
+// The heads-up display (DOM overlay): player frame (name/HP/resource/XP/level), the class
+// ability hotbar with cooldown + affordability state, a loot prompt, and a transient toast
+// stack. Reads sim state each frame; never mutates it. ADR-002.
 
 import type { World, Entity } from '../core/ecs/world';
 import {
@@ -10,7 +10,6 @@ import {
   type Resource,
   type AbilityState,
   type Progression,
-  type Inventory,
   type CombatState,
   type Statuses,
   type LootDrop,
@@ -88,7 +87,6 @@ export class Hud {
   private readonly xpFill: HTMLDivElement;
   private readonly xpCur: HTMLDivElement;
   private readonly xpPct: HTMLDivElement;
-  private readonly goldVal: HTMLSpanElement;
   private resIcoKey = '';
   private portraitKey = '';
   private readonly nameEl: HTMLDivElement;
@@ -100,7 +98,6 @@ export class Hud {
   private hotbarSig = '';
   private readonly castBar: HTMLDivElement;
   private readonly castFill: HTMLDivElement;
-  private readonly goldEl: HTMLDivElement;
   private readonly promptEl: HTMLDivElement;
   private readonly toastWrap: HTMLDivElement;
   private readonly toasts: Toast[] = [];
@@ -131,9 +128,6 @@ export class Hud {
     this.castBar.style.display = 'none';
 
     this.hotbar = div('hotbar', parent);
-    this.goldEl = div('gold', parent);
-    this.goldEl.innerHTML = `${icon('coin')}<span class="gv">0</span>`;
-    this.goldVal = this.goldEl.querySelector('.gv') as HTMLSpanElement;
     this.promptEl = div('loot-prompt', parent);
     this.promptEl.style.display = 'none';
     this.toastWrap = div('toast-wrap', parent);
@@ -143,6 +137,11 @@ export class Hud {
     this.xpFill = div('xp-fill', xpBar);
     this.xpCur = div('xp-cur', xpBar);
     this.xpPct = div('xp-pct', xpBar);
+  }
+
+  /** Set the character's display name shown in the player unit-frame. */
+  setPlayerName(name: string): void {
+    this.nameEl.textContent = name;
   }
 
   toast(text: string, kind: 'info' | 'good' | 'rare' | 'epic' | 'legendary' | 'relic' = 'info'): void {
@@ -182,15 +181,15 @@ export class Hud {
     // At Lv 30 the capstone empowers a signature ability (name + power); reflect it here.
     const abilities = empowerKit(cls, resolveKit(cls, pc?.choices), prog?.level ?? 1);
     const ab = world.get<AbilityState>(player, C.AbilityState);
-    const inv = world.get<Inventory>(player, C.Inventory);
     const cs = world.get<CombatState>(player, C.CombatState);
     const st = world.get<Statuses>(player, C.Statuses);
 
-    // Portrait/name only change on a class switch — avoid re-parsing the SVG every frame.
+    // Portrait only changes on a class switch — avoid re-parsing the SVG every frame.
+    // The unit-frame name shows the character's name (setPlayerName); the class is shown
+    // on the level line below.
     if (cls.id !== this.portraitKey) {
       this.portraitKey = cls.id;
       this.portraitEl.innerHTML = icon(CLASS_ICON[cls.id] ?? 'sword');
-      this.nameEl.textContent = cls.name;
     }
     const shield = world.get<Shield>(player, C.Shield);
     if (h) {
@@ -213,7 +212,7 @@ export class Hud {
       const capped = prog.xpToNext === Infinity;
       const r = capped ? 1 : prog.xp / prog.xpToNext;
       this.xpFill.style.width = `${Math.min(1, r) * 100}%`;
-      this.levelEl.textContent = `Lv ${prog.level}`;
+      this.levelEl.textContent = `Lv ${prog.level} · ${cls.name}`;
       if (capped) {
         this.xpCur.textContent = 'MAX LEVEL';
         this.xpPct.textContent = '100%';
@@ -268,8 +267,6 @@ export class Hud {
     } else {
       this.castBar.style.display = 'none';
     }
-
-    if (inv) this.goldVal.textContent = `${inv.gold}`;
 
     // Loot prompt: nearest item drop in range.
     this.promptEl.style.display = 'none';

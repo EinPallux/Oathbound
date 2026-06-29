@@ -2042,7 +2042,7 @@ body {
   flex-wrap: wrap;
   justify-content: center;
 }
-.char-slot {
+.cs-slot {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2055,7 +2055,7 @@ body {
   border-radius: 12px;
   box-shadow: var(--shadow-panel), var(--edge-hi);
 }
-.char-slot.empty {
+.cs-slot.empty {
   justify-content: center;
   font: inherit;
   color: var(--ink-faint);
@@ -2063,35 +2063,35 @@ body {
   cursor: pointer;
   transition: border-color 0.14s ease, color 0.14s ease, transform 0.14s ease;
 }
-.char-slot.empty:hover {
+.cs-slot.empty:hover {
   border-color: var(--gold);
   color: var(--gold-bright);
   transform: translateY(-4px);
 }
-.char-slot-plus {
+.cs-slot-plus {
   font-size: 46px;
   line-height: 1;
   color: var(--gold-deep);
 }
-.char-slot.empty:hover .char-slot-plus {
+.cs-slot.empty:hover .cs-slot-plus {
   color: var(--gold);
 }
-.char-slot-ico {
+.cs-slot-ico {
   font-size: 50px;
   color: var(--gold);
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
 }
-.char-slot-name {
+.cs-slot-name {
   font-family: var(--font-display);
   font-size: 19px;
   letter-spacing: 0.04em;
   color: var(--gold-bright);
 }
-.char-slot-meta {
+.cs-slot-meta {
   font-size: 12.5px;
   color: var(--ink-dim);
 }
-.char-slot-actions {
+.cs-slot-actions {
   display: flex;
   flex-direction: column;
   gap: 8px;
