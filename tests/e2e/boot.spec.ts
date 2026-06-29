@@ -240,7 +240,7 @@ test('a world boss spawns and its fight runs without errors', async ({ page }) =
   // this exercises boss-ai (phases + telegraphed heavy → ground-AoE) and the boss/danger
   // render paths in a real browser. We only assert it stays healthy and error-free.
   await page.evaluate(() => window.__oathbound!.debugSetLevel(30));
-  await page.evaluate(() => window.__oathbound!.debugTeleport(-213, -20));
+  await page.evaluate(() => window.__oathbound!.debugTeleport(-294, 0));
   await page.waitForTimeout(2500);
 
   const running = await page.evaluate(() => window.__oathbound!.loop.isRunning);

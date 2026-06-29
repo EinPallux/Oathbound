@@ -66,37 +66,79 @@ const BUILDING_PALETTE: Record<Building['type'], Palette> = {
   house: { wall: 0xcabfa3, roof: 0x7c4a38, door: 0x4f3a22, window: 0x3a4b54, trim: 0x5a4632 },
   blacksmith: { wall: 0x70706f, roof: 0x3f3b38, door: 0x2c2622, window: 0x2a3338, trim: 0x4a4642 },
   tavern: { wall: 0xb79f78, roof: 0x77492f, door: 0x4a3520, window: 0x3a4b54, trim: 0x5c4326 },
+  hall: { wall: 0xa89a80, roof: 0x55606e, door: 0x4a3a26, window: 0x3a4b54, trim: 0x6a5a42 },
+  chapel: { wall: 0xcdc6b2, roof: 0x6a5648, door: 0x4a3826, window: 0x3f5560, trim: 0x7a6a52 },
+  tower: { wall: 0x8c857a, roof: 0x4a4640, door: 0x3a342c, window: 0x2e342f, trim: 0x6a6258 },
+  shop: { wall: 0xc2b48e, roof: 0x84543a, door: 0x4a3622, window: 0x3a4b54, trim: 0x6a4f2e },
+  barn: { wall: 0x8c5e38, roof: 0x5e4226, door: 0x3a2a18, window: 0x2e2418, trim: 0x6a4a2c },
 };
 
 /** Local-space parts for one building (centred at origin, +z is the front). */
 function buildingParts(b: Building): Part[] {
   const pal = BUILDING_PALETTE[b.type];
   const parts: Part[] = [];
-  // Walls.
+  const hw = b.w / 2;
+  const hd = b.d / 2;
+  // Walls + a base sill line.
   parts.push({ geo: box(b.w, b.h, b.d).translate(0, b.h / 2, 0), color: pal.wall });
-  // A timber sill line near the base for a bit of definition.
   parts.push({ geo: box(b.w + 0.06, 0.18, b.d + 0.06).translate(0, 0.12, 0), color: pal.trim });
-  // Hip/pyramid roof (a 4-sided cone), overhanging the walls a touch.
-  const rh = b.type === 'blacksmith' ? 1.5 : 1.7;
-  const k = 1.08 / 0.7071;
-  parts.push({
-    geo: new THREE.ConeGeometry(1, rh, 4)
-      .rotateY(Math.PI / 4)
-      .scale((b.w / 2) * k, 1, (b.d / 2) * k)
-      .translate(0, b.h + rh / 2, 0),
-    color: pal.roof,
-  });
-  // Door on the front (+z) wall.
-  parts.push({ geo: box(1.0, 1.5, 0.12).translate(0, 0.75, b.d / 2 + 0.02), color: pal.door });
-  // Front windows flanking the door, plus one on each side wall.
+
+  if (b.type === 'tower') {
+    // Crenellated flat top instead of a roof.
+    parts.push({ geo: box(b.w + 0.3, 0.25, b.d + 0.3).translate(0, b.h + 0.12, 0), color: pal.trim });
+    const r = hw + 0.12;
+    for (const [mx, mz] of [[-r, -r], [0, -r], [r, -r], [r, 0], [r, r], [0, r], [-r, r], [-r, 0]] as const)
+      parts.push({ geo: box(0.32, 0.45, 0.32).translate(mx, b.h + 0.42, mz), color: pal.wall });
+    parts.push({ geo: box(0.08, 1.3, 0.08).translate(0, b.h + 1.1, 0), color: 0x3a342c });
+    parts.push({ geo: box(0.7, 0.4, 0.04).translate(0.35, b.h + 1.5, 0), color: 0xb0473c });
+  } else {
+    // Hip/pyramid roof (steeper on the chapel, broader on the hall/barn).
+    const rh = b.type === 'chapel' ? 2.6 : b.type === 'hall' || b.type === 'barn' ? 2.1 : 1.7;
+    const k = 1.08 / 0.7071;
+    parts.push({
+      geo: new THREE.ConeGeometry(1, rh, 4).rotateY(Math.PI / 4).scale(hw * k, 1, hd * k).translate(0, b.h + rh / 2, 0),
+      color: pal.roof,
+    });
+  }
+
+  // Door (the barn gets big stable doors, the hall a grand one).
+  const dw = b.type === 'barn' ? 2.2 : b.type === 'hall' ? 1.7 : 1.0;
+  const dh = b.type === 'barn' ? 2.3 : b.type === 'hall' ? 2.1 : 1.5;
+  parts.push({ geo: box(dw, dh, 0.12).translate(0, dh / 2, hd + 0.02), color: pal.door });
+
+  // Windows — front pair (not on the barn's big door wall) + one per side.
   const wy = Math.min(1.4, b.h - 0.7);
-  parts.push({ geo: box(0.7, 0.7, 0.1).translate(-b.w / 2 + 0.95, wy, b.d / 2 + 0.02), color: pal.window });
-  parts.push({ geo: box(0.7, 0.7, 0.1).translate(b.w / 2 - 0.95, wy, b.d / 2 + 0.02), color: pal.window });
-  parts.push({ geo: box(0.1, 0.7, 0.7).translate(-b.w / 2 - 0.02, wy, 0), color: pal.window });
-  parts.push({ geo: box(0.1, 0.7, 0.7).translate(b.w / 2 + 0.02, wy, 0), color: pal.window });
-  // Chimney for houses, the tavern and the smithy.
-  if (b.type !== 'cottage') {
-    parts.push({ geo: box(0.5, 1.3, 0.5).translate(b.w / 2 - 0.9, b.h + 0.9, b.d / 2 - 0.9), color: pal.trim });
+  if (b.type !== 'barn') {
+    parts.push({ geo: box(0.7, 0.7, 0.1).translate(-hw + 0.95, wy, hd + 0.02), color: pal.window });
+    parts.push({ geo: box(0.7, 0.7, 0.1).translate(hw - 0.95, wy, hd + 0.02), color: pal.window });
+  }
+  parts.push({ geo: box(0.1, 0.7, 0.7).translate(-hw - 0.02, wy, 0), color: pal.window });
+  parts.push({ geo: box(0.1, 0.7, 0.7).translate(hw + 0.02, wy, 0), color: pal.window });
+  if (b.h >= 3.5 && b.type !== 'barn') {
+    parts.push({ geo: box(0.6, 0.6, 0.1).translate(0, b.h - 0.55, hd + 0.02), color: pal.window }); // upper storey
+  }
+
+  // Chimney.
+  if (b.type === 'house' || b.type === 'tavern' || b.type === 'blacksmith' || b.type === 'shop') {
+    parts.push({ geo: box(0.5, 1.3, 0.5).translate(hw - 0.9, b.h + 0.9, hd - 0.9), color: pal.trim });
+  }
+
+  // Landmarks.
+  if (b.type === 'chapel') {
+    const sx = -hw + 0.85;
+    const sz = hd - 0.85;
+    parts.push({ geo: box(1.4, b.h + 1.8, 1.4).translate(sx, (b.h + 1.8) / 2, sz), color: pal.wall });
+    parts.push({ geo: new THREE.ConeGeometry(0.95, 2.8, 4).rotateY(Math.PI / 4).translate(sx, b.h + 1.8 + 1.4, sz), color: pal.roof });
+    parts.push({ geo: box(0.5, 0.95, 0.08).translate(0, 1.55, hd + 0.03), color: pal.window }); // arched window
+  }
+  if (b.type === 'hall') {
+    for (const cx of [-hw + 0.8, hw - 0.8])
+      parts.push({ geo: new THREE.CylinderGeometry(0.22, 0.24, b.h + 0.1, 8).translate(cx, (b.h + 0.1) / 2, hd + 0.45), color: pal.wall });
+    parts.push({ geo: box(0.09, 2.4, 0.09).translate(0, b.h + 1.2, 0.2), color: 0x3a342c }); // banner pole
+    parts.push({ geo: box(0.9, 1.5, 0.05).translate(0.5, b.h + 1.4, 0.2), color: 0x9a3b3b }); // banner
+  }
+  if (b.type === 'shop') {
+    parts.push({ geo: box(2.4, 0.1, 1.0).rotateX(-0.32).translate(0, 2.05, hd + 0.5), color: 0x8a4a44 }); // awning
   }
   return parts;
 }
@@ -284,7 +326,7 @@ export class VillageView {
       { geo: box(0.3, 0.35, 0.6).translate(0, 0.5, 0), color: 0x2e2a28 },
       { geo: box(0.5, 0.18, 0.5).translate(0, 0.27, 0), color: 0x35302c },
     ]), LAMBERT());
-    anvil.position.set(-11.5, field.sample(-11.5, -3.6), -3.6);
+    anvil.position.set(-8.4, field.sample(-8.4, -9), -9);
     this.group.add(anvil);
 
     // ── Props (merged per type) + lantern flames (emissive) ──
