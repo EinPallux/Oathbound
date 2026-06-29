@@ -1,5 +1,6 @@
-// Entry point. Phase 0.0.2 "Scaffold".
+// Entry point. The app shell (src/game/app.ts) runs the onboarding flow — Login →
+// Character Select → enter world — and boots the play session when a character is chosen.
 import './styles.css';
-import { boot } from './game/bootstrap';
+import { runApp } from './game/app';
 
-boot();
+runApp();

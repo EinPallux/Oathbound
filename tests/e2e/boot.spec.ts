@@ -46,7 +46,7 @@ test('boots the vertical slice, renders, and runs the loop', async ({ page }) =>
   });
   page.on('pageerror', (e) => errors.push(String(e)));
 
-  await page.goto('/');
+  await page.goto('/?autostart');
 
   await expect(page.locator('#game')).toBeVisible();
   await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.7.2-INDEV');
@@ -61,7 +61,7 @@ test('boots the vertical slice, renders, and runs the loop', async ({ page }) =>
 });
 
 test('WASD moves the player and ground-snaps to terrain', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => window.__oathbound !== undefined);
 
   const before = await page.evaluate(() => window.__oathbound!.player());
@@ -76,7 +76,7 @@ test('WASD moves the player and ground-snaps to terrain', async ({ page }) => {
 });
 
 test('attacking damages a Bloomhusk and respects the GCD', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
 
   const before = await page.evaluate(totalEnemyHp);
@@ -102,7 +102,7 @@ test('attacking damages a Bloomhusk and respects the GCD', async ({ page }) => {
 });
 
 test('Tab locks onto an enemy and Esc clears it', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
 
   expect(await page.evaluate(() => window.__oathbound!.target())).toBeNull();
@@ -115,7 +115,7 @@ test('Tab locks onto an enemy and Esc clears it', async ({ page }) => {
 });
 
 test('telemetry counts damage dealt through the real event flow', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
 
   expect(await page.evaluate(() => window.__oathbound!.telemetry().damageDealt)).toBe(0);
@@ -125,7 +125,7 @@ test('telemetry counts damage dealt through the real event flow', async ({ page 
 });
 
 test('plays as the Hunter — ranged shots damage the camp', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
 
   await page.evaluate(() => window.__oathbound!.debugSetClass('hunter'));
@@ -141,7 +141,7 @@ test('plays as the Hunter — ranged shots damage the camp', async ({ page }) =>
 });
 
 test('plays as the Priest — holy Smite damages the camp', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
 
   await page.evaluate(() => window.__oathbound!.debugSetClass('priest'));
@@ -155,7 +155,7 @@ test('plays as the Priest — holy Smite damages the camp', async ({ page }) => 
 });
 
 test('attunes the spawn Oathstone and opens fast travel with T', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => (window.__oathbound?.oathstones().length ?? 0) >= 1);
 
   // The hub Oathstone next to spawn attunes on the first tick (binds the respawn).
@@ -175,7 +175,7 @@ test('attunes the spawn Oathstone and opens fast travel with T', async ({ page }
 });
 
 test('shows the Goal Tracker + minimap and toggles the full map with M', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => window.__oathbound !== undefined);
 
   // Fresh character → the onboarding checklist is up.
@@ -196,7 +196,7 @@ test('shows the Goal Tracker + minimap and toggles the full map with M', async (
 });
 
 test('talents: choosing the other option swaps the hotbar ability', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => window.__oathbound !== undefined);
   await page.evaluate(() => window.__oathbound!.debugSetClass('warrior'));
   await page.evaluate(() => window.__oathbound!.debugSetLevel(18));
@@ -224,7 +224,7 @@ test('a world boss spawns and its fight runs without errors', async ({ page }) =
   });
   page.on('pageerror', (e) => errors.push(String(e)));
 
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
 
   // The three world bosses are tracked enemies with vastly more HP than any mob.
@@ -259,7 +259,7 @@ test('Lv-30 endgame: the Goal Tracker pivots to the relic chase + map renders bo
 
   // Skip the tutorial so the Goal Tracker shows the goals/endgame view.
   await page.addInitScript(() => localStorage.setItem('oathbound.onboarded', '1'));
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => window.__oathbound !== undefined);
   await page.evaluate(() => window.__oathbound!.debugSetClass('warrior'));
   await page.evaluate(() => window.__oathbound!.debugSetLevel(30));
@@ -283,7 +283,7 @@ test('Settings (O): accessibility options apply live and persist across reload',
   });
   page.on('pageerror', (e) => errors.push(String(e)));
 
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => window.__oathbound !== undefined);
 
   // O opens the settings panel.
@@ -326,7 +326,7 @@ test('Settings (O): accessibility options apply live and persist across reload',
 });
 
 test('Inventory: item hover shows a tooltip; Rare+ salvage asks to confirm', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => window.__oathbound !== undefined);
   await page.evaluate(() => window.__oathbound!.debugSetClass('warrior'));
   await page.evaluate(() => window.__oathbound!.debugSetLevel(10)); // past the salvage unlock
@@ -361,7 +361,7 @@ test('Inventory: item hover shows a tooltip; Rare+ salvage asks to confirm', asy
 });
 
 test('Controls: rebinding a key takes effect in-game and persists across reload', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => window.__oathbound !== undefined);
 
   await page.keyboard.press('KeyO'); // open settings
@@ -392,7 +392,7 @@ test('Controls: rebinding a key takes effect in-game and persists across reload'
 });
 
 test('UI pass: unit frames, Esc menu (layered), and the micro-bar', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
   await page.evaluate(() => window.__oathbound!.debugSetClass('warrior'));
 
@@ -418,7 +418,7 @@ test('UI pass: unit frames, Esc menu (layered), and the micro-bar', async ({ pag
 });
 
 test('progress persists across a reload (save v1)', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?autostart');
   await page.waitForFunction(() => window.__oathbound !== undefined);
   expect(await page.evaluate(() => window.__oathbound!.level())).toBe(1);
 
@@ -430,4 +430,56 @@ test('progress persists across a reload (save v1)', async ({ page }) => {
   await page.reload();
   await page.waitForFunction(() => window.__oathbound?.level() === 2);
   expect(await page.evaluate(() => window.__oathbound!.level())).toBe(2);
+});
+
+test('onboarding: login → create a character → enter world → log out → re-enter', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
+  page.on('pageerror', (e) => errors.push(String(e)));
+
+  // No autostart here — we walk the real flow. The login gate shows first.
+  await page.goto('/');
+  await expect(page.locator('.login-screen')).toBeVisible();
+  await expect(page.locator('#game')).toBeVisible();
+  // The world isn't booted until a character is chosen.
+  expect(await page.evaluate(() => window.__oathbound === undefined)).toBe(true);
+
+  // Enter → character select with three empty slots.
+  await page.locator('.login-play').click();
+  await expect(page.locator('.char-select')).toBeVisible();
+  await expect(page.locator('.char-slot.empty.char-create')).toHaveCount(3);
+
+  // Create a Hunter named "Lyra" in the first slot.
+  await page.locator('.char-create').first().click();
+  await expect(page.locator('.char-create-form')).toBeVisible();
+  await page.locator('.create-name').fill('Lyra');
+  // The confirm button is disabled until a class is chosen.
+  await expect(page.locator('.create-confirm')).toBeDisabled();
+  await page.locator('.class-card[data-class="hunter"]').click();
+  await expect(page.locator('.create-confirm')).toBeEnabled();
+  await page.locator('.create-confirm').click();
+
+  // The world boots with that character.
+  await page.waitForFunction(() => window.__oathbound !== undefined);
+  expect(await page.evaluate(() => window.__oathbound!.classId())).toBe('hunter');
+  await page.evaluate(() => window.__oathbound!.save()); // flush the slot before we leave
+
+  // Log out from in-game (micro-bar "Character select / Log out" button) → back to select.
+  await page.locator('.micro-bar .micro-btn').last().click();
+  await expect(page.locator('.char-select')).toBeVisible();
+  const filled = page.locator('.char-slot.filled');
+  await expect(filled).toHaveCount(1);
+  await expect(filled).toContainText('Lyra');
+  await expect(filled).toContainText('Hunter');
+  // Two empty slots remain (max three characters total).
+  await expect(page.locator('.char-slot.empty.char-create')).toHaveCount(2);
+
+  // Re-enter the world with the existing character.
+  await filled.locator('.char-play').click();
+  await page.waitForFunction(() => window.__oathbound !== undefined);
+  expect(await page.evaluate(() => window.__oathbound!.classId())).toBe('hunter');
+
+  expect(errors).toEqual([]);
 });

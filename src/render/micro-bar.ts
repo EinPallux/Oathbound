@@ -18,6 +18,7 @@ export class MicroBar {
   onMap: () => void = () => {};
   onSettings: () => void = () => {};
   onFullscreen: () => void = () => {};
+  onLogout: () => void = () => {};
 
   constructor(parent: HTMLElement) {
     const bar = document.createElement('div');
@@ -28,6 +29,7 @@ export class MicroBar {
     iconBtn(bar, '🗺', 'Map (M)', () => this.onMap());
     iconBtn(bar, '⚙', 'Settings (Esc)', () => this.onSettings());
     iconBtn(bar, '⛶', 'Toggle fullscreen', () => this.onFullscreen());
+    iconBtn(bar, '🚪', 'Character select / Log out', () => this.onLogout());
     parent.appendChild(bar);
   }
 }

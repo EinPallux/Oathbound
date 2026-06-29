@@ -169,7 +169,14 @@ export interface Game {
   stop(): void;
 }
 
-export function boot(): Game {
+export interface BootOptions {
+  /** When set, start a fresh character of this class/name instead of loading a save. */
+  newCharacter?: { name: string; classId: ClassId };
+  /** Invoked when the player chooses "log out / character select" in-game. */
+  onLogout?: () => void;
+}
+
+export function boot(options: BootOptions = {}): Game {
   const canvas = document.getElementById('game') as HTMLCanvasElement | null;
   const uiRoot = document.getElementById('ui-root') as HTMLElement | null;
   if (!canvas || !uiRoot) {
@@ -322,6 +329,7 @@ export function boot(): Game {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     else void document.documentElement.requestFullscreen().catch(() => {});
   };
+  microBar.onLogout = () => options.onLogout?.();
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -467,12 +475,21 @@ export function boot(): Game {
   };
   void loadSave()
     .then((data) => {
-      if (data) applySave(world, player, data);
-      else classSelect.show(); // fresh character → pick a class
+      if (options.newCharacter) {
+        // Brand-new character: the player entity was just created at defaults, so we only
+        // need to apply the chosen class. Its first save is written in finally() below so
+        // the character slot immediately shows as occupied on the select screen.
+        setPlayerClass(world, player, options.newCharacter.classId);
+      } else if (data) {
+        applySave(world, player, data);
+      } else {
+        classSelect.show(); // legacy/fallback: no save and no chosen class → pick one
+      }
     })
     .catch(() => {})
     .finally(() => {
       loaded = true;
+      if (options.newCharacter) autosave();
     });
   const saveTimer = window.setInterval(autosave, 30_000);
   const onHide = (): void => autosave();
