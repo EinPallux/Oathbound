@@ -138,12 +138,16 @@ interface OathstoneSpawn {
 }
 const OATHSTONES: OathstoneSpawn[] = [
   { id: 'oathhold', name: 'Oathhold', x: 0, z: -3 }, // hub — auto-activates at spawn
-  { id: 'millford', name: 'Millford Waystation', x: 30, z: 28, road: true }, // Greenmarch heartland
-  { id: 'thornlodge', name: 'Thornwood Lodge', x: 132, z: 132, road: true }, // Thornwood Vale (NE)
-  { id: 'fenhollow', name: 'Fenhollow Camp', x: 0, z: -132, road: true }, // Sunken Fen (south)
-  { id: 'windbreak', name: 'Windbreak Outpost', x: -132, z: 2, road: true }, // Emberreach (west)
-  { id: 'frostgate', name: 'Frostgate Keep', x: 132, z: 6, road: true }, // The Riven Peaks (east)
-  { id: 'gravegate', name: 'Reclaimed Gatehouse', x: 4, z: 132, road: true }, // Gravereach (north)
+  { id: 'millford', name: 'Millford Waystation', x: 35, z: 38, road: true }, // Greenmarch heartland
+  { id: 'thornlodge', name: 'Thornwood Lodge', x: 158, z: 156, road: true }, // Thornwood Vale (NE)
+  { id: 'fenhollow', name: 'Fenhollow Camp', x: -14, z: -182, road: true }, // Sunken Fen (south)
+  { id: 'windbreak', name: 'Windbreak Outpost', x: -188, z: 8, road: true }, // Emberreach (west)
+  { id: 'frostgate', name: 'Frostgate Keep', x: 176, z: 14, road: true }, // The Riven Peaks (east)
+  { id: 'gravegate', name: 'Reclaimed Gatehouse', x: 6, z: 188, road: true }, // Gravereach (north)
+  // Deep-frontier shrines (discovered on foot) — fast-travel hubs near each world boss.
+  { id: 'emberwatch', name: 'Emberwatch Shrine', x: -256, z: 2 }, // deep Emberreach
+  { id: 'frostpeak', name: 'Frostpeak Cairn', x: 230, z: 10 }, // deep Riven Peaks
+  { id: 'gravecourt', name: 'Hollow Court', x: 8, z: 262 }, // deep Gravereach
 ];
 
 export interface EnemySnapshot {

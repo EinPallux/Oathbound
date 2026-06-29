@@ -95,8 +95,8 @@ export const BOSSES: Record<BossId, BossDef> = {
     goldMin: 180,
     goldMax: 320,
     respawnSec: 300,
-    x: -215,
-    z: -20,
+    x: -296,
+    z: 0,
   },
   // ── The Rimewyrm — the Riven Peaks (far east, frost). ~Lv 25. ──
   rimewyrm: {
@@ -127,8 +127,8 @@ export const BOSSES: Record<BossId, BossDef> = {
     goldMin: 260,
     goldMax: 460,
     respawnSec: 300,
-    x: 215,
-    z: 20,
+    x: 250,
+    z: 12,
   },
   // ── Maelgrith — Gravereach (far north, blight/undead). The Lv-30 capstone boss. ──
   maelgrith: {
@@ -159,8 +159,8 @@ export const BOSSES: Record<BossId, BossDef> = {
     goldMin: 420,
     goldMax: 700,
     respawnSec: 300,
-    x: 0,
-    z: 215,
+    x: 10,
+    z: 292,
   },
 };
 

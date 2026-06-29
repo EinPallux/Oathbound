@@ -382,10 +382,10 @@ function buildRoads(targets: { x: number; z: number }[]): SceneryPath[] {
     const dist = Math.hypot(t.x, t.z);
     if (dist < 1) continue;
     const steps = Math.max(2, Math.round(dist / 10));
-    // Perpendicular unit vector for a slight sinusoidal bend.
+    // Perpendicular unit vector for a slight sinusoidal bend (gentle on long roads).
     const px = -t.z / dist;
     const pz = t.x / dist;
-    const bend = Math.min(18, dist * 0.12);
+    const bend = Math.min(12, dist * 0.06);
     const points: { x: number; z: number }[] = [];
     for (let i = 0; i <= steps; i++) {
       const s = i / steps;

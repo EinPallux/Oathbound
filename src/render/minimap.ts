@@ -253,15 +253,20 @@ export class Minimap {
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
     };
-    // Label with a dark halo so it stays legible over snow / bright terrain.
-    const label = (text: string, x: number, y: number, color: string): void => {
+    // Label beside a marker with a dark halo; flips to the left near the right edge so
+    // names don't run off the map.
+    const label = (text: string, mx: number, y: number, color: string): void => {
+      const flip = mx > size * 0.66;
       ctx.font = '11px ui-monospace, monospace';
+      ctx.textAlign = flip ? 'right' : 'left';
+      const lx = mx + (flip ? -8 : 8);
       ctx.lineWidth = 3;
       ctx.strokeStyle = 'rgba(0,0,0,0.78)';
       ctx.lineJoin = 'round';
-      ctx.strokeText(text, x, y);
+      ctx.strokeText(text, lx, y);
       ctx.fillStyle = color;
-      ctx.fillText(text, x, y);
+      ctx.fillText(text, lx, y);
+      ctx.textAlign = 'left';
     };
 
     // Live enemies (red).
@@ -290,7 +295,7 @@ export class Minimap {
       if (!inBounds(x, y)) continue;
       dot(x, y, centered ? 4 : 6, 'rgba(0,0,0,0.5)');
       dot(x, y, centered ? 3 : 5, os.activated ? '#49d6e0' : '#8aa0b0');
-      if (!centered) label(os.name, x + 8, y + 4, os.activated ? '#dff6f8' : '#cdd8e3');
+      if (!centered) label(os.name, x, y + 4, os.activated ? '#dff6f8' : '#cdd8e3');
     }
 
     // World bosses — a distinct crimson diamond (+ name on the big map). Hidden while slain.
@@ -314,7 +319,9 @@ export class Minimap {
       ctx.stroke();
       if (!centered) {
         const info = world.get<EnemyInfo>(e, C.EnemyInfo);
-        label(info?.name ?? 'World Boss', x + 9, y + 4, '#ffd7da');
+        // Short name on the map (e.g. "Emberhorn") so it doesn't crowd nearby labels.
+        const short = (info?.name ?? 'World Boss').split(',')[0];
+        label(short, x, y + 4, '#ffd7da');
       }
     }
 
