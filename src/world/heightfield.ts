@@ -4,12 +4,20 @@
 
 import { Rng } from '../core/rng';
 import { clamp } from '../core/math';
-import { biomeElevation } from './biomes';
+import { biomeElevation, smoothstep } from './biomes';
+import { carveLakes } from './lakes';
 
 export interface CylinderCollider {
   x: number;
   z: number;
   radius: number;
+}
+
+/** A spot to level into a flat shelf (boss arenas, the starting village). */
+export interface FlatSpot {
+  x: number;
+  z: number;
+  r: number;
 }
 
 export class Heightfield {
@@ -58,7 +66,12 @@ export class Heightfield {
  * The biome ramps only kick in well beyond the hub (see biomes.ts), so a small field
  * (e.g. the 100 m unit-test field) is just the rolling hills + flat spawn as before.
  */
-export function generateHeightfield(size: number, res: number, seed = 1): Heightfield {
+export function generateHeightfield(
+  size: number,
+  res: number,
+  seed = 1,
+  flats: readonly FlatSpot[] = [],
+): Heightfield {
   const rng = new Rng(seed);
   const ox = rng.range(0, 100);
   const oz = rng.range(0, 100);
@@ -66,19 +79,37 @@ export function generateHeightfield(size: number, res: number, seed = 1): Height
   const half = size / 2;
   const cell = size / (res - 1);
 
+  // Base rolling hills: a few sine octaves for natural, varied terrain (a broad
+  // continental swell + mid rolls + finer undulation). Kept moderate so it's traversable.
+  const base = (wx: number, wz: number): number =>
+    Math.sin((wx + ox) * 0.06) * Math.cos((wz + oz) * 0.05) * 2.4 +
+    Math.sin(wx * 0.13 + oz) * 0.7 +
+    Math.cos(wz * 0.11 + ox) * 0.7 +
+    Math.sin((wx - wz) * 0.025 + ox) * 1.5 +
+    Math.sin(wx * 0.014 - oz) * Math.cos(wz * 0.013 + ox) * 3.0;
+
+  // Natural height = base hills + biome landforms, with lake bowls carved in.
+  const natural = (wx: number, wz: number): number =>
+    carveLakes(wx, wz, base(wx, wz) + biomeElevation(wx, wz));
+
+  // Each flat spot levels to its own centre height, so arenas/the village sit on a shelf.
+  const flatTargets = flats.map((s) => ({ ...s, y: natural(s.x, s.z) }));
+
   for (let zi = 0; zi < res; zi++) {
     for (let xi = 0; xi < res; xi++) {
       const wx = -half + xi * cell;
       const wz = -half + zi * cell;
-      let h =
-        Math.sin((wx + ox) * 0.06) * Math.cos((wz + oz) * 0.05) * 2.2 +
-        Math.sin(wx * 0.13 + oz) * 0.6 +
-        Math.cos(wz * 0.11 + ox) * 0.6;
-      h += biomeElevation(wx, wz);
+      let h = natural(wx, wz);
+
+      // Level flat shelves (boss arenas / village) toward their centre height.
+      for (const s of flatTargets) {
+        const d = Math.hypot(wx - s.x, wz - s.z);
+        if (d < s.r) h += (s.y - h) * smoothstep(s.r, s.r * 0.55, d);
+      }
+
       // Flatten a clear spawn area within ~8 units of the origin.
-      const d = Math.hypot(wx, wz);
-      const flat = Math.max(0, 1 - d / 8);
-      h *= 1 - flat;
+      const d0 = Math.hypot(wx, wz);
+      h *= 1 - Math.max(0, 1 - d0 / 8);
       heights[zi * res + xi] = h;
     }
   }
