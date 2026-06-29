@@ -302,7 +302,7 @@ export function boot(options: BootOptions = {}): Game {
   hud.setPlayerName(playerName);
   const vignette = new Vignette(uiRoot);
   const goalTracker = new GoalTracker(uiRoot);
-  const minimap = new Minimap(uiRoot, WORLD_SIZE);
+  const minimap = new Minimap(uiRoot, WORLD_SIZE, field, scenery);
   // One shared item tooltip on <body> (outside the zoom-scaled #ui-root), used by both
   // the inventory bag and the character sheet — only one panel is open at a time.
   const itemTooltip = new ItemTooltip(document.body);
