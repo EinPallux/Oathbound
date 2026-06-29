@@ -5,6 +5,7 @@
 import type { World, Entity } from '../core/ecs/world';
 import { C, type Item, type EquipSlot, type Inventory } from '../core/ecs/components';
 import { vendorValue } from '../sim/vendor';
+import { icon } from './ui/icons';
 
 const SLOT_LABEL: Record<EquipSlot, string> = {
   weapon: 'Weapon',
@@ -37,7 +38,7 @@ export class VendorPanel {
 
     const title = document.createElement('div');
     title.className = 'inv-title';
-    title.textContent = 'Vendor — F to close';
+    title.innerHTML = `${icon('shop')}Vendor — F to close`;
     this.root.appendChild(title);
 
     this.wallet = document.createElement('div');
@@ -76,7 +77,7 @@ export class VendorPanel {
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
-    this.wallet.textContent = `${inv.gold} gold`;
+    this.wallet.innerHTML = `<span class="currency coin">${icon('coin')}${inv.gold} gold</span>`;
 
     this.actions.replaceChildren();
     const sellCommons = document.createElement('button');

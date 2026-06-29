@@ -79,6 +79,7 @@ import type { TelemetrySnapshot } from '../sim/telemetry';
 import { Rng } from '../core/rng';
 import { buildTerrainMesh, buildProps } from '../render/terrain-mesh';
 import { buildScenery } from '../render/scenery-view';
+import { AmbientLife } from '../render/ambient-life';
 import { PlayerView } from '../render/player-view';
 import { CameraRig } from '../render/camera-rig';
 import { EnemyView } from '../render/enemy-view';
@@ -257,6 +258,7 @@ export function boot(): Game {
 
   // Render / UI.
   const playerView = new PlayerView(renderer.scene);
+  const ambientLife = new AmbientLife(renderer.scene);
   const cameraRig = new CameraRig(renderer.camera, input, [terrain, props]);
   const enemyView = new EnemyView(renderer.scene);
   const lootView = new LootView(renderer.scene);
@@ -534,6 +536,7 @@ export function boot(): Game {
       const speed = Math.hypot(pv.x, pv.z);
       const pcId = world.get<PlayerClass>(player, C.PlayerClass)?.id ?? 'warrior';
       playerView.update(x, y, z, yaw, rdt, speed, pcId);
+      ambientLife.update(rdt, x, z, field);
       cameraRig.update(x, y, z);
 
       enemyView.update(world, renderer.camera, alpha, rdt, playerTarget.entity);

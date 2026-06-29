@@ -20,11 +20,50 @@ import {
 } from '../core/ecs/components';
 import { getClass, resolveKit, empowerKit } from '../sim/classes';
 import { hasStatus, Status } from '../sim/combat/statuses';
+import { icon } from './ui/icons';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 const PICKUP_RADIUS = 2.5;
-/** Portrait monogram per class (asset-free, font-safe unit-frame icon). */
-const CLASS_GLYPH: Record<string, string> = { warrior: 'W', hunter: 'H', priest: 'P' };
+/** Class portrait icon for the unit-frame (game-icons SVG). */
+const CLASS_ICON: Record<string, string> = { warrior: 'sword', hunter: 'bow', priest: 'staff' };
+const RES_ICON: Record<string, string> = { Fury: 'flame', Focus: 'focus', Mana: 'droplet' };
+const RES_MOD: Record<string, string> = { Fury: 'fury', Focus: 'focus', Mana: 'mana' };
+const TOAST_ICON: Record<string, string> = {
+  good: 'check',
+  rare: 'gem',
+  epic: 'gem',
+  legendary: 'sparkles',
+  relic: 'crown',
+};
+
+/** Map an ability (by display name) to a game-icon. Keyword-matched, order matters. */
+function abilityIcon(name: string): string {
+  const n = name.toLowerCase();
+  const h = (s: string): boolean => n.includes(s);
+  if (h('cleav')) return 'saber-slash';
+  if (h('sunder')) return 'sword-wound';
+  if (h('whirl') || h('wrath') || h('oathbreak')) return 'spinning-sword';
+  if (h('charge')) return 'run';
+  if (h('second wind') || h('mend')) return 'healing';
+  if (h('pommel') || h('silence') || h('scatter shot')) return 'sword-clash';
+  if (h('rallying') || h('cry')) return 'horn';
+  if (h('bloodthirst') || h('ravager')) return 'blood';
+  if (h('holy fire')) return 'flame';
+  if (h('smite')) return 'holy-symbol';
+  if (h('searing') || h('dawnbreak')) return 'sunbeams';
+  if (h('nova') || h('consecr') || h('divine star')) return 'beams-aura';
+  if (h('atonement') || h('penance') || h('prayer')) return 'prayer';
+  if (h('aegis') || h('bulwark') || h('unbreak')) return 'shield';
+  if (h('quick shot') || h('aimed')) return 'broadhead';
+  if (h('piercing')) return 'striking-arrows';
+  if (h('volley') || h('barrage') || h('rain of arrows') || h('fusillade')) return 'arrow-cluster';
+  if (h('disengage') || h('camouflage')) return 'wingfoot';
+  if (h('trap')) return 'trap';
+  if (h('mark')) return 'target';
+  if (h('earthsplit')) return 'magic-swirl';
+  if (h('star')) return 'star';
+  return 'crossed-swords';
+}
 
 interface Toast {
   el: HTMLDivElement;
@@ -42,9 +81,13 @@ function div(cls: string, parent: HTMLElement): HTMLDivElement {
 export class Hud {
   private readonly hpFill: HTMLDivElement;
   private readonly hpText: HTMLDivElement;
+  private readonly resBar: HTMLDivElement;
   private readonly resFill: HTMLDivElement;
   private readonly resText: HTMLDivElement;
+  private readonly resIco: HTMLDivElement;
   private readonly xpFill: HTMLDivElement;
+  private readonly goldVal: HTMLSpanElement;
+  private resIcoKey = '';
   private readonly nameEl: HTMLDivElement;
   private readonly levelEl: HTMLDivElement;
   private readonly portraitEl: HTMLDivElement;
@@ -72,11 +115,13 @@ export class Hud {
 
     const hp = div('bar hp', body);
     this.hpFill = div('bar-fill', hp);
+    div('bar-ico', hp).innerHTML = icon('heart');
     this.hpText = div('bar-text', hp);
     this.levelEl = div('unit-level', body);
-    const resBar = div('bar fury', body);
-    this.resFill = div('bar-fill', resBar);
-    this.resText = div('bar-text', resBar);
+    this.resBar = div('bar fury', body);
+    this.resFill = div('bar-fill', this.resBar);
+    this.resIco = div('bar-ico', this.resBar);
+    this.resText = div('bar-text', this.resBar);
     const xp = div('bar xp', body);
     this.xpFill = div('bar-fill', xp);
 
@@ -86,7 +131,8 @@ export class Hud {
 
     this.hotbar = div('hotbar', parent);
     this.goldEl = div('gold', parent);
-    this.goldEl.textContent = '0 g';
+    this.goldEl.innerHTML = `${icon('coin')}<span class="gv">0</span>`;
+    this.goldVal = this.goldEl.querySelector('.gv') as HTMLSpanElement;
     this.promptEl = div('loot-prompt', parent);
     this.promptEl.style.display = 'none';
     this.toastWrap = div('toast-wrap', parent);
@@ -95,7 +141,10 @@ export class Hud {
   toast(text: string, kind: 'info' | 'good' | 'rare' | 'epic' | 'legendary' | 'relic' = 'info'): void {
     const el = document.createElement('div');
     el.className = `toast ${kind}`;
-    el.textContent = text;
+    el.innerHTML = icon(TOAST_ICON[kind] ?? 'info');
+    const t = document.createElement('span');
+    t.textContent = text;
+    el.appendChild(t);
     this.toastWrap.appendChild(el);
     this.toasts.push({ el, life: 0, ttl: 2.6 });
   }
@@ -106,6 +155,7 @@ export class Hud {
     for (let i = 0; i < names.length; i++) {
       const wrap = div('slot', this.hotbar);
       div('slot-key', wrap).textContent = KEYS[i] ?? '';
+      div('slot-icon', wrap).innerHTML = icon(abilityIcon(names[i]));
       div('slot-name', wrap).textContent = names[i];
       const cd = div('slot-cd', wrap);
       this.slots.push({ wrap, cd });
@@ -129,7 +179,7 @@ export class Hud {
     const cs = world.get<CombatState>(player, C.CombatState);
     const st = world.get<Statuses>(player, C.Statuses);
 
-    this.portraitEl.textContent = CLASS_GLYPH[cls.id] ?? '✦';
+    this.portraitEl.innerHTML = icon(CLASS_ICON[cls.id] ?? 'sword');
     this.nameEl.textContent = cls.name;
     const shield = world.get<Shield>(player, C.Shield);
     if (h) {
@@ -139,6 +189,12 @@ export class Hud {
       this.hpText.textContent = `${Math.ceil(Math.max(0, h.current))}/${h.max}${shieldTxt}`;
     }
     if (res) {
+      const rname = cls.resource.name;
+      if (rname !== this.resIcoKey) {
+        this.resIcoKey = rname;
+        this.resBar.className = `bar ${RES_MOD[rname] ?? 'fury'}`;
+        this.resIco.innerHTML = icon(RES_ICON[rname] ?? 'flame');
+      }
       this.resFill.style.width = `${(res.current / res.max) * 100}%`;
       this.resText.textContent = `${Math.floor(res.current)}/${res.max}`;
     }
@@ -180,6 +236,7 @@ export class Hud {
           slot.cd.style.opacity = '0';
         }
         slot.wrap.classList.toggle('disabled', locked || unaffordable || onGcd);
+        slot.wrap.classList.toggle('ready', !locked && !unaffordable && !onGcd && cd <= 0.05);
       }
     }
 
@@ -193,7 +250,7 @@ export class Hud {
       this.castBar.style.display = 'none';
     }
 
-    if (inv) this.goldEl.textContent = `${inv.gold} g`;
+    if (inv) this.goldVal.textContent = `${inv.gold}`;
 
     // Loot prompt: nearest item drop in range.
     this.promptEl.style.display = 'none';
@@ -210,8 +267,11 @@ export class Hud {
         }
       }
       if (nearest) {
-        this.promptEl.style.display = 'block';
-        this.promptEl.textContent = `Press F — ${nearest.name}`;
+        this.promptEl.style.display = 'flex';
+        this.promptEl.innerHTML = `<span class="key">F</span>`;
+        const t = document.createElement('span');
+        t.textContent = nearest.name;
+        this.promptEl.appendChild(t);
       }
     }
 

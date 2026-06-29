@@ -6,6 +6,7 @@
 import type { World, Entity } from '../core/ecs/world';
 import { C, type Transform, type Inventory, type CombatState } from '../core/ecs/components';
 import { activatedOathstones, TRAVEL_TOLL } from '../sim/travel';
+import { icon } from './ui/icons';
 
 const HERE_RADIUS = 4;
 
@@ -25,7 +26,7 @@ export class TravelPanel {
 
     const title = document.createElement('div');
     title.className = 'inv-title';
-    title.textContent = 'Fast Travel — T to close';
+    title.innerHTML = `${icon('map')}Fast Travel — T to close`;
     this.root.appendChild(title);
 
     this.status = document.createElement('div');

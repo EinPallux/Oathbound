@@ -203,6 +203,10 @@ export interface Enemy {
   deadFor: number;
   /** Brief invulnerability while returning from a leash. */
   invulnTimer: number;
+  /** Idle wander (lazy-initialised by enemy-ai): a roam target near home + a timer. */
+  wanderTimer?: number;
+  wanderTx?: number;
+  wanderTz?: number;
 }
 
 /**

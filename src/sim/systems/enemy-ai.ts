@@ -30,8 +30,11 @@ const ENEMY_RADIUS = 0.45;
 const LEASH_RETURN_SPEED = 1.3;
 const ENEMY_PROJECTILE_SPEED = 22;
 /** Idle enemies past this distance from the player update on a slow cadence. */
-const DEFAULT_SIM_RADIUS = 60;
+const DEFAULT_SIM_RADIUS = 95;
 const THROTTLE_EVERY = 6;
+/** Idle wander: enemies amble within this radius of home at a fraction of their speed. */
+const WANDER_RADIUS = 4.5;
+const WANDER_SPEED_FRAC = 0.35;
 /** Pack-leader rally: outgoing-damage buff applied to nearby allies. */
 const EMPOWER_SEC = 6;
 const EMPOWER_MAG = 0.25;
@@ -193,6 +196,38 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
           } else if (distHome > 1e-3) {
             vx = (dhx / distHome) * en.moveSpeed * LEASH_RETURN_SPEED;
             vz = (dhz / distHome) * en.moveSpeed * LEASH_RETURN_SPEED;
+          }
+        } else if (en.state === 'idle' && en.tier !== 'boss') {
+          // Idle wander: amble to a roam point near home, pause, repeat — so camps feel
+          // alive. Stays well within leashRange; bosses loom in place instead.
+          let wt = en.wanderTimer;
+          if (wt === undefined) {
+            wt = rng.range(0.5, 3.5);
+            en.wanderTx = tr.x;
+            en.wanderTz = tr.z;
+          }
+          wt -= dt;
+          if (wt <= 0) {
+            if (rng.next() < 0.4) {
+              en.wanderTx = tr.x; // pause in place
+              en.wanderTz = tr.z;
+              wt = rng.range(2, 5);
+            } else {
+              const a = rng.next() * Math.PI * 2;
+              const r = rng.range(1, WANDER_RADIUS);
+              en.wanderTx = en.homeX + Math.cos(a) * r;
+              en.wanderTz = en.homeZ + Math.sin(a) * r;
+              wt = rng.range(2.5, 6);
+            }
+          }
+          en.wanderTimer = wt;
+          const wdx = (en.wanderTx ?? en.homeX) - tr.x;
+          const wdz = (en.wanderTz ?? en.homeZ) - tr.z;
+          const wd = Math.hypot(wdx, wdz);
+          if (wd > 0.4) {
+            const s = en.moveSpeed * WANDER_SPEED_FRAC;
+            vx = (wdx / wd) * s;
+            vz = (wdz / wd) * s;
           }
         }
 

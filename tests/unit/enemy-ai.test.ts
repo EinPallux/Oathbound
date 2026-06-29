@@ -41,6 +41,36 @@ describe('melee enemy AI', () => {
     expect(world.get<Enemy>(b, C.Enemy)!.state).toBe('engage'); // joined via social aggro
   });
 
+  it('idle enemies wander near home but stay close (lively, not drifting)', () => {
+    const world = new World();
+    createPlayer(world, FIELD, 0, 60); // out of aggro range (10) so the enemy stays idle
+    const enemy = createBloomhusk(world, FIELD, 0, 0);
+    const en = world.get<Enemy>(enemy, C.Enemy)!;
+    const tr = world.get<Transform>(enemy, C.Transform)!;
+    const ai = sys();
+
+    let maxFromHome = 0;
+    for (let i = 0; i < Math.ceil(20 / DT); i++) {
+      ai.update(world, DT);
+      maxFromHome = Math.max(maxFromHome, Math.hypot(tr.x, tr.z));
+    }
+    expect(en.state).toBe('idle'); // never aggroed from 60 m
+    expect(maxFromHome).toBeGreaterThan(0.5); // it actually ambled around
+    expect(maxFromHome).toBeLessThan(6.5); // but stayed near home (~WANDER_RADIUS)
+  });
+
+  it('bosses loom in place — no idle wander', () => {
+    const world = new World();
+    createPlayer(world, FIELD, 0, 60);
+    const enemy = createBloomhusk(world, FIELD, 0, 0);
+    world.get<Enemy>(enemy, C.Enemy)!.tier = 'boss';
+    const tr = world.get<Transform>(enemy, C.Transform)!;
+    const ai = sys();
+
+    for (let i = 0; i < Math.ceil(8 / DT); i++) ai.update(world, DT);
+    expect(Math.hypot(tr.x, tr.z)).toBeLessThan(0.01); // stayed exactly at its arena
+  });
+
   it('leashes when dragged past its leash range, then resets + heals at home', () => {
     const world = new World();
     createPlayer(world, FIELD, 100, 100); // far away

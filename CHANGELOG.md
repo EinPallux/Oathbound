@@ -6,20 +6,28 @@ Each entry is an **independently testable build**. After each phase, work pauses
 ---
 
 ## 0.7.1-INDEV — "UI Pass" → HUD restyle (owner-requested, after the 0.7.0 playtest)
-**Goal:** a focused HUD/UX pass from playtest feedback — a proper unit-frame look, an Esc menu, and mouse-friendly access — before the 0.8.x optimization/balance work. No gameplay change.
-- **Player + target unit-frames** (top-centre, facing each other), rebuilt to a classic MMO look: a **gold-framed portrait** (class monogram for you, a skull for the target), the name, a level, and bars — your **HP in green + a gold resource bar** (and a slim XP sliver), the target's **HP in red**. Replaces the old bottom-left player panel + plain target strip.
-- **Esc opens the menu.** Esc is now layered: **close the topmost open panel → else clear the target → else open the Settings menu** (it was previously only "clear target", and Settings had no obvious opener). Settings still opens with `O` too. Tab/Esc targeting still works (Esc clears a target before opening the menu).
-- **Micro-bar** (bottom-right): a compact row of icon buttons — **Inventory · Fast travel · Map · Settings · Fullscreen** — mirroring the hotkeys for click access to every panel.
-- **Removed the floating controls hint** that overlapped the cast bar (the controls now live in **Settings → Controls**, which is also rebindable).
+**Goal:** a focused HUD/UX pass from playtest feedback — a proper unit-frame look, an Esc menu, and mouse-friendly access. **Reconciled onto the parallel "Launch UI" overhaul (PR #36): this layers the new layout/features on top of #36's design system + game-icons rather than replacing them** (the hud.ts/styles.css merge conflicts were resolved that way). No gameplay change.
+- **Player + target unit-frames** (top-centre, facing each other), rebuilt to a classic MMO look — using **#36's design tokens + SVG icons**: a gold-framed portrait (your **class icon**, a skull for the target), the name (Cinzel display), a level, and bars — your **HP in green + a gold resource bar** (with #36's heart/resource icons) + a slim XP sliver, the target's **HP in red**. Replaces the old bottom-left player panel + plain target strip.
+- **Esc opens the menu.** Esc is now layered: **close the topmost open panel → else clear the target → else open the Settings menu** (it was previously only "clear target", and Settings had no obvious opener). Settings still opens with `O` too.
+- **Micro-bar** (bottom-right): a compact row of icon buttons — **Inventory · Fast travel · Map · Settings · Fullscreen** — styled in the launch design, mirroring the hotkeys.
+- **Removed the floating controls hint** that overlapped the cast bar (controls now live in **Settings → Controls**, rebindable).
 - Internal: Esc handling moved out of the combat sim into the central bootstrap input layer (`consumeClearTarget` → `consumeEscape`).
-- Tests: all unit suites green (controls/Esc refactor) → **293 unit**; a new **UI-pass e2e** (controls hint gone, player + target unit-frames, layered Esc clears→menu, micro-bar opens the bag) → **17 e2e**. Version → `0.7.1-INDEV`.
+- Tests: full suites green after the #36 reconciliation → **295 unit**; a new **UI-pass e2e** (controls hint gone, player + target unit-frames, layered Esc clears→menu, micro-bar opens the bag) → **17 e2e**. Version → `0.7.1-INDEV`.
 
-**Verified:** `typecheck` ✓ · `npm test` → 293/293 ✓ · `build` ✓ · `test:e2e` → 17/17 ✓.
+**Verified:** `typecheck` ✓ · `npm test` → 295/295 ✓ · `build` ✓ · `test:e2e` → 17/17 ✓.
 
 ---
 
 ## 0.7.0-INDEV — "Feel & Finish" → UX, Accessibility & Content Polish *(✅ feature-complete — awaiting playtest)*
 **Goal:** make the game *feel finished to use* — full menus, tooltips/comparison, an audio + VFX pass, onboarding polish, and the **accessibility commit list** ([docs/design/UX_AND_ACCESSIBILITY.md](./docs/design/UX_AND_ACCESSIBILITY.md)), all persisting and taking effect without restart. **Gameplay feature-freeze begins** (no new systems). Built in verified checkpoints.
+
+### 🎨 Launch UI — full visual overhaul (owner-requested)
+A complete, **release-ready UI** replacing the beta/dev styling — a cohesive dark-fantasy RPG interface aiming at AAA-MMO polish, with **real iconography throughout** (no more text-only menus). Pure presentation: the DOM structure + every test/selector hook is preserved, so there is no gameplay/sim change.
+- **Design system** (`src/styles.css`, fully rewritten): an aged-gold accent system over layered obsidian panels, a serif **Cinzel/Georgia** display stack + Spectral/serif body, framed panels with inner-bevel + drop shadow + blur, glossy gradient vital bars, beveled hotbar slots with a "ready" glow, styled buttons/inputs/selects/sliders/scrollbars, and rarity-glow toasts — all honouring the existing accessibility toggles (UI scale, reduced-effects, high-contrast rarity, damage-number size).
+- **Icons** (`src/render/ui/icons.ts`): **54 inline SVG icons sourced from game-icons.net (CC BY 3.0**, see [CREDITS.md](./CREDITS.md)), recoloured to `currentColor`. Wired across the UI: per-**ability** hotbar icons (keyword-mapped for all 3 classes), class-aware **resource bars** (Fury flame / Focus eye / Mana droplet) + an HP heart, **currencies** (coin/whetstone), **equipment-slot** icons (helm/chest/gauntlet/ring/…), action buttons (equip/reinforce/lock/salvage), panel headers (bag/shop/map), the class-select cards (sword/bow/staff), and toasts.
+- **Screens** restyled & iconified: the **class-select** (ornate cards + large class crest), the **HUD** (vitals frame, ability hotbar, target frame, toasts, loot prompt, gold), the **inventory/character** panel (widened; slot icons, item rows, talents, stat chips), **vendor** + **fast-travel**, **settings/controls**, **tooltips**, and the **minimap**.
+- **Offline-safe**: type uses the player's system serif stack (no external font/CDN dependency), so there are no network requests or console errors at boot.
+- Verified: `typecheck` ✓ · `npm test` → **295/295** unit ✓ · `build` ✓ (~222 KB gzip JS / ~5 KB gzip CSS) · `test:e2e` → **16/16** ✓ (all existing selector/text hooks intact).
 
 ### ✅ Checkpoint 1 — Settings & accessibility core
 - **A persisted Settings panel (`O`)** — device-local preferences (separate from the gameplay save) in `localStorage`, **applied live** to the DOM UI overlay (no restart) via CSS variables/classes (`src/game/settings.ts` + `src/render/settings-panel.ts`). Tolerant load (validates/merges/clamps unknown or old data → defaults), plus a **Reset to defaults**.
@@ -91,6 +99,22 @@ The placeholder capsule is replaced by a **procedural low-poly humanoid** (built
 - Tests: combat emits `AbilityUsed` on a successful cast (and not when the ability whiffs with no target) → **222 unit tests**; e2e green (11). The per-test e2e timeout was raised 30 s → 60 s: the now-large open world renders slowly in the headless software-GL container (each heavy interaction test passes in ~20 s alone but contends under parallel load); real-hardware FPS is unaffected.
 
 **Verified:** `typecheck` ✓ · `npm test` → 222/222 ✓ · `build` ✓ (~172 KB gzip) · `test:e2e` → 11/11 ✓.
+
+### 👹 Enemy models + nameplates (owner-requested)
+Every enemy family now has its **own unique low-poly model** (procedural primitives, no asset files) instead of the shared capsule — keyed by family + role so the three shared families split correctly (Sporeling/Sporemother, Bramblekin/Warchief, Ashen Reaver/Ember Warlord). ~21 distinct looks across 7 body archetypes — plant (Bloomhusks/Bramblekin), humanoid (Reavers/Drudges/Forsworn knights), floating (Wisps/Wraiths/Revenants/Cinderborn), spider (Weavers), mushroom (Sporelings/Sporemother), beast (Magmaw/Frostfang/Fenstalker) and crystalline/bone construct (Rimebound/Bonewrought) — each themed to its zone (magma cracks, frost ice, undead bone, blight glow…).
+- **Name + level nameplate** above each enemy, in addition to the HP bar: a clean billboarded label (baked to a canvas texture) with the **name coloured by tier** (standard pale · elite orange · rare gold) and the level below, outlined for readability on any background.
+- Models **flash on hit / tint during telegraphs** (all body materials, preserving caster/ghost glow), **floating creatures hover**, and the click-to-target raycast hits any part of the model.
+- **Perf**: models + nameplates are created lazily for enemies near the camera and freed when they move far away (the open world holds ~80 spawns but only a camp or two is ever close); off-screen models are frustum-culled.
+- The three CP2 **world bosses** also get unique, oversized models (a fiery Emberhorn beast, a frost Rimewyrm, the crowned Maelgrith), rendered at boss scale with a crimson nameplate.
+
+**Verified (post-merge with CP2):** `typecheck` ✓ · `npm test` → 238/238 ✓ · `build` ✓ (~177 KB gzip) · `test:e2e` → 12/12 ✓.
+
+### 🐦 Living world — enemy wander + ambient wildlife (owner-requested)
+- **Idle enemies now wander.** Out of combat, standard enemies amble to random points within ~4.5 m of their spawn, pause, and repeat (at ~35 % move speed, facing where they walk), so camps feel alive instead of frozen. They stay well within leash range (no drifting between camps); aggro / social / leash are unchanged, and **world bosses loom in place** (no wander). The AI sim-radius widened (60→95 m) to match the enemy view distance so all visible enemies wander smoothly.
+- **Ambient wildlife** (`src/render/ambient-life.ts`, render-only — no sim entities): **birds wheel overhead** (a flock that lazily follows you, flapping pale silhouettes), **critters** (rats/rabbits) scurry on the ground nearby in short dart-and-pause bursts, and **butterflies** flit close by. A small fixed pool follows the player around the open world (relocated off-screen), so there's always life nearby without spawning thousands — purely decorative (no collision, not targetable, not saved).
+- Tests: idle enemies wander but stay near home; bosses don't wander → **240 unit tests**; e2e green (12).
+
+**Verified:** `typecheck` ✓ · `npm test` → 240/240 ✓ · `build` ✓ (~179 KB gzip) · `test:e2e` → 12/12 ✓.
 
 ### ✅ Checkpoint 2 — three solo world bosses
 - **Three hand-authored open-world bosses**, one deep in each of the three highest frontiers — **Emberhorn, the Cinder Tyrant** (Emberreach, fire, ~Lv 20), **The Rimewyrm** (Riven Peaks, frost, ~Lv 25), and **Maelgrith, the Hollow Crown** (Gravereach, blight/undead, the **Lv-30 capstone fight**). New `boss` enemy tier + a `Boss` component (`src/sim/content/bosses.ts`); they reuse enemy-ai for locomotion/basic swings and add a thin escalation layer.
