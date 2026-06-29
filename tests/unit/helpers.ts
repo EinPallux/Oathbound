@@ -54,7 +54,7 @@ export function makeInput(): { ctrl: ControlState; state: InputState } {
       state.cycle = false;
       return c;
     },
-    consumeClearTarget: () => {
+    consumeEscape: () => {
       const c = state.clear;
       state.clear = false;
       return c;

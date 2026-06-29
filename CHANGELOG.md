@@ -5,6 +5,19 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.7.1-INDEV — "UI Pass" → HUD restyle (owner-requested, after the 0.7.0 playtest)
+**Goal:** a focused HUD/UX pass from playtest feedback — a proper unit-frame look, an Esc menu, and mouse-friendly access — before the 0.8.x optimization/balance work. No gameplay change.
+- **Player + target unit-frames** (top-centre, facing each other), rebuilt to a classic MMO look: a **gold-framed portrait** (class monogram for you, a skull for the target), the name, a level, and bars — your **HP in green + a gold resource bar** (and a slim XP sliver), the target's **HP in red**. Replaces the old bottom-left player panel + plain target strip.
+- **Esc opens the menu.** Esc is now layered: **close the topmost open panel → else clear the target → else open the Settings menu** (it was previously only "clear target", and Settings had no obvious opener). Settings still opens with `O` too. Tab/Esc targeting still works (Esc clears a target before opening the menu).
+- **Micro-bar** (bottom-right): a compact row of icon buttons — **Inventory · Fast travel · Map · Settings · Fullscreen** — mirroring the hotkeys for click access to every panel.
+- **Removed the floating controls hint** that overlapped the cast bar (the controls now live in **Settings → Controls**, which is also rebindable).
+- Internal: Esc handling moved out of the combat sim into the central bootstrap input layer (`consumeClearTarget` → `consumeEscape`).
+- Tests: all unit suites green (controls/Esc refactor) → **293 unit**; a new **UI-pass e2e** (controls hint gone, player + target unit-frames, layered Esc clears→menu, micro-bar opens the bag) → **17 e2e**. Version → `0.7.1-INDEV`.
+
+**Verified:** `typecheck` ✓ · `npm test` → 293/293 ✓ · `build` ✓ · `test:e2e` → 17/17 ✓.
+
+---
+
 ## 0.7.0-INDEV — "Feel & Finish" → UX, Accessibility & Content Polish *(✅ feature-complete — awaiting playtest)*
 **Goal:** make the game *feel finished to use* — full menus, tooltips/comparison, an audio + VFX pass, onboarding polish, and the **accessibility commit list** ([docs/design/UX_AND_ACCESSIBILITY.md](./docs/design/UX_AND_ACCESSIBILITY.md)), all persisting and taking effect without restart. **Gameplay feature-freeze begins** (no new systems). Built in verified checkpoints.
 

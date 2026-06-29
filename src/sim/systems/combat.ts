@@ -130,7 +130,7 @@ export function createCombatSystem(deps: CombatDeps): System {
           );
           tgt.entity = cycleTarget(tgt.entity, inCone);
         }
-        if (input.consumeClearTarget()) tgt.entity = null;
+        // Esc is handled centrally by the bootstrap (close panel → clear target → menu).
 
         const req = input.consumeAbility();
         if (req != null && req >= 0 && req < abilities.length) {

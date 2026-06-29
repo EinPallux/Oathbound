@@ -24,8 +24,9 @@ export interface ControlState {
   consumeAbility(): number | null;
   /** Returns true once if Tab (cycle target) was pressed since the last call. */
   consumeTargetCycle(): boolean;
-  /** Returns true once if Esc (clear target) was pressed since the last call. */
-  consumeClearTarget(): boolean;
+  /** Returns true once if Esc was pressed since the last call (handled by the bootstrap:
+   *  close a panel → clear target → open the menu). */
+  consumeEscape(): boolean;
   /** Returns a queued left-click in normalized device coords [-1, 1], or null. */
   consumeClick(): { ndcX: number; ndcY: number } | null;
   /** Returns true once if the interact key (F) was pressed since the last call. */
@@ -241,7 +242,7 @@ export class InputController implements ControlState {
     return c;
   }
 
-  consumeClearTarget(): boolean {
+  consumeEscape(): boolean {
     const c = this.clearQueued;
     this.clearQueued = false;
     return c;

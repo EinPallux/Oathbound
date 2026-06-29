@@ -23,6 +23,8 @@ import { hasStatus, Status } from '../sim/combat/statuses';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 const PICKUP_RADIUS = 2.5;
+/** Portrait monogram per class (asset-free, font-safe unit-frame icon). */
+const CLASS_GLYPH: Record<string, string> = { warrior: 'W', hunter: 'H', priest: 'P' };
 
 interface Toast {
   el: HTMLDivElement;
@@ -44,6 +46,8 @@ export class Hud {
   private readonly resText: HTMLDivElement;
   private readonly xpFill: HTMLDivElement;
   private readonly nameEl: HTMLDivElement;
+  private readonly levelEl: HTMLDivElement;
+  private readonly portraitEl: HTMLDivElement;
   private readonly stateEl: HTMLDivElement;
   private readonly hotbar: HTMLDivElement;
   private slots: { wrap: HTMLDivElement; cd: HTMLDivElement }[] = [];
@@ -57,18 +61,23 @@ export class Hud {
   private lastMs = performance.now();
 
   constructor(parent: HTMLElement) {
-    const frame = div('player-frame', parent);
-    const header = div('player-header', frame);
-    this.nameEl = div('player-name', header);
-    this.stateEl = div('player-state', header);
+    // Player unit-frame (top-centre, left of the target): portrait + name/level + bars.
+    const frame = div('unit-frame player', parent);
+    this.portraitEl = div('unit-portrait', frame);
+    const body = div('unit-body', frame);
 
-    const hp = div('bar hp', frame);
+    const top = div('unit-top', body);
+    this.nameEl = div('unit-name', top);
+    this.stateEl = div('player-state', top);
+
+    const hp = div('bar hp', body);
     this.hpFill = div('bar-fill', hp);
     this.hpText = div('bar-text', hp);
-    const resBar = div('bar fury', frame);
+    this.levelEl = div('unit-level', body);
+    const resBar = div('bar fury', body);
     this.resFill = div('bar-fill', resBar);
     this.resText = div('bar-text', resBar);
-    const xp = div('bar xp', frame);
+    const xp = div('bar xp', body);
     this.xpFill = div('bar-fill', xp);
 
     this.castBar = div('cast-bar', parent);
@@ -120,21 +129,23 @@ export class Hud {
     const cs = world.get<CombatState>(player, C.CombatState);
     const st = world.get<Statuses>(player, C.Statuses);
 
+    this.portraitEl.textContent = CLASS_GLYPH[cls.id] ?? '✦';
+    this.nameEl.textContent = cls.name;
     const shield = world.get<Shield>(player, C.Shield);
     if (h) {
       const r = h.max > 0 ? h.current / h.max : 0;
       this.hpFill.style.width = `${Math.max(0, r) * 100}%`;
       const shieldTxt = shield && shield.amount > 0 ? ` (+${Math.ceil(shield.amount)})` : '';
-      this.hpText.textContent = `${Math.ceil(Math.max(0, h.current))} / ${h.max}${shieldTxt}`;
+      this.hpText.textContent = `${Math.ceil(Math.max(0, h.current))}/${h.max}${shieldTxt}`;
     }
     if (res) {
       this.resFill.style.width = `${(res.current / res.max) * 100}%`;
-      this.resText.textContent = `${Math.floor(res.current)} ${cls.resource.name}`;
+      this.resText.textContent = `${Math.floor(res.current)}/${res.max}`;
     }
     if (prog) {
       const r = prog.xpToNext === Infinity ? 1 : prog.xp / prog.xpToNext;
       this.xpFill.style.width = `${Math.min(1, r) * 100}%`;
-      this.nameEl.textContent = `${cls.name} · Lv ${prog.level}`;
+      this.levelEl.textContent = `Lv ${prog.level}`;
     }
     if (cs) {
       const shaken = hasStatus(st, Status.Shaken);

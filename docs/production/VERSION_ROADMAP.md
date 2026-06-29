@@ -4,7 +4,7 @@ The canonical phased plan. It follows **deep vertical progression**, not a "skel
 
 > **Roadmap philosophy (anti-scope-creep).** We do **not** build: a fake dungeon before combat is fun · a raid mockup before enemies work · a guild menu before networking · an auction house without an economy · ten empty zones · three one-ability classes · stat-less equipment · giant empty terrain. We **do** build one satisfying slice and deepen it.
 
-> 📍 **Live progress** (which phases are actually done) is tracked in [`AGENTS.md`](../../AGENTS.md) and [`CHANGELOG.md`](../../CHANGELOG.md), not here — this document is the **static plan**. As of the latest sync: **`0.0.1`–`0.7.0` are ✅ done** (the full Lv 1–30 game + Lv-30 endgame is playable; the UX/accessibility commit list is in — settings, tooltips, audio, remappable controls; Level 1–30 Content + Endgame Foundation gate automatable scope passed); **next is `0.8.x`** (optimization & balance pass).
+> 📍 **Live progress** (which phases are actually done) is tracked in [`AGENTS.md`](../../AGENTS.md) and [`CHANGELOG.md`](../../CHANGELOG.md), not here — this document is the **static plan**. As of the latest sync: **`0.0.1`–`0.7.0` are ✅ done** (the full Lv 1–30 game + Lv-30 endgame is playable; the UX/accessibility commit list is in — settings, tooltips, audio, remappable controls; Level 1–30 Content + Endgame Foundation gate automatable scope passed), plus a **`0.7.1` HUD/UI pass** (unit-frames, Esc menu, micro-bar) after the playtest; **next is `0.8.x`** (optimization & balance pass).
 
 ## Milestone band overview
 | Band | Theme | Player-facing outcome | Exit gate |

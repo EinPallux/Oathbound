@@ -79,20 +79,6 @@ body {
   pointer-events: none;
 }
 
-.controls-hint {
-  position: fixed;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  color: #7e8ea0;
-  font-size: 12px;
-  background: rgba(0, 0, 0, 0.4);
-  padding: 5px 12px;
-  border-radius: 6px;
-  pointer-events: none;
-  white-space: nowrap;
-}
-
 /* Floating combat text (pooled). Anchored top-left; positioned via transform. */
 .dmg-layer {
   position: fixed;
@@ -142,73 +128,75 @@ body {
   background: linear-gradient(#ffe08a, #e0b44c);
 }
 
-/* Current-target frame (top-centre). */
-.target-frame {
+/* ── Unit frames: player (left) + target (right), top-centre, facing each other ─ */
+.unit-frame {
   position: fixed;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  min-width: 200px;
-  background: rgba(0, 0, 0, 0.55);
+  top: 10px;
+  display: flex;
+  gap: 8px;
+  width: 280px;
+  background: rgba(6, 10, 16, 0.66);
   border: 1px solid rgba(120, 200, 255, 0.25);
-  border-radius: 6px;
-  padding: 6px 10px;
+  border-radius: 8px;
+  padding: 6px;
   pointer-events: none;
 }
-
-.target-name {
-  font-size: 13px;
-  color: #e8d44d;
-  margin-bottom: 4px;
+.unit-frame.player {
+  left: 50%;
+  transform: translateX(-100%) translateX(-10px); /* right edge ~10px left of centre */
 }
-
-.target-hp {
-  position: relative;
-  height: 14px;
-  background: #14171c;
-  border-radius: 3px;
-  overflow: hidden;
+.unit-frame.target {
+  left: 50%;
+  transform: translateX(10px); /* left edge ~10px right of centre */
 }
-
-.target-hp-fill {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  background: linear-gradient(#7be08a, #4caf60);
-  transition: width 0.08s linear;
-}
-
-.target-hp-text {
-  position: absolute;
-  inset: 0;
+.unit-portrait {
+  flex: none;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  color: #eef3f8;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  font-size: 26px;
+  background: radial-gradient(circle at 50% 35%, #2a3344, #10151d);
+  border: 2px solid #d9a441; /* gold frame */
+  border-radius: 6px;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.6);
 }
-
-/* ── Player frame (bottom-left) ─────────────────────────────────────── */
-.player-frame {
-  position: fixed;
-  bottom: 14px;
-  left: 14px;
-  width: 240px;
-  pointer-events: none;
+.unit-portrait.enemy {
+  border-color: #b85b5b; /* enemy → red-bronze frame */
+  color: #ffd0d0;
 }
-.player-header {
+.unit-body {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 4px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
 }
-.player-name {
-  font-size: 13px;
-  color: #e8eef5;
+.unit-frame.target .unit-body {
+  text-align: right;
+}
+.unit-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.unit-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #eef3f8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.unit-level {
+  font-size: 11px;
+  color: #b8c6d4;
 }
 .player-state {
-  font-size: 11px;
+  font-size: 10px;
 }
 .player-state.combat {
   color: #ff9a6a;
@@ -237,10 +225,14 @@ body {
   width: 100%;
 }
 .bar.hp .bar-fill {
-  background: linear-gradient(#ff6b6b, #cc3b3b);
+  background: linear-gradient(#74e07a, #3da548); /* player health → green */
+  transition: width 0.08s linear;
+}
+.bar.hp.target .bar-fill {
+  background: linear-gradient(#ff6b6b, #cc3b3b); /* target health → red */
 }
 .bar.fury .bar-fill {
-  background: linear-gradient(#ffb347, #e08a2c);
+  background: linear-gradient(#ffd24a, #e0a52c); /* resource → gold */
 }
 .bar.xp .bar-fill {
   background: linear-gradient(#7aa2ff, #5a78d8);
@@ -911,4 +903,32 @@ body {
 }
 .tt-cmp.down {
   color: #ff7676;
+}
+
+/* ── Micro-bar (bottom-right): quick-access feature buttons ──────────────────── */
+.micro-bar {
+  position: fixed;
+  bottom: 14px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+.micro-btn {
+  width: 34px;
+  height: 34px;
+  font-size: 17px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #cdd9e5;
+  background: rgba(8, 12, 18, 0.82);
+  border: 1px solid rgba(120, 200, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.micro-btn:hover {
+  background: rgba(30, 42, 56, 0.95);
+  border-color: #7aa2ff;
 }
