@@ -303,12 +303,12 @@ test('Settings (O): accessibility options apply live and persist across reload',
   );
   expect(scale).toBe('1.3');
 
-  // Audio: mute + set the volume slider (the Audio section).
+  // Audio: mute + set the volume slider (the first range; the Audio section).
   const mute = page.locator('.settings-panel input[type="checkbox"]').nth(4); // 5th: "Mute audio"
   await mute.check();
-  const range = page.locator('.settings-panel input[type="range"]');
-  await expect(range).toBeVisible();
-  await range.evaluate((el: HTMLInputElement) => {
+  const volume = page.locator('.settings-panel input[type="range"]').first();
+  await expect(volume).toBeVisible();
+  await volume.evaluate((el: HTMLInputElement) => {
     el.value = '30';
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
@@ -320,7 +320,7 @@ test('Settings (O): accessibility options apply live and persist across reload',
   await page.keyboard.press('KeyO');
   await expect(page.locator('.settings-panel')).toBeVisible();
   expect(await page.locator('.settings-panel input[type="checkbox"]').nth(4).isChecked()).toBe(true);
-  expect(await page.locator('.settings-panel input[type="range"]').inputValue()).toBe('30');
+  expect(await page.locator('.settings-panel input[type="range"]').first().inputValue()).toBe('30');
 
   expect(errors).toEqual([]);
 });
@@ -354,6 +354,37 @@ test('Inventory: item hover shows a tooltip; Rare+ salvage asks to confirm', asy
   expect(await page.evaluate(() => window.__oathbound!.bagCount())).toBe(1); // not yet salvaged
   await salv.click();
   expect(await page.evaluate(() => window.__oathbound!.bagCount())).toBe(0); // confirmed → salvaged
+});
+
+test('Controls: rebinding a key takes effect in-game and persists across reload', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__oathbound !== undefined);
+
+  await page.keyboard.press('KeyO'); // open settings
+  await expect(page.locator('.settings-panel')).toBeVisible();
+
+  const invKey = page.locator('.keybind-row', { hasText: 'Inventory' }).locator('.keybind-key');
+  await expect(invKey).toHaveText('I'); // default
+
+  // Rebind Inventory: I → J (capture the next keypress).
+  await invKey.click();
+  await expect(invKey).toHaveText('Press a key…');
+  await page.keyboard.press('KeyJ');
+  await expect(invKey).toHaveText('J');
+
+  // Close settings; the new binding actually drives the game (J now opens the bag).
+  await page.keyboard.press('KeyO');
+  await expect(page.locator('.settings-panel')).toBeHidden();
+  await page.keyboard.press('KeyJ');
+  await expect(page.locator('.inv-panel')).toBeVisible();
+
+  // Persists across a reload.
+  await page.reload();
+  await page.waitForFunction(() => window.__oathbound !== undefined);
+  await page.keyboard.press('KeyO');
+  await expect(
+    page.locator('.keybind-row', { hasText: 'Inventory' }).locator('.keybind-key'),
+  ).toHaveText('J');
 });
 
 test('progress persists across a reload (save v1)', async ({ page }) => {

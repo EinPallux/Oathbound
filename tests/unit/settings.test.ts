@@ -58,6 +58,8 @@ describe('settings — merge/validate', () => {
       confirmDestructive: false,
       masterVolume: 0.4,
       muteAudio: true,
+      mouseSensitivity: 1.5,
+      invertY: true,
     };
     expect(mergeSettings(JSON.parse(JSON.stringify(custom)))).toEqual(custom);
     // confirmDestructive defaults to on, and validates like the other booleans.
@@ -72,6 +74,14 @@ describe('settings — merge/validate', () => {
     expect(mergeSettings({ masterVolume: Number.NaN }).masterVolume).toBe(DEFAULT_SETTINGS.masterVolume);
     expect(mergeSettings({ muteAudio: true }).muteAudio).toBe(true);
     expect(mergeSettings({ muteAudio: 'yes' }).muteAudio).toBe(DEFAULT_SETTINGS.muteAudio);
+  });
+
+  it('clamps mouse sensitivity and validates invert-Y', () => {
+    expect(mergeSettings({ mouseSensitivity: 99 }).mouseSensitivity).toBe(3);
+    expect(mergeSettings({ mouseSensitivity: 0 }).mouseSensitivity).toBe(0.25);
+    expect(mergeSettings({ mouseSensitivity: 1.5 }).mouseSensitivity).toBe(1.5);
+    expect(mergeSettings({ mouseSensitivity: Number.NaN }).mouseSensitivity).toBe(DEFAULT_SETTINGS.mouseSensitivity);
+    expect(mergeSettings({ invertY: true }).invertY).toBe(true);
   });
 });
 

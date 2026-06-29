@@ -770,6 +770,47 @@ body {
   cursor: pointer;
 }
 
+/* ── Controls: rebindable keys ──────────────────────────────────────────────── */
+.keybinds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.keybind-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px;
+  font-size: 12px;
+}
+.keybind-label {
+  color: #b8c6d4;
+}
+.keybind-key {
+  font: inherit;
+  font-size: 11px;
+  min-width: 64px;
+  text-align: center;
+  color: #cdd9e5;
+  background: #1b222c;
+  border: 1px solid rgba(120, 200, 255, 0.28);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.keybind-key:hover {
+  background: #25303d;
+}
+.keybind-key.capturing {
+  color: #0e1116;
+  background: #ffd166;
+  border-color: #ffd166;
+}
+
 /* ── Low-HP vignette (combat feedback; honours reduced-effects via the curve) ──── */
 .low-hp-vignette {
   position: fixed;

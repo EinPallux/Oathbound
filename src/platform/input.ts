@@ -3,6 +3,7 @@
 // the camera rig is a pure consumer of these. See docs/design/COMBAT_DESIGN.md (controls).
 
 import { clamp } from '../core/math';
+import { DEFAULT_KEYBINDS, ACTION_ORDER, type Keybinds, type BindableAction } from '../game/keybinds';
 
 /** The subset of control state the simulation reads (no DOM concepts). */
 export interface ControlState {
@@ -64,7 +65,12 @@ export class InputController implements ControlState {
   private toggleMapQueued = false;
   private toggleSettingsQueued = false;
   private dragging = false;
-  private readonly lookSensitivity = 0.0035;
+  /** Base look sensitivity; scaled by the user's mouseSensitivity setting. */
+  private readonly baseSensitivity = 0.0035;
+  private sensitivity = 1;
+  private invertY = false;
+  private bindings: Keybinds = { ...DEFAULT_KEYBINDS };
+  private readonly codeToAction = new Map<string, BindableAction>();
 
   private readonly onKeyDown = (e: KeyboardEvent): void => this.setKey(e, true);
   private readonly onKeyUp = (e: KeyboardEvent): void => this.setKey(e, false);
@@ -95,14 +101,16 @@ export class InputController implements ControlState {
   };
   private readonly onMouseMove = (e: MouseEvent): void => {
     if (!this.dragging) return;
-    this.yaw -= e.movementX * this.lookSensitivity;
-    this.pitch = clamp(this.pitch + e.movementY * this.lookSensitivity, 0.15, 1.3);
+    const s = this.baseSensitivity * this.sensitivity;
+    this.yaw -= e.movementX * s;
+    this.pitch = clamp(this.pitch + e.movementY * s * (this.invertY ? -1 : 1), 0.15, 1.3);
   };
   private readonly onWheel = (e: WheelEvent): void => {
     this.dist = clamp(this.dist + Math.sign(e.deltaY) * 1, 4, 22);
   };
 
-  constructor(private readonly el: HTMLElement) {
+  constructor(private readonly el: HTMLElement, keybinds: Keybinds = DEFAULT_KEYBINDS) {
+    this.setKeybinds(keybinds);
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     el.addEventListener('contextmenu', this.onContextMenu);
@@ -113,102 +121,99 @@ export class InputController implements ControlState {
     el.addEventListener('wheel', this.onWheel, { passive: true });
   }
 
+  /** Apply a new keybind map live and rebuild the code→action lookup. */
+  setKeybinds(keybinds: Keybinds): void {
+    this.bindings = { ...keybinds };
+    this.codeToAction.clear();
+    for (const action of ACTION_ORDER) {
+      const code = this.bindings[action];
+      if (code) this.codeToAction.set(code, action);
+    }
+    // Drop any held movement so a rebind mid-press can't leave a key stuck "down".
+    this.forward = this.back = this.left = this.right = this.sprint = false;
+  }
+
+  /** Mouse-look options: sensitivity multiplier + invert vertical axis. */
+  setLook(sensitivityMult: number, invertY: boolean): void {
+    this.sensitivity = sensitivityMult;
+    this.invertY = invertY;
+  }
+
   private setKey(e: KeyboardEvent, down: boolean): void {
+    // Fixed (non-rebindable): target cycle/clear + an always-on arrow-key move fallback.
     switch (e.code) {
-      case 'KeyW':
-      case 'ArrowUp':
-        this.forward = down;
-        break;
-      case 'KeyS':
-      case 'ArrowDown':
-        this.back = down;
-        break;
-      case 'KeyA':
-      case 'ArrowLeft':
-        this.left = down;
-        break;
-      case 'KeyD':
-      case 'ArrowRight':
-        this.right = down;
-        break;
-      case 'ShiftLeft':
-      case 'ShiftRight':
-        this.sprint = down;
-        break;
-      case 'Space':
-        if (down) this.jumpQueued = true;
-        e.preventDefault();
-        break;
-      case 'KeyP':
-        if (down) this.pauseQueued = true;
-        break;
-      case 'Digit1':
-      case 'Numpad1':
-        if (down) this.abilityQueued = 0;
-        break;
-      case 'Digit2':
-      case 'Numpad2':
-        if (down) this.abilityQueued = 1;
-        break;
-      case 'Digit3':
-      case 'Numpad3':
-        if (down) this.abilityQueued = 2;
-        break;
-      case 'Digit4':
-      case 'Numpad4':
-        if (down) this.abilityQueued = 3;
-        break;
-      case 'Digit5':
-      case 'Numpad5':
-        if (down) this.abilityQueued = 4;
-        break;
-      case 'Digit6':
-      case 'Numpad6':
-        if (down) this.abilityQueued = 5;
-        break;
-      case 'Digit7':
-      case 'Numpad7':
-        if (down) this.abilityQueued = 6;
-        break;
-      case 'Digit8':
-      case 'Numpad8':
-        if (down) this.abilityQueued = 7;
-        break;
-      case 'Digit9':
-      case 'Numpad9':
-        if (down) this.abilityQueued = 8;
-        break;
-      case 'Digit0':
-      case 'Numpad0':
-        if (down) this.abilityQueued = 9;
-        break;
-      case 'KeyF':
-        if (down) this.interactQueued = true;
-        break;
-      case 'KeyI':
-        if (down) this.toggleInvQueued = true;
-        break;
-      case 'KeyC':
-        if (down) this.toggleCharQueued = true;
-        break;
-      case 'KeyT':
-        if (down) this.toggleTravelQueued = true;
-        break;
-      case 'KeyM':
-        if (down) this.toggleMapQueued = true;
-        break;
-      case 'KeyO':
-        if (down) this.toggleSettingsQueued = true;
-        break;
       case 'Tab':
         if (down) this.cycleQueued = true;
         e.preventDefault(); // keep keyboard focus on the game
-        break;
+        return;
       case 'Escape':
         if (down) this.clearQueued = true;
-        break;
-      default:
         return;
+      case 'ArrowUp':
+        this.forward = down;
+        return;
+      case 'ArrowDown':
+        this.back = down;
+        return;
+      case 'ArrowLeft':
+        this.left = down;
+        return;
+      case 'ArrowRight':
+        this.right = down;
+        return;
+    }
+
+    const action = this.codeToAction.get(e.code);
+    if (!action) return;
+    this.dispatch(action, down);
+    if (action === 'jump') e.preventDefault(); // Space shouldn't scroll the page
+  }
+
+  private dispatch(action: BindableAction, down: boolean): void {
+    if (action.startsWith('ability')) {
+      if (down) this.abilityQueued = parseInt(action.slice(7), 10) - 1;
+      return;
+    }
+    switch (action) {
+      case 'forward':
+        this.forward = down;
+        break;
+      case 'back':
+        this.back = down;
+        break;
+      case 'left':
+        this.left = down;
+        break;
+      case 'right':
+        this.right = down;
+        break;
+      case 'sprint':
+        this.sprint = down;
+        break;
+      case 'jump':
+        if (down) this.jumpQueued = true;
+        break;
+      case 'pause':
+        if (down) this.pauseQueued = true;
+        break;
+      case 'interact':
+        if (down) this.interactQueued = true;
+        break;
+      case 'inventory':
+        if (down) this.toggleInvQueued = true;
+        break;
+      case 'character':
+        if (down) this.toggleCharQueued = true;
+        break;
+      case 'travel':
+        if (down) this.toggleTravelQueued = true;
+        break;
+      case 'map':
+        if (down) this.toggleMapQueued = true;
+        break;
+      case 'settings':
+        if (down) this.toggleSettingsQueued = true;
+        break;
     }
   }
 

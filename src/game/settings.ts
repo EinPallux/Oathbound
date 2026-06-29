@@ -26,6 +26,10 @@ export interface Settings {
   masterVolume: number;
   /** Mute all audio (independent of the volume level). */
   muteAudio: boolean;
+  /** Mouse look sensitivity multiplier (1 = default). */
+  mouseSensitivity: number;
+  /** Invert the vertical mouse-look axis. */
+  invertY: boolean;
 }
 
 /** Discrete UI-scale steps offered in the panel (continuous values are clamped to range). */
@@ -40,6 +44,8 @@ export const DEFAULT_SETTINGS: Settings = {
   confirmDestructive: true,
   masterVolume: 0.7,
   muteAudio: false,
+  mouseSensitivity: 1,
+  invertY: false,
 };
 
 const STORAGE_KEY = 'oathbound.settings';
@@ -87,6 +93,11 @@ export function mergeSettings(raw: unknown): Settings {
         ? clamp01(r.masterVolume)
         : DEFAULT_SETTINGS.masterVolume,
     muteAudio: typeof r.muteAudio === 'boolean' ? r.muteAudio : DEFAULT_SETTINGS.muteAudio,
+    mouseSensitivity:
+      typeof r.mouseSensitivity === 'number' && Number.isFinite(r.mouseSensitivity)
+        ? Math.min(3, Math.max(0.25, r.mouseSensitivity))
+        : DEFAULT_SETTINGS.mouseSensitivity,
+    invertY: typeof r.invertY === 'boolean' ? r.invertY : DEFAULT_SETTINGS.invertY,
   };
 }
 

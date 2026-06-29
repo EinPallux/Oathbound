@@ -99,6 +99,7 @@ import { ClassSelect } from '../render/class-select';
 import { SettingsPanel } from '../render/settings-panel';
 import { Vignette } from '../render/vignette';
 import { loadSettings, saveSettings, applySettings, tierTag } from './settings';
+import { loadKeybinds, saveKeybinds } from './keybinds';
 import { Sfx } from '../platform/audio';
 import { loadSave, writeSave } from '../platform/save-store';
 import { lerp, lerpAngle } from '../core/math';
@@ -172,7 +173,8 @@ export function boot(): Game {
   }
 
   const renderer = new Renderer(canvas);
-  const input = new InputController(canvas);
+  const keybinds = loadKeybinds();
+  const input = new InputController(canvas, keybinds);
   const overlay = new PerfOverlay(uiRoot);
   const sfx = new Sfx();
 
@@ -181,6 +183,7 @@ export function boot(): Game {
   applySettings(uiRoot, settings);
   const applyVolume = (): void => sfx.setVolume(settings.muteAudio ? 0 : settings.masterVolume);
   applyVolume();
+  input.setLook(settings.mouseSensitivity, settings.invertY);
 
   // World data (pure) + meshes (render).
   const field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337);
@@ -270,11 +273,16 @@ export function boot(): Game {
   const vendorPanel = new VendorPanel(uiRoot);
   const travelPanel = new TravelPanel(uiRoot);
   const classSelect = new ClassSelect(uiRoot);
-  const settingsPanel = new SettingsPanel(uiRoot, settings);
+  const settingsPanel = new SettingsPanel(uiRoot, settings, keybinds);
   settingsPanel.onChange = () => {
     saveSettings(settings);
     applySettings(uiRoot, settings);
     applyVolume();
+    input.setLook(settings.mouseSensitivity, settings.invertY);
+  };
+  settingsPanel.onKeybindsChange = () => {
+    saveKeybinds(keybinds);
+    input.setKeybinds(keybinds);
   };
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();

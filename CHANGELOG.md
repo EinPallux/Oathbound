@@ -5,7 +5,7 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
-## 0.7.0-INDEV — "Feel & Finish" → UX, Accessibility & Content Polish *(in progress)*
+## 0.7.0-INDEV — "Feel & Finish" → UX, Accessibility & Content Polish *(✅ feature-complete — awaiting playtest)*
 **Goal:** make the game *feel finished to use* — full menus, tooltips/comparison, an audio + VFX pass, onboarding polish, and the **accessibility commit list** ([docs/design/UX_AND_ACCESSIBILITY.md](./docs/design/UX_AND_ACCESSIBILITY.md)), all persisting and taking effect without restart. **Gameplay feature-freeze begins** (no new systems). Built in verified checkpoints.
 
 ### ✅ Checkpoint 1 — Settings & accessibility core
@@ -34,8 +34,16 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 **Verified:** `typecheck` ✓ · `npm test` → 287/287 ✓ · `build` ✓ (~179 KB gzip) · `test:e2e` → 15/15 ✓.
 
-### ⏳ Remaining for "Feel & Finish" (next checkpoint)
-- **CP4:** **fully remappable keybinds** + camera/mouse options · onboarding polish (class tutorial cards) · any remaining HUD (buff/debuff durations, cast bar polish).
+### ✅ Checkpoint 4 — fully remappable controls + mouse options
+- **Fully remappable keybinds** (the headline). A new `src/game/keybinds.ts` maps **23 actions** (movement, sprint, jump, the 10 ability slots, interact, the panels, pause) → `KeyboardEvent.code`, with conflict-free defaults, persisted to `localStorage`. The **InputController** now resolves keys through this map (rebuilt live on change) instead of a hardcoded switch; **Tab** (cycle target) and **Esc** (clear/close) stay fixed, and arrow keys remain an always-on movement fallback.
+- **Controls UI in Settings.** A new **Controls** section lists every action with its current key; **click → "Press a key…" → press** rebinds it (capturing the key before the game sees it), automatically **unbinding any conflicting action**. Plus **mouse sensitivity** (slider) and **invert Y** — applied live to the camera look. A **Reset to defaults** now also restores the default bindings.
+- Everything **persists and takes effect without restart** (the accessibility acceptance bar): rebinds + mouse options survive reload.
+- HUD note: the cast bar, numeric cooldown timers, GCD/affordability dimming, and combat/Shaken state were already in place from earlier phases, so this checkpoint focused on the controls gap. (Buff/debuff *duration icons* + onboarding class-tutorial cards remain optional later polish — not blockers for the accessibility commit list.)
+- Tests: keybind defaults/labels/merge/rebind-conflict resolution + mouse-sensitivity clamping/invert-Y validation → **293 unit tests**; a **Controls e2e** (rebind Inventory I→J → it opens the bag in-game and **persists across reload**) → **16 e2e**.
+
+**Verified:** `typecheck` ✓ · `npm test` → 293/293 ✓ · `build` ✓ (~180 KB gzip) · `test:e2e` → 16/16 ✓.
+
+> **0.7.0 "Feel & Finish" is feature-complete** (CP1 settings & accessibility · CP2 tooltips & comparison · CP3 audio + vignette · CP4 remappable controls). The accessibility commit list is in: UI scale, reduced effects, colorblind-safe rarity, damage-number options, confirmations, volume/mute, **remappable keybinds + mouse options** — all persisted, all live. Remaining for the version is **owner playtest** (feel/UX). Next: **0.8.x** optimization & balance pass.
 
 ---
 
