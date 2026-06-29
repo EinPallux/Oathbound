@@ -60,6 +60,7 @@ describe('settings — merge/validate', () => {
       muteAudio: true,
       mouseSensitivity: 1.5,
       invertY: true,
+      maxPixelRatio: 1,
     };
     expect(mergeSettings(JSON.parse(JSON.stringify(custom)))).toEqual(custom);
     // confirmDestructive defaults to on, and validates like the other booleans.
@@ -82,6 +83,14 @@ describe('settings — merge/validate', () => {
     expect(mergeSettings({ mouseSensitivity: 1.5 }).mouseSensitivity).toBe(1.5);
     expect(mergeSettings({ mouseSensitivity: Number.NaN }).mouseSensitivity).toBe(DEFAULT_SETTINGS.mouseSensitivity);
     expect(mergeSettings({ invertY: true }).invertY).toBe(true);
+  });
+
+  it('clamps the graphics resolution quality (maxPixelRatio) to [0.5, 2]', () => {
+    expect(mergeSettings({ maxPixelRatio: 4 }).maxPixelRatio).toBe(2);
+    expect(mergeSettings({ maxPixelRatio: 0.1 }).maxPixelRatio).toBe(0.5);
+    expect(mergeSettings({ maxPixelRatio: 1 }).maxPixelRatio).toBe(1);
+    expect(mergeSettings({ maxPixelRatio: Number.NaN }).maxPixelRatio).toBe(DEFAULT_SETTINGS.maxPixelRatio);
+    expect(DEFAULT_SETTINGS.maxPixelRatio).toBe(1.5);
   });
 });
 

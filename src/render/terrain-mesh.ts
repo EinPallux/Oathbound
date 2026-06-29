@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import type { Heightfield, CylinderCollider } from '../world/heightfield';
 import { biomeFactors, dominantBiome } from '../world/biomes';
+import { TERRAIN_RENDER_RES } from '../world/layout';
 
 // Per-biome terrain palette (low ground → high ground within each biome).
 const PALETTE = {
@@ -44,7 +45,10 @@ function terrainColor(x: number, z: number, h: number, out: THREE.Color): THREE.
 }
 
 export function buildTerrainMesh(field: Heightfield): THREE.Mesh {
-  const geo = new THREE.PlaneGeometry(field.size, field.size, field.res - 1, field.res - 1);
+  // Draw at the render tessellation (≤ the heightfield density); heights are still
+  // sampled from the full-res field at each vertex, so landforms are unchanged.
+  const seg = Math.min(field.res - 1, TERRAIN_RENDER_RES - 1);
+  const geo = new THREE.PlaneGeometry(field.size, field.size, seg, seg);
   geo.rotateX(-Math.PI / 2); // lie flat in the XZ plane (Y becomes height)
 
   const pos = geo.attributes.position as THREE.BufferAttribute;
@@ -65,7 +69,10 @@ export function buildTerrainMesh(field: Heightfield): THREE.Mesh {
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
 
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
+  // Lambert (not Standard/PBR): the terrain fills most of the screen, and a matte
+  // diffuse surface looks identical here while costing far less per fragment — the main
+  // fill-rate win on integrated GPUs. Same for the other large matte world surfaces.
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = 'terrain';
   return mesh;
@@ -84,7 +91,7 @@ const ROCK_TINT: Record<string, THREE.Color> = {
 
 export function buildProps(cols: readonly CylinderCollider[], field: Heightfield): THREE.InstancedMesh {
   const geo = new THREE.IcosahedronGeometry(1, 0);
-  const mat = new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true });
+  const mat = new THREE.MeshLambertMaterial({ flatShading: true });
   const mesh = new THREE.InstancedMesh(geo, mat, cols.length);
   const dummy = new THREE.Object3D();
 

@@ -185,6 +185,7 @@ export function boot(): Game {
   // Player settings & accessibility (device-local, persisted) — applied live to the UI.
   const settings = loadSettings();
   applySettings(uiRoot, settings);
+  renderer.setMaxPixelRatio(settings.maxPixelRatio);
   const applyVolume = (): void => sfx.setVolume(settings.muteAudio ? 0 : settings.masterVolume);
   applyVolume();
   input.setLook(settings.mouseSensitivity, settings.invertY);
@@ -286,6 +287,7 @@ export function boot(): Game {
   settingsPanel.onChange = () => {
     saveSettings(settings);
     applySettings(uiRoot, settings);
+    renderer.setMaxPixelRatio(settings.maxPixelRatio);
     applyVolume();
     input.setLook(settings.mouseSensitivity, settings.invertY);
   };

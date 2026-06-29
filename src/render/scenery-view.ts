@@ -174,7 +174,7 @@ export function buildScenery(scenery: Scenery, field: Heightfield): THREE.Group 
   group.name = 'scenery';
 
   // ── Trees (one instanced mesh per variant; baked trunk/canopy colours) ───────
-  const treeMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+  const treeMat = new THREE.MeshLambertMaterial({ vertexColors: true });
   const byVariant: SceneryInstance[][] = [[], [], []];
   for (const t of scenery.trees) byVariant[t.variant]?.push(t);
   for (let v = 0; v < byVariant.length; v++) {
@@ -195,7 +195,7 @@ export function buildScenery(scenery: Scenery, field: Heightfield): THREE.Group 
     ];
     const mesh = instancedFromGeo(
       new THREE.IcosahedronGeometry(1, 0),
-      new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }),
+      new THREE.MeshLambertMaterial({ flatShading: true }),
       scenery.boulders.length,
       'boulders',
     );
@@ -207,7 +207,7 @@ export function buildScenery(scenery: Scenery, field: Heightfield): THREE.Group 
   if (scenery.pebbles.length) {
     const mesh = instancedFromGeo(
       new THREE.IcosahedronGeometry(0.5, 0),
-      new THREE.MeshStandardMaterial({ color: 0x8b8c8f, roughness: 1, flatShading: true }),
+      new THREE.MeshLambertMaterial({ color: 0x8b8c8f, flatShading: true }),
       scenery.pebbles.length,
       'pebbles',
     );
@@ -220,7 +220,7 @@ export function buildScenery(scenery: Scenery, field: Heightfield): THREE.Group 
     const tints = [new THREE.Color(0x3c6b34), new THREE.Color(0x6e5a36), new THREE.Color(0x6a5a72)];
     const mesh = instancedFromGeo(
       new THREE.IcosahedronGeometry(0.7, 0),
-      new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }),
+      new THREE.MeshLambertMaterial({ flatShading: true }),
       scenery.bushes.length,
       'bushes',
     );
@@ -234,7 +234,7 @@ export function buildScenery(scenery: Scenery, field: Heightfield): THREE.Group 
     const geo = new THREE.ConeGeometry(0.14, 0.7, 4).translate(0, 0.35, 0);
     const mesh = instancedFromGeo(
       geo,
-      new THREE.MeshStandardMaterial({ roughness: 1 }),
+      new THREE.MeshLambertMaterial(),
       scenery.grass.length,
       'grass',
     );
@@ -254,7 +254,7 @@ export function buildScenery(scenery: Scenery, field: Heightfield): THREE.Group 
     const tints = [new THREE.Color(0xd85b6a), new THREE.Color(0xe6c64a), new THREE.Color(0x9a6fd0)];
     const mesh = instancedFromGeo(
       new THREE.IcosahedronGeometry(0.16, 0),
-      new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }),
+      new THREE.MeshLambertMaterial({ flatShading: true }),
       scenery.flowers.length,
       'flowers',
     );
@@ -280,9 +280,8 @@ export function buildScenery(scenery: Scenery, field: Heightfield): THREE.Group 
   }
 
   // ── Roads (draped tan paths from the hub to the frontier) ────────────────────
-  const roadMat = new THREE.MeshStandardMaterial({
+  const roadMat = new THREE.MeshLambertMaterial({
     color: 0x9c8a5e,
-    roughness: 1,
     side: THREE.DoubleSide,
     polygonOffset: true,
     polygonOffsetFactor: -3,

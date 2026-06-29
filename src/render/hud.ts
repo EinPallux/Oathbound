@@ -90,6 +90,7 @@ export class Hud {
   private readonly xpPct: HTMLDivElement;
   private readonly goldVal: HTMLSpanElement;
   private resIcoKey = '';
+  private portraitKey = '';
   private readonly nameEl: HTMLDivElement;
   private readonly levelEl: HTMLDivElement;
   private readonly portraitEl: HTMLDivElement;
@@ -185,8 +186,12 @@ export class Hud {
     const cs = world.get<CombatState>(player, C.CombatState);
     const st = world.get<Statuses>(player, C.Statuses);
 
-    this.portraitEl.innerHTML = icon(CLASS_ICON[cls.id] ?? 'sword');
-    this.nameEl.textContent = cls.name;
+    // Portrait/name only change on a class switch — avoid re-parsing the SVG every frame.
+    if (cls.id !== this.portraitKey) {
+      this.portraitKey = cls.id;
+      this.portraitEl.innerHTML = icon(CLASS_ICON[cls.id] ?? 'sword');
+      this.nameEl.textContent = cls.name;
+    }
     const shield = world.get<Shield>(player, C.Shield);
     if (h) {
       const r = h.max > 0 ? h.current / h.max : 0;

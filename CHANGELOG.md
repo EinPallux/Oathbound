@@ -5,6 +5,18 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.7.2-INDEV — ⚡ Performance pass (owner-requested: 20–30 → 60-70+ FPS, no content cut)
+**Goal:** lift the framerate to a smooth 60-70+ without removing any world, enemies, or detail. A scene profile (via `renderer.info`) found the cost in three places — a huge fixed triangle load, a per-enemy draw-call explosion, and PBR fill cost — so the fixes target each. Headless software-GL numbers (no GPU) at the starter camp: **draw calls 214 → ~120**, **triangles 537k → 258k**, frame time **−40%**; the fill-rate wins below help real GPUs even more than the software rasteriser shows. Pure rendering — the sim, world data, and gameplay are untouched.
+- **Terrain render tessellation decoupled from the heightfield.** The single world-spanning terrain mesh was drawn at the full gameplay sampling density (433² → ~373k triangles, never culled — ~70% of the whole frame). It now draws at ~half density (`TERRAIN_RENDER_RES`, ~93k triangles, a 4× cut) while still sampling heights from the full-res field at every vertex, so the landforms are pixel-identical at the low-poly art scale. Ground-snap/collision (which read the field, not the mesh) are unchanged.
+- **Enemy models merged from ~10 draw calls to ~3.** Each enemy was 7–13 separate primitive meshes (torso/head/limbs/eyes…). They're now baked once, at creation, into one vertex-coloured body mesh (also the single hit-flash material) plus merged glow groups — so the glowing eyes/cores and any translucent parts keep their look, the body still flashes red on hit and tints on telegraph, and click-to-target still works. World bosses included.
+- **Cheaper materials for the big surfaces.** Terrain, rocks, and all scenery (trees/boulders/grass/flowers/road) switched from `MeshStandardMaterial` (PBR) to matte `MeshLambertMaterial` — visually identical at roughness 1 but far cheaper per fragment, the main saving on integrated GPUs. Water keeps its Standard sheen.
+- **Resolution-quality setting (the FPS lever).** A new **Settings → Graphics → Resolution quality** (Performance / Balanced / High / Ultra) caps the render pixel-ratio, applied live and persisted. Default **High (1.5×)** already saves ~45% of pixels vs native 2× on hi-DPI screens; **Performance** renders below native for the most FPS on weak hardware. Plus: far clip-plane pulled in to where fog is already opaque (stops rasterising invisible distance), and the HUD no longer re-parses the portrait SVG every frame.
+- Tests: a `maxPixelRatio` clamp test → **296 unit**; full e2e green (enemy rendering, targeting, settings) → **17 e2e**.
+
+**Verified:** `typecheck` ✓ · `npm test` → 296/296 ✓ · `build` ✓ · `test:e2e` → 17/17 ✓.
+
+---
+
 ## 0.7.2-INDEV — "UI split" → bottom XP bar, Inventory⇄Character split, Character rework (owner-requested, before 0.8.x)
 **Goal:** three targeted UI changes from the latest playtest, layered on the launch design system. No gameplay/sim change.
 - **XP bar relocated to the bottom of the screen.** Removed the slim XP sliver from the player unit-frame; the bar is now a **full-width amber bar pinned to the very bottom**, below the hotbar — showing `current / next EXP` (left) and the **percent to next level** (right), with a `MAX LEVEL` state at the cap. The hotbar, micro-bar and version tag were nudged up to clear it.

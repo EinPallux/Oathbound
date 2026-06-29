@@ -8,16 +8,24 @@ export class Renderer {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
 
+  private maxPixelRatio = 1.5;
+
   constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // Cap the render pixel-ratio (default 1.5, not the display's native 2–3×): on hi-DPI
+    // screens this is the single biggest fill-rate saving — ~45% fewer pixels shaded at 2×
+    // — for a small sharpness cost the low-poly art barely shows. The Graphics quality
+    // setting drives this live (Performance renders below native for the most FPS).
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.maxPixelRatio));
 
     // Open-world depth: distant terrain/mountains fade into haze rather than a near
     // fog wall, so the enlarged world (layout.ts) reads as a big landscape.
     this.scene.background = new THREE.Color(0x141a22);
     this.scene.fog = new THREE.Fog(0x141a22, 120, 620);
 
-    this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2400);
+    // Far plane sits just past where fog is fully opaque (620): everything beyond is solid
+    // background colour anyway, so clipping it there saves rasterising invisible distance.
+    this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 680);
     this.camera.position.set(0, 9, 16);
     this.camera.lookAt(0, 0, 0);
 
@@ -37,6 +45,13 @@ export class Renderer {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+  }
+
+  /** Set the render resolution cap (Graphics quality). Applied live, never above native. */
+  setMaxPixelRatio(mpr: number): void {
+    this.maxPixelRatio = mpr;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, mpr));
+    this.resize(); // re-apply the drawing-buffer size at the new ratio
   }
 
   render(): void {

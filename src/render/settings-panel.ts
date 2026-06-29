@@ -3,7 +3,13 @@
 // immediately (no restart). Accessibility-first: every control is a labelled native
 // input. See docs/design/UX_AND_ACCESSIBILITY.md (Settings + accessibility commit list).
 
-import { type Settings, type DamageNumberSize, UI_SCALES, DEFAULT_SETTINGS } from '../game/settings';
+import {
+  type Settings,
+  type DamageNumberSize,
+  UI_SCALES,
+  PIXEL_RATIO_PRESETS,
+  DEFAULT_SETTINGS,
+} from '../game/settings';
 import {
   type Keybinds,
   type BindableAction,
@@ -18,6 +24,7 @@ export class SettingsPanel {
   private readonly root: HTMLDivElement;
   private visible = false;
   private uiScale!: HTMLSelectElement;
+  private quality!: HTMLSelectElement;
   private dmgOn!: HTMLInputElement;
   private dmgSize!: HTMLSelectElement;
   private reduced!: HTMLInputElement;
@@ -59,6 +66,21 @@ export class SettingsPanel {
         this.onChange();
       },
     );
+
+    groups.appendChild(this.sectionHead('Graphics'));
+    this.quality = this.selectRow(
+      groups,
+      'Resolution quality',
+      PIXEL_RATIO_PRESETS.map((p) => ({ value: String(p.value), label: p.label })),
+      () => {
+        this.settings.maxPixelRatio = parseFloat(this.quality.value);
+        this.onChange();
+      },
+    );
+    const qHint = document.createElement('div');
+    qHint.className = 'inv-hint';
+    qHint.textContent = 'Lower this for more FPS on weaker GPUs.';
+    groups.appendChild(qHint);
 
     groups.appendChild(this.sectionHead('Combat text'));
     this.dmgOn = this.checkRow(groups, 'Show damage numbers', () => {
@@ -252,6 +274,7 @@ export class SettingsPanel {
   /** Push the current settings values into the controls (open / after reset). */
   private syncControls(): void {
     this.uiScale.value = String(this.settings.uiScale);
+    this.quality.value = String(this.settings.maxPixelRatio);
     this.dmgOn.checked = this.settings.damageNumbers;
     this.dmgSize.value = this.settings.damageNumberSize;
     this.reduced.checked = this.settings.reducedEffects;
