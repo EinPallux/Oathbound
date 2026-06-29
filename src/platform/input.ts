@@ -80,6 +80,10 @@ export class InputController implements ControlState {
     if (e.button === 2) {
       this.dragging = true;
       this.el.style.cursor = 'none'; // hide the cursor while looking around
+      // Pointer Lock pins the OS cursor where the look began: dragging the camera can no
+      // longer fling the pointer off-window, and movementX/Y still drives yaw/pitch. If
+      // the browser refuses the lock we fall back to the bare cursor:none behaviour.
+      this.requestLook();
     } else if (e.button === 0) {
       // Left-click selects: stash the click in normalized device coords for the
       // renderer to raycast against enemy meshes.
@@ -94,11 +98,24 @@ export class InputController implements ControlState {
     if (e.button === 2) {
       this.dragging = false;
       this.el.style.cursor = ''; // restore the cursor when the look ends
+      if (document.pointerLockElement === this.el) document.exitPointerLock();
     }
   };
   private readonly onMouseLeave = (): void => {
     this.dragging = false;
     this.el.style.cursor = '';
+  };
+  // Pointer Lock dropping out from under us (the user pressed Esc, tabbed away, etc.)
+  // must stop the drag, or the camera would keep slewing after the cursor reappears.
+  private readonly onPointerLockChange = (): void => {
+    if (document.pointerLockElement !== this.el) {
+      this.dragging = false;
+      this.el.style.cursor = '';
+    }
+  };
+  private readonly onPointerLockError = (): void => {
+    // Lock was refused (e.g. the engage-too-soon throttle); the cursor:none drag still
+    // works, just without the pin. Swallow so it never surfaces as a console error.
   };
   private readonly onMouseMove = (e: MouseEvent): void => {
     if (!this.dragging) return;
@@ -114,12 +131,30 @@ export class InputController implements ControlState {
     this.setKeybinds(keybinds);
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
-    el.addEventListener('contextmenu', this.onContextMenu);
+    // Block the browser context menu everywhere (not just over the canvas): right-drag is
+    // the camera-look control, and the menu must never interrupt it — even if the press
+    // strays over a UI panel. Panels with their own right-click menus still work; they
+    // run their handlers and preventDefault independently.
+    window.addEventListener('contextmenu', this.onContextMenu);
     el.addEventListener('mousedown', this.onMouseDown);
     window.addEventListener('mouseup', this.onMouseUp);
     el.addEventListener('mouseleave', this.onMouseLeave);
     window.addEventListener('mousemove', this.onMouseMove);
+    document.addEventListener('pointerlockchange', this.onPointerLockChange);
+    document.addEventListener('pointerlockerror', this.onPointerLockError);
     el.addEventListener('wheel', this.onWheel, { passive: true });
+  }
+
+  /** Ask the browser to pin the cursor for camera-look. No-op / silent if unsupported. */
+  private requestLook(): void {
+    if (document.pointerLockElement === this.el) return;
+    try {
+      // Newer browsers return a Promise; older ones return void — handle both.
+      const r = this.el.requestPointerLock() as unknown as Promise<void> | undefined;
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+    } catch {
+      // Unsupported → the cursor:none drag still works, just without the pin.
+    }
   }
 
   /** Apply a new keybind map live and rebuild the code→action lookup. */
@@ -293,12 +328,15 @@ export class InputController implements ControlState {
   dispose(): void {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
-    this.el.removeEventListener('contextmenu', this.onContextMenu);
+    window.removeEventListener('contextmenu', this.onContextMenu);
     this.el.removeEventListener('mousedown', this.onMouseDown);
     window.removeEventListener('mouseup', this.onMouseUp);
     this.el.removeEventListener('mouseleave', this.onMouseLeave);
     window.removeEventListener('mousemove', this.onMouseMove);
+    document.removeEventListener('pointerlockchange', this.onPointerLockChange);
+    document.removeEventListener('pointerlockerror', this.onPointerLockError);
     this.el.removeEventListener('wheel', this.onWheel);
+    if (document.pointerLockElement === this.el) document.exitPointerLock();
     this.el.style.cursor = '';
   }
 }
