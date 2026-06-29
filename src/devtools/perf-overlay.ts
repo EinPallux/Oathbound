@@ -2,7 +2,7 @@
 // entity count, sim steps, and an optional extra line. Planned devtool per
 // docs/qa/TEST_STRATEGY.md. Excluded from production builds in a later phase.
 
-const VERSION = '0.7.1-INDEV';
+const VERSION = '0.7.2-INDEV';
 
 export class PerfOverlay {
   private readonly el: HTMLDivElement;

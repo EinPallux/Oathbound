@@ -49,7 +49,7 @@ test('boots the vertical slice, renders, and runs the loop', async ({ page }) =>
   await page.goto('/');
 
   await expect(page.locator('#game')).toBeVisible();
-  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.7.1-INDEV');
+  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.7.2-INDEV');
 
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
   const running = await page.evaluate(() => window.__oathbound!.loop.isRunning);
@@ -202,11 +202,11 @@ test('talents: choosing the other option swaps the hotbar ability', async ({ pag
   await page.evaluate(() => window.__oathbound!.debugSetLevel(18));
   await page.evaluate(() => window.__oathbound!.debugTeleport(40, 0)); // empty space, out of combat
 
-  // Open the bag/talents panel.
-  await page.keyboard.press('KeyI');
-  const panel = page.locator('.inv-panel');
+  // Open the character/talents panel (C).
+  await page.keyboard.press('KeyC');
+  const panel = page.locator('.char-panel');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('.inv-talents')).toContainText('Talents');
+  await expect(panel.locator('.char-talents')).toContainText('Talents');
 
   // Hotbar slot 9 (choice node A) shows the default option.
   const slotA = page.locator('.hotbar .slot').nth(8).locator('.slot-name');
@@ -332,25 +332,29 @@ test('Inventory: item hover shows a tooltip; Rare+ salvage asks to confirm', asy
   await page.evaluate(() => window.__oathbound!.debugSetLevel(10)); // past the salvage unlock
   await page.evaluate(() => window.__oathbound!.debugGiveItem('rare'));
 
-  await page.keyboard.press('KeyI');
-  const panel = page.locator('.inv-panel');
+  await page.keyboard.press('KeyB');
+  const panel = page.locator('.inv-panel.bag');
   await expect(panel).toBeVisible();
 
-  // The granted Rare weapon's backpack row (weapon base name = "Greataxe").
-  const row = panel.locator('.inv-row', { hasText: 'Greataxe' }).first();
-  await expect(row).toBeVisible();
+  // The granted Rare weapon occupies the only filled bag cell.
+  const cell = panel.locator('.bag-cell:not(.empty)').first();
+  await expect(cell).toBeVisible();
 
   // Hovering it shows the item tooltip with its stat lines.
-  await row.hover();
+  await cell.hover();
   const tip = page.locator('.item-tooltip');
   await expect(tip).toBeVisible();
+  await expect(tip).toContainText('Greataxe'); // weapon base name
   await expect(tip).toContainText('Strength'); // warrior weapon → primary STR line
 
-  // Salvaging a Rare item is a two-step confirm (Confirm destructive actions is on).
-  const salv = row.locator('button.danger');
-  await expect(salv).toHaveText('Salvage');
+  // Right-click opens the context menu; salvaging a Rare is a two-step confirm.
+  await cell.click({ button: 'right' });
+  const menu = page.locator('.bag-menu');
+  await expect(menu).toBeVisible();
+  const salv = menu.locator('.bag-menu-item.danger');
+  await expect(salv).toContainText('Salvage');
   await salv.click();
-  await expect(salv).toHaveText('Confirm?');
+  await expect(salv).toContainText('Confirm');
   expect(await page.evaluate(() => window.__oathbound!.bagCount())).toBe(1); // not yet salvaged
   await salv.click();
   expect(await page.evaluate(() => window.__oathbound!.bagCount())).toBe(0); // confirmed → salvaged
@@ -364,9 +368,9 @@ test('Controls: rebinding a key takes effect in-game and persists across reload'
   await expect(page.locator('.settings-panel')).toBeVisible();
 
   const invKey = page.locator('.keybind-row', { hasText: 'Inventory' }).locator('.keybind-key');
-  await expect(invKey).toHaveText('I'); // default
+  await expect(invKey).toHaveText('B'); // default
 
-  // Rebind Inventory: I → J (capture the next keypress).
+  // Rebind Inventory: B → J (capture the next keypress).
   await invKey.click();
   await expect(invKey).toHaveText('Press a key…');
   await page.keyboard.press('KeyJ');
@@ -376,7 +380,7 @@ test('Controls: rebinding a key takes effect in-game and persists across reload'
   await page.keyboard.press('KeyO');
   await expect(page.locator('.settings-panel')).toBeHidden();
   await page.keyboard.press('KeyJ');
-  await expect(page.locator('.inv-panel')).toBeVisible();
+  await expect(page.locator('.inv-panel.bag')).toBeVisible();
 
   // Persists across a reload.
   await page.reload();

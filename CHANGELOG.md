@@ -5,6 +5,20 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 0.7.2-INDEV — "UI split" → bottom XP bar, Inventory⇄Character split, Character rework (owner-requested, before 0.8.x)
+**Goal:** three targeted UI changes from the latest playtest, layered on the launch design system. No gameplay/sim change.
+- **XP bar relocated to the bottom of the screen.** Removed the slim XP sliver from the player unit-frame; the bar is now a **full-width amber bar pinned to the very bottom**, below the hotbar — showing `current / next EXP` (left) and the **percent to next level** (right), with a `MAX LEVEL` state at the cap. The hotbar, micro-bar and version tag were nudged up to clear it.
+- **Inventory (`B`) and Character (`C`) are now separate windows.** The old combined panel is split:
+  - **Inventory** is a modern **grid bag** — a header with a **settings gear** + close, a **Filter** box, a grid of **rarity-bordered item cells** (with lock / `+N` reinforce / upgrade-`▲` badges), **left-click to equip**, **right-click for a context menu** (Equip · Reinforce · Lock · Salvage, keeping the Rare+ confirm), a **Salvage all Common** action, and a footer **wallet** (gold · whetstones · bag count). **All currencies now live here, not on the Character sheet.**
+  - **Character** is a reworked, modern **sheet** — a class **identity strip** (portrait + level + combat state), an **equipment column** (slot icons, rarity-coloured item names, score, reinforce), an **Attributes** chip grid, and **Talents**.
+- **Micro-bar** gains a **Character** button (👤); the Inventory button's hotkey hint is now `B`. The bag and sheet share one hover tooltip instance.
+- Default keybind: **Inventory `I` → `B`** (Character stays `C`); both remain rebindable in Settings.
+- Tests: the inventory e2e now drives the **grid + right-click context-menu** salvage-confirm; the talents e2e opens the **Character** panel (`C`); the rebind e2e expects the new `B` default → **295 unit / 17 e2e**. Version → `0.7.2-INDEV`.
+
+**Verified:** `typecheck` ✓ · `npm test` → 295/295 ✓ · `build` ✓ · `test:e2e` → 17/17 ✓.
+
+---
+
 ## 0.7.1-INDEV — "UI Pass" → HUD restyle (owner-requested, after the 0.7.0 playtest)
 **Goal:** a focused HUD/UX pass from playtest feedback — a proper unit-frame look, an Esc menu, and mouse-friendly access. **Reconciled onto the parallel "Launch UI" overhaul (PR #36): this layers the new layout/features on top of #36's design system + game-icons rather than replacing them** (the hud.ts/styles.css merge conflicts were resolved that way). No gameplay change.
 - **Player + target unit-frames** (top-centre, facing each other), rebuilt to a classic MMO look — using **#36's design tokens + SVG icons**: a gold-framed portrait (your **class icon**, a skull for the target), the name (Cinzel display), a level, and bars — your **HP in green + a gold resource bar** (with #36's heart/resource icons) + a slim XP sliver, the target's **HP in red**. Replaces the old bottom-left player panel + plain target strip.

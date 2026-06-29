@@ -86,6 +86,8 @@ export class Hud {
   private readonly resText: HTMLDivElement;
   private readonly resIco: HTMLDivElement;
   private readonly xpFill: HTMLDivElement;
+  private readonly xpCur: HTMLDivElement;
+  private readonly xpPct: HTMLDivElement;
   private readonly goldVal: HTMLSpanElement;
   private resIcoKey = '';
   private readonly nameEl: HTMLDivElement;
@@ -122,8 +124,6 @@ export class Hud {
     this.resFill = div('bar-fill', this.resBar);
     this.resIco = div('bar-ico', this.resBar);
     this.resText = div('bar-text', this.resBar);
-    const xp = div('bar xp', body);
-    this.xpFill = div('bar-fill', xp);
 
     this.castBar = div('cast-bar', parent);
     this.castFill = div('cast-fill', this.castBar);
@@ -136,6 +136,12 @@ export class Hud {
     this.promptEl = div('loot-prompt', parent);
     this.promptEl.style.display = 'none';
     this.toastWrap = div('toast-wrap', parent);
+
+    // Full-width XP bar pinned to the very bottom of the screen, below the hotbar.
+    const xpBar = div('xp-bar', parent);
+    this.xpFill = div('xp-fill', xpBar);
+    this.xpCur = div('xp-cur', xpBar);
+    this.xpPct = div('xp-pct', xpBar);
   }
 
   toast(text: string, kind: 'info' | 'good' | 'rare' | 'epic' | 'legendary' | 'relic' = 'info'): void {
@@ -199,9 +205,17 @@ export class Hud {
       this.resText.textContent = `${Math.floor(res.current)}/${res.max}`;
     }
     if (prog) {
-      const r = prog.xpToNext === Infinity ? 1 : prog.xp / prog.xpToNext;
+      const capped = prog.xpToNext === Infinity;
+      const r = capped ? 1 : prog.xp / prog.xpToNext;
       this.xpFill.style.width = `${Math.min(1, r) * 100}%`;
       this.levelEl.textContent = `Lv ${prog.level}`;
+      if (capped) {
+        this.xpCur.textContent = 'MAX LEVEL';
+        this.xpPct.textContent = '100%';
+      } else {
+        this.xpCur.textContent = `${prog.xp.toLocaleString()} / ${prog.xpToNext.toLocaleString()} EXP`;
+        this.xpPct.textContent = `${(r * 100).toFixed(2)}%`;
+      }
     }
     if (cs) {
       const shaken = hasStatus(st, Status.Shaken);
