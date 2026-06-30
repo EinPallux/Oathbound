@@ -12,7 +12,13 @@
 
 export const MAP_FORMAT_VERSION = 1;
 
-/** Biome ids — same set as the game (src/world/biomes.ts). Index = paint value. */
+/**
+ * Ground-surface ids — the paint value (= array index) for the per-cell ground grid.
+ * 0–6 mirror the game's gameplay biomes (src/world/biomes.ts); 7+ are extra cosmetic
+ * ground surfaces (city, desert, mesa, …) used by the Map Builder's "Ground" tool. The
+ * loader colours custom-map terrain by this index (see colorForBiome); they don't drive
+ * gameplay/scatter. Append only — never reorder (old maps store the index).
+ */
 export const BIOME_IDS = [
   'greenmarch',
   'thornwood',
@@ -21,6 +27,20 @@ export const BIOME_IDS = [
   'riven',
   'gravereach',
   'hub',
+  // ── extended ground surfaces (cosmetic; custom maps only) ──
+  'city',
+  'desert',
+  'mesa',
+  'savanna',
+  'tundra',
+  'dirt',
+  'sand',
+  'mud',
+  'cobblestone',
+  'ash',
+  'jungle',
+  'ice',
+  'basalt',
 ] as const;
 export type BiomeId = (typeof BIOME_IDS)[number];
 
