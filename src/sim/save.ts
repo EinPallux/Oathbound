@@ -46,6 +46,8 @@ export interface SaveData {
   relics: string[];
   inventory: Item[];
   equipment: Partial<Record<EquipSlot, Item>>;
+  /** Quest progress for the active custom map (injected by the game layer; optional). */
+  quests?: { active: { id: string; progress: number }[]; completed: string[] };
 }
 
 function clone<T>(v: T): T {

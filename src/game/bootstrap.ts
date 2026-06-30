@@ -79,6 +79,7 @@ import {
 import {
   CombatEvent,
   type DamageEvent,
+  type DeathEvent,
   type HealEvent,
   type AbilityUsedEvent,
   type LevelUpEvent,
@@ -96,6 +97,10 @@ import { buildTerrainMesh, buildProps } from '../render/terrain-mesh';
 import { buildScenery } from '../render/scenery-view';
 import { buildCustomTerrainMesh, buildCustomScenery } from '../render/custom-map-view';
 import { CustomNpcs } from '../render/custom-npcs';
+import { CustomCritters } from '../render/custom-critters';
+import { QuestLog } from './quests';
+import { DialogPanel } from '../render/dialog-panel';
+import { QuestTracker } from '../render/quest-tracker';
 import { Sky } from '../render/sky';
 import { VillageView } from '../render/village-view';
 import { AmbientLife } from '../render/ambient-life';
@@ -360,6 +365,44 @@ export function boot(options: BootOptions = {}): Game {
   const sky = new Sky(renderer.scene);
   const village = villageEnabled ? new VillageView(renderer.scene, field) : null;
   const customNpcs = customMap ? new CustomNpcs(renderer.scene, field, customMap.npcs) : null;
+  const customCritters = customMap ? new CustomCritters(renderer.scene, field, customMap.critters) : null;
+
+  // Dialog + quests (custom maps only). NPCs become clickable/interactable; quest progress
+  // tracks the sim's Death events and persists in the save. Rewards are granted here.
+  const quests = customMap?.quests ?? [];
+  const questLog = new QuestLog(quests);
+  const npcName = (id: string): string => customMap?.npcs.find((n) => n.id === id)?.name ?? id;
+  const dialogPanel = new DialogPanel(uiRoot);
+  const questTracker = new QuestTracker(uiRoot);
+  questLog.onChange = () => questTracker.update(questLog, npcName);
+  function openDialog(npcIndex: number): void {
+    const npc = customMap?.npcs[npcIndex];
+    if (!npc || !npc.id) return;
+    questLog.onTalk(npc.id);
+    invPanel.close();
+    charPanel.close();
+    vendorPanel.close();
+    travelPanel.close();
+    dialogPanel.open(npc, {
+      quests,
+      questLog,
+      npcName,
+      onAccept: (qid) => {
+        questLog.accept(qid);
+        hud.toast(`Quest accepted: ${questLog.byId(qid)?.name ?? ''}`, 'good');
+        autosave();
+      },
+      onTurnIn: (qid) => {
+        const q = questLog.complete(qid);
+        if (!q) return;
+        const inv = world.get<Inventory>(player, C.Inventory);
+        if (inv) inv.gold += q.reward.gold;
+        if (q.reward.xp > 0) grantXp(world, player, q.reward.xp);
+        hud.toast(`Quest complete: ${q.name}  (+${q.reward.gold}g, +${q.reward.xp} XP)`, 'good');
+        autosave();
+      },
+    });
+  }
   const playerView = new PlayerView(renderer.scene);
   const ambientLife = new AmbientLife(renderer.scene);
   // Buildings join the camera's occlusion obstacles so the chase camera springs off walls.
@@ -551,6 +594,12 @@ export function boot(options: BootOptions = {}): Game {
     sfx.levelUp();
     autosave();
   });
+  // Quest kill-objective tracking: read the dead enemy's template id (still on the entity
+  // when the Death event fires) and advance any matching active kill quests.
+  world.events.on<DeathEvent>(CombatEvent.Death, (ev) => {
+    const tmpl = world.get<Enemy>(ev.entity, C.Enemy)?.template;
+    if (tmpl) questLog.onKill(tmpl);
+  });
 
   // Persistence: load the saved run, then autosave on key events + a timer + unload.
   // `loaded` gates autosave so the first-tick Oathstone attune doesn't write a default
@@ -560,7 +609,9 @@ export function boot(options: BootOptions = {}): Game {
   function autosave(): void {
     if (saving || !loaded) return;
     saving = true;
-    void writeSave(serialize(world, player)).finally(() => {
+    const data = serialize(world, player);
+    data.quests = questLog.toSave();
+    void writeSave(data).finally(() => {
       saving = false;
     });
   }
@@ -577,6 +628,7 @@ export function boot(options: BootOptions = {}): Game {
         setPlayerClass(world, player, options.newCharacter.classId);
       } else if (data) {
         applySave(world, player, data);
+        questLog.load(data.quests);
       } else {
         classSelect.show(); // legacy/fallback: no save and no chosen class → pick one
       }
@@ -631,7 +683,8 @@ export function boot(options: BootOptions = {}): Game {
       if (input.consumeToggleSettings()) settingsPanel.toggle();
       // Esc, layered: close the topmost panel → else clear the target → else open the menu.
       if (input.consumeEscape()) {
-        if (settingsPanel.isOpen) settingsPanel.close();
+        if (dialogPanel.isOpen) dialogPanel.close();
+        else if (settingsPanel.isOpen) settingsPanel.close();
         else if (invPanel.isOpen) invPanel.close();
         else if (charPanel.isOpen) charPanel.close();
         else if (vendorPanel.isOpen) vendorPanel.close();
@@ -643,13 +696,18 @@ export function boot(options: BootOptions = {}): Game {
       // F interact: close an open vendor panel, else grab nearby loot, else open the
       // vendor panel when standing by a vendor. (Centralized interact key.)
       if (input.consumeInteract()) {
-        if (vendorPanel.isOpen) {
+        if (dialogPanel.isOpen) {
+          dialogPanel.close();
+        } else if (vendorPanel.isOpen) {
           vendorPanel.close();
         } else if (!pickUpNearest(world) && nearestVendor(world, player) != null) {
           invPanel.close();
           charPanel.close();
           travelPanel.close();
           vendorPanel.open();
+        } else {
+          const ni = customNpcs?.nearest(playerTransform.x, playerTransform.z, 3.6) ?? null;
+          if (ni != null) openDialog(ni);
         }
       }
       // Auto-close the vendor panel once you walk away from the stall.
@@ -660,12 +718,18 @@ export function boot(options: BootOptions = {}): Game {
       if (click) {
         pointer.set(click.ndcX, click.ndcY);
         raycaster.setFromCamera(pointer, renderer.camera);
-        const hits = raycaster.intersectObjects(enemyView.pickables(), false);
-        if (hits.length > 0) {
-          const ent = hits[0].object.userData.entity as number | undefined;
-          if (ent != null && world.has(ent)) {
-            const h = world.get<Health>(ent, C.Health);
-            if (h && h.current > 0) playerTarget.entity = ent;
+        // Click an NPC → talk; otherwise click an enemy → target it.
+        const npcHit = customNpcs?.pick(raycaster) ?? null;
+        if (npcHit != null) {
+          openDialog(npcHit);
+        } else {
+          const hits = raycaster.intersectObjects(enemyView.pickables(), false);
+          if (hits.length > 0) {
+            const ent = hits[0].object.userData.entity as number | undefined;
+            if (ent != null && world.has(ent)) {
+              const h = world.get<Health>(ent, C.Health);
+              if (h && h.current > 0) playerTarget.entity = ent;
+            }
           }
         }
       }
@@ -683,6 +747,7 @@ export function boot(options: BootOptions = {}): Game {
       ambientLife.update(rdt, x, z, field);
       village?.update(rdt);
       customNpcs?.update(rdt);
+      customCritters?.update(rdt);
       cameraRig.update(x, y, z);
       sky.update(renderer.camera, rdt);
 

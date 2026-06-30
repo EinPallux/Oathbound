@@ -67,16 +67,17 @@ Everything you placed in the builder comes through:
 
 - **Terrain** (sculpted heightfield) + **biome painting** (ground colour + which vegetation the game auto-scatters)
 - **Water** (lakes, rivers) and **roads**
-- **Assets** — built-in props, the pre-made presets (buildings, walls, towers, town props, ruins, trees, rocks…) and your **custom assets** (Asset Builder). Buildings/walls with a footprint are **solid**.
-- **Gameplay markers** — enemy spawns, world bosses, Oathstone travel points, the player spawn, and (optionally) the town.
-- **Friendly NPCs** — they walk their patrol routes (or idle).
+- **Assets** — built-in props, the pre-made presets (buildings, walls, towers, town-style props, ruins, trees, rocks…) and your **custom assets** (Asset Builder). Buildings/walls with a footprint are **solid**. Build your settlements from these.
+- **Gameplay markers** — enemy spawns, world bosses, Oathstone travel points and the player spawn.
+- **Friendly NPCs** — they walk their patrol routes (or idle), and can carry **dialog + quests** (see below).
+- **Quests & dialog** — talk to an NPC to read its lines; accept quests at their giver NPC and turn them in at the destination NPC for a gold + XP reward. Progress (kills / talk) is tracked on-screen and saved with your character.
 
 ### Good-to-know behaviour
 
 - **Player spawn:** fresh characters start where you placed the Player Spawn marker.
-- **Vendor:** on a map *without* a town, the Quartermaster is placed next to your player spawn so the sell/buy loop still works.
+- **Vendor:** the Quartermaster is placed next to your player spawn so the sell/buy loop always works — build your own town/market around it with preset props.
 - **Oathstones:** if you didn't place any, a `Home` stone is auto-added at the spawn so respawn + fast-travel work.
-- **Town (current v1 limit):** if you include the town, the standard Oathhold renders at the **world origin** — the town marker's position/rotation isn't applied yet. Keep your player spawn near the origin if you include it.
+- **NPC interaction:** **left-click** an NPC, or stand near it and press **F**, to open its dialog. Quest progress and accepted/completed quests persist in your save.
 
 ---
 

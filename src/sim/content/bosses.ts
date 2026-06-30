@@ -215,6 +215,7 @@ export function spawnBoss(
   world.set<Enemy>(e, C.Enemy, {
     archetype: 'melee_bruiser',
     family: def.family,
+    template: id,
     tier: 'boss',
     state: 'idle',
     homeX: x,

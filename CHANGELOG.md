@@ -5,6 +5,33 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## NPC dialog & quests for custom maps (owner-requested follow-up)
+**Goal:** make custom-map NPCs talk and hand out quests — accept at one NPC, complete at another — so authored maps can carry early story/quest content. Additive; the default procedural world is unchanged (it ships no NPCs/quests, so nothing new appears there).
+- **Clickable / interactable NPCs:** the custom-map NPCs (render-only walkers) now resolve to a dialog on **left-click** (raycast pick) or the **F interact key** (nearest within ~3.6 m). `src/render/custom-npcs.ts` gained `pick()`/`nearest()`; no sim/ECS coupling — they stay ambient.
+- **Dialog panel** (`src/render/dialog-panel.ts`): shows the NPC's name + title + lines, and any quest this NPC offers (**Accept**) or takes in (**Turn in (+gold, +XP)**), reading live state from the quest log. Closes on its ✕, Esc, or the interact key.
+- **Quest log** (`src/game/quests.ts`, game layer — not the sim): tracks active quests + objective progress and completed quests. **Kill** objectives advance from the sim's `CombatEvent.Death` (matched by the enemy's template id); **talk** objectives advance when you talk to the target NPC. Rewards (gold + XP) are granted in the bootstrap on turn-in.
+- **Quest tracker** (`src/render/quest-tracker.ts`): a small on-screen list of active quests with `n/count` kill progress or a "Talk to X" hint, refreshed whenever the log changes.
+- **Persistence:** quest state is saved/loaded with the character (`SaveData.quests`, injected at autosave and restored on load) and survives a reload.
+- Format additions (mirror of the builder): `MapNpc` gained `id` / `title` / `dialog[]`; new `MapQuest` (+ `QuestObjective`) and `OathboundMap.quests[]`. `Enemy` ECS component gained `template` (the spawn's template id) so kill credit can be attributed without leaking content into the sim.
+- **Bug fix:** the dialog panel's buttons were unclickable — `#ui-root` is `pointer-events:none` and the panel never opted back in. Added `pointer-events:auto` so Accept / Turn in / ✕ work with the mouse.
+- Demo `sample` map: the three NPCs now have titles + dialog and two showcase quests — *Cull the Bloomhusks* (accept at Mara → slay 3 → turn in at Sergeant Bram, +50g/+120xp) and *A Word with the Elder* (a talk-objective chain, accept at Bram → turn in at the Elder).
+
+**Verified:** `typecheck` ✓ · `npm test` → 314/314 ✓ (new `tests/unit/quests.test.ts` covers kill/talk/persist) · `build` ✓ · headless `?map=sample`: click/F opens the dialog, **Accept** adds the quest to the tracker, the full talk-quest **Turn in** grants +15 gold, both maps boot with **zero console errors**; default boot (no `?map=`) unchanged.
+
+---
+
+## Map loader — per-asset height, bridges & ambient critters (owner-requested follow-up)
+**Goal:** more range when building maps — raise/lower placed props, cross water with bridges, and bring the ambient wildlife into custom maps. Additive; the default procedural world is unchanged.
+- **Per-asset Y offset:** `PlacedAsset.y` raises/lowers a placed prop above its terrain seating (e.g. a bridge over a lake), honoured by the custom-map renderer.
+- **+24 presets** (mirror of the builder): 4 bridges (2 wooden, 2 stone), dock, rowboat, haystack, wood pile, cart, bench, table, statue, obelisk, tombstone, torch, brazier, scarecrow, hedge, berry bush, rock pile, ice spikes, lava rock, chest, banner pole — the library is now ~70 props. Bridges are walk-through (no collider); buildings keep their box footprints.
+- **Ambient critters:** `src/render/custom-critters.ts` spawns each `map.critters` zone — wheeling birds, scurrying ground critters (rats/rabbits), drifting butterflies and glowing fireflies — wandering within its radius (render-only, like AmbientLife), updated from the bootstrap frame loop.
+- Format additions (mirror): `PlacedAsset.y` and `critters[]` (`MapCritter`). The builder also gained a WASD/QE fly camera and image **heightmap import** (editor-only).
+- Demo `sample` map expanded with raised bridges + a dock over the lake and four critter zones (birds / butterflies / fireflies / ground critters).
+
+**Verified:** `typecheck` ✓ · `npm test` → 309/309 ✓ · `build` ✓ · `test:e2e` → 18/18 ✓ · headless `?map=sample` renders the raised bridges + glowing fireflies + a scurrying critter by the lake with **zero console errors**; default boot (no `?map=`) unchanged.
+
+---
+
 ## Map loader — presets, building collision & friendly NPCs (owner-requested follow-up)
 **Goal:** richer custom maps — a pre-made building/prop library, solid buildings, and friendly NPCs that walk patrol routes. Extends the map loader below; the default procedural world is unchanged.
 - **Preset asset library** (`src/world/presets.ts`, a mirror of the builder's): ~45 data-driven props placed as `preset:<id>` and built through the shared custom-asset geometry, so they render identically to the editor. A full **village set** — small/blue/green/stone houses, cottage, two-story, townhouse, manor, inn/tavern, longhouse, barn, chapel (bell tower + spire), windmill, round hut, blacksmith, shop, storehouse, guard house, fountain — plus round/square/watch/wall towers, walls, gate, fence, palisade, well, market stall, tent, ruins, and extra trees/rocks/crystals/plants.
