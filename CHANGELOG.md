@@ -5,6 +5,16 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Fix: custom maps loaded by filename (`?map=name.oathbound-map.json`) failed
+**Goal:** loading a map by its full filename — or a missing map — produced the cryptic console error *“Unexpected token '<', "<!doctype "… is not valid JSON”* and silently fell back to the default world.
+- **Root cause:** the loader treated any `?map=` value containing a dot as a literal path, so `?map=tanaria.oathbound-map.json` was fetched relative to the page (`/tanaria.oathbound-map.json`), not from `public/maps/`. Static hosts answer a missing file with the app's `index.html` (HTTP **200** + HTML), so `res.json()` choked on the leading `<`.
+- **Fix:** new pure `resolveMapUrl()` (`src/world/map-url.ts`) — a bare name (with or without a `.oathbound-map.json` / `.json` suffix typed in) resolves to `public/maps/<name>.oathbound-map.json`; only values containing a slash (explicit path / URL) are used verbatim. The loader also detects an HTML response and logs a **clear, actionable message** (which path it tried, where to put the file) instead of the JSON parse error.
+- `tests/unit/map-url.test.ts` covers the resolution + the previously-broken filename case.
+
+**Verified:** `typecheck` ✓ · `npm test` → 320/320 ✓ · `build` ✓ · headless against the real dev server: `?map=tanaria` and `?map=tanaria.oathbound-map.json` **both load**, and `?map=missing` boots the default world with a clear warning and **no** `Unexpected token '<'` error.
+
+---
+
 ## Fix: "+ Add quest" silently did nothing with no NPCs (Map Builder) + full quest-system audit
 **Goal:** the owner couldn't add a quest in the Quests & Dialog editor. Root cause: a quest needs a giver / turn-in NPC, so the button guarded against zero NPCs — but silently (only a fleeting status-bar line), so it looked broken.
 - **Fix (Map Builder):** when no NPCs exist, the **"+ Add quest" button is now disabled** (greyed, with a tooltip) and the Quests pane shows a clear inline notice — *"⚠ Add an NPC first. Quests are given out and turned in by NPCs…"*. The moment an NPC is placed, the button enables and works.

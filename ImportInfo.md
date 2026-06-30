@@ -45,7 +45,9 @@ You can keep as many maps here as you like.
 
 ### 3. Load it with `?map=`
 
-The `?map=` value is the **filename without the `.oathbound-map.json` part**.
+The `?map=` value is the map's **name** — typically the filename without the `.oathbound-map.json`
+part. (Typing the full `…oathbound-map.json` or `.json` suffix also works — both resolve to
+`public/maps/<name>.oathbound-map.json`.)
 
 | File in `public/maps/` | URL to load it |
 |---|---|
@@ -56,6 +58,11 @@ The `?map=` value is the **filename without the `.oathbound-map.json` part**.
   (Vite serves `public/` live — just add the file and refresh, no restart needed.)
 - **Deployed (Vercel):** `https://your-game.vercel.app/?map=my-world` — but the file must be
   **committed to the repo** first (see *Shipping a map* below), because `public/` is bundled at build time.
+
+> **Console says “Unexpected token '<' … is not valid JSON”?** That means the game fetched a
+> **web page (HTML), not your map** — i.e. the file isn’t at `public/maps/<name>.oathbound-map.json`.
+> Check the file is in `public/maps/` (and, when deployed, committed + redeployed) and that the
+> `?map=` name matches the filename. The loader now prints exactly which path it tried.
 
 Try the included demo right now: **`?map=sample`**.
 
