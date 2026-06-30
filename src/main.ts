@@ -8,21 +8,31 @@ import './styles.css';
 import { runApp } from './game/app';
 import { setActiveMap } from './world/active-map';
 import { normalizeMap } from './world/map-format';
+import { resolveMapUrl, mapNameHint } from './world/map-url';
 
 async function loadRequestedMap(): Promise<void> {
+  const name = new URLSearchParams(location.search).get('map');
+  if (!name) return;
+  const url = resolveMapUrl(name, import.meta.env.BASE_URL);
+  const hint = mapNameHint(name);
+  const place = `Put the exported file at public/maps/${hint}.oathbound-map.json and load it with ?map=${hint}.`;
   try {
-    const name = new URLSearchParams(location.search).get('map');
-    if (!name) return;
-    const url = /[/.]/.test(name) ? name : `${import.meta.env.BASE_URL}maps/${name}.oathbound-map.json`;
     const res = await fetch(url);
     if (!res.ok) {
-      console.warn(`Oathbound: map "${name}" not found (${res.status}); booting the default world.`);
+      console.warn(`Oathbound: map "${name}" not found (HTTP ${res.status}) at ${url}. ${place} Booting the default world.`);
       return;
     }
-    setActiveMap(normalizeMap(await res.json()));
-    console.info(`Oathbound: loaded custom map "${name}".`);
+    // A missing file is often answered with the app's index.html (HTTP 200) on static
+    // hosts — which would blow up as JSON. Detect that and explain it clearly.
+    const text = await res.text();
+    if (text.trimStart().startsWith('<')) {
+      console.warn(`Oathbound: "${name}" resolved to a web page, not a map — the server returned HTML from ${url}, which usually means the file isn't there. ${place} Booting the default world.`);
+      return;
+    }
+    setActiveMap(normalizeMap(JSON.parse(text)));
+    console.info(`Oathbound: loaded custom map "${name}" from ${url}.`);
   } catch (err) {
-    console.warn('Oathbound: failed to load custom map; booting the default world.', err);
+    console.warn(`Oathbound: failed to load custom map "${name}" from ${url}; booting the default world.`, err);
   }
 }
 
