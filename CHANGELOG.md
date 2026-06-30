@@ -5,6 +5,17 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Remove the onboarding tutorial; quests can reward items (owner-requested follow-up)
+**Goal:** clear the way for an authored "get started" questline by removing the built-in tutorial, and let quests hand out gear/relics — not just gold + XP.
+- **Removed the "Getting Started" tracker completely.** Deleted the `Onboarding` sim tracker (`src/sim/onboarding.ts`), the `GoalTracker` overlay (`src/render/goal-tracker.ts`) — which also carried the ongoing Goals/Endgame guidance — their styles, the unit test, and all bootstrap wiring + the `oathbound.onboarded` localStorage flag. Nothing replaces it on-screen (the owner's questline will). The **login / character-select flow is unaffected** — that's a separate system.
+- **Item rewards on quests.** `MapQuest.reward` gained an optional `item`: either a **gear** spec (`slot` + `rarity` + `ilvl` + optional `primaryStat`) rolled on turn-in like any loot, or a named **relic** (`relicId`) handed out whole. Granting happens in the bootstrap turn-in path (`generateItem` / `makeRelic` → `addItem`); the turn-in button and toast show the payout, and a full bag is reported rather than silently eating the drop.
+- Format additions (mirror of the builder): `QuestReward`, `QuestItemReward`, and the `ITEM_SLOTS` / `ITEM_RARITIES` / `ITEM_PRIMARY_STATS` / `RELIC_IDS` id sets.
+- Demo `sample` map: *Cull the Bloomhusks* now also rewards an uncommon weapon, and *A Word with the Elder* rewards a pair of boots (matching its "for your feet" line).
+
+**Verified:** `typecheck` ✓ · `npm test` → 311/311 ✓ (quest test now asserts the item-reward round-trip) · `build` ✓ · `test:e2e` → 18/18 ✓ (boot flow intact with the tracker gone) · headless `?map=sample`: no `.goal-tracker` in the DOM, and turning in the talk quest grants **+15 gold and a pair of boots** (bag +1) with zero console errors.
+
+---
+
 ## NPC dialog & quests for custom maps (owner-requested follow-up)
 **Goal:** make custom-map NPCs talk and hand out quests — accept at one NPC, complete at another — so authored maps can carry early story/quest content. Additive; the default procedural world is unchanged (it ships no NPCs/quests, so nothing new appears there).
 - **Clickable / interactable NPCs:** the custom-map NPCs (render-only walkers) now resolve to a dialog on **left-click** (raycast pick) or the **F interact key** (nearest within ~3.6 m). `src/render/custom-npcs.ts` gained `pick()`/`nearest()`; no sim/ECS coupling — they stay ambient.

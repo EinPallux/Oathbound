@@ -70,7 +70,7 @@ Everything you placed in the builder comes through:
 - **Assets** — built-in props, the pre-made presets (buildings, walls, towers, town-style props, ruins, trees, rocks…) and your **custom assets** (Asset Builder). Buildings/walls with a footprint are **solid**. Build your settlements from these.
 - **Gameplay markers** — enemy spawns, world bosses, Oathstone travel points and the player spawn.
 - **Friendly NPCs** — they walk their patrol routes (or idle), and can carry **dialog + quests** (see below).
-- **Quests & dialog** — talk to an NPC to read its lines; accept quests at their giver NPC and turn them in at the destination NPC for a gold + XP reward. Progress (kills / talk) is tracked on-screen and saved with your character.
+- **Quests & dialog** — talk to an NPC to read its lines; accept quests at their giver NPC and turn them in at the destination NPC for a reward (gold + XP, and optionally an item — a rolled piece of gear or a named relic). Progress (kills / talk) is tracked on-screen and saved with your character.
 
 ### Good-to-know behaviour
 

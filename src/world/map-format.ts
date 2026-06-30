@@ -143,6 +143,39 @@ export type QuestObjective =
   | { type: 'kill'; enemyId: EnemyId; count: number }
   | { type: 'talk'; npcId: string };
 
+/** Equipment slots a gear reward can target (mirror of EquipSlot in the game). */
+export const ITEM_SLOTS = [
+  'weapon', 'offhand', 'head', 'chest', 'hands', 'legs', 'feet', 'amulet', 'ring1', 'ring2',
+] as const;
+export type ItemSlot = (typeof ITEM_SLOTS)[number];
+
+/** Rarities a rolled gear reward can take (relics are awarded by id, not rolled). */
+export const ITEM_RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const;
+export type ItemRarity = (typeof ITEM_RARITIES)[number];
+
+/** Primary-stat bias for a rolled weapon/jewellery reward (armour ignores it). */
+export const ITEM_PRIMARY_STATS = ['STR', 'DEX', 'SPR'] as const;
+export type ItemPrimaryStat = (typeof ITEM_PRIMARY_STATS)[number];
+
+/** Named end-game relics that can be handed out whole (mirror of RelicId in the game). */
+export const RELIC_IDS = ['ashbrand', 'rimewyrm-heart', 'hollow-crown', 'bloodroot-sigil'] as const;
+export type RelicRewardId = (typeof RELIC_IDS)[number];
+
+/**
+ * An item handed out on quest turn-in: either a piece of gear *rolled* from a spec
+ * (slot + rarity + item level, like all loot) or a fixed, hand-designed relic by id.
+ */
+export type QuestItemReward =
+  | { kind: 'gear'; slot: ItemSlot; rarity: ItemRarity; ilvl: number; primaryStat?: ItemPrimaryStat }
+  | { kind: 'relic'; relicId: RelicRewardId };
+
+/** A quest's payout: gold + XP, and optionally one item. */
+export interface QuestReward {
+  gold: number;
+  xp: number;
+  item?: QuestItemReward;
+}
+
 /** A quest accepted at `giver`, completed at `turnIn`, with one objective + a reward. */
 export interface MapQuest {
   id: string;
@@ -153,7 +186,7 @@ export interface MapQuest {
   /** NPC id where it's turned in (can equal the giver). */
   turnIn: string;
   objective: QuestObjective;
-  reward: { gold: number; xp: number };
+  reward: QuestReward;
   /** Dialog shown when offering / while in progress / on completion. */
   offerText?: string;
   progressText?: string;

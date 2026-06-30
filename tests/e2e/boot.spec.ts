@@ -174,14 +174,9 @@ test('attunes the spawn Oathstone and opens fast travel with T', async ({ page }
   await expect(page.locator('.travel-panel')).toBeHidden();
 });
 
-test('shows the Goal Tracker + minimap and toggles the full map with M', async ({ page }) => {
+test('shows the minimap and toggles the full map with M', async ({ page }) => {
   await page.goto('/?autostart');
   await page.waitForFunction(() => window.__oathbound !== undefined);
-
-  // Fresh character → the onboarding checklist is up.
-  await expect(page.locator('.goal-tracker')).toBeVisible();
-  await expect(page.locator('.goal-tracker')).toContainText('Getting Started');
-  await expect(page.locator('.goal-tracker')).toContainText('Move with WASD');
 
   // Always-on minimap, labelled with the current region (spawn = the hub).
   await expect(page.locator('.minimap')).toBeVisible();
@@ -252,24 +247,17 @@ test('a world boss spawns and its fight runs without errors', async ({ page }) =
   expect(errors).toEqual([]);
 });
 
-test('Lv-30 endgame: the Goal Tracker pivots to the relic chase + map renders bosses', async ({ page }) => {
+test('Lv-30 endgame: the full map renders the world-boss markers error-free', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(m.text());
   });
   page.on('pageerror', (e) => errors.push(String(e)));
 
-  // Skip the tutorial so the Goal Tracker shows the goals/endgame view.
-  await page.addInitScript(() => localStorage.setItem('oathbound.onboarded', '1'));
   await page.goto('/?autostart');
   await page.waitForFunction(() => window.__oathbound !== undefined);
   await page.evaluate(() => window.__oathbound!.debugSetClass('warrior'));
   await page.evaluate(() => window.__oathbound!.debugSetLevel(30));
-
-  const tracker = page.locator('.goal-tracker');
-  await expect(tracker).toContainText('Endgame');
-  await expect(tracker).toContainText('Relics 0/4');
-  await expect(tracker).toContainText('Emberhorn'); // the next relic target to hunt
 
   // The full map (with the crimson world-boss markers + labels) renders error-free.
   await page.keyboard.press('KeyM');
@@ -434,7 +422,7 @@ test('progress persists across a reload (save v1)', async ({ page }) => {
   expect(await page.evaluate(() => window.__oathbound!.level())).toBe(2);
 });
 
-test('onboarding: login → create a character → enter world → log out → re-enter', async ({ page }) => {
+test('character flow: login → create a character → enter world → log out → re-enter', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(m.text());

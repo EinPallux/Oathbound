@@ -2,7 +2,7 @@
 // custom-map NPC: shows the NPC's title + lines, and any quests this NPC offers (Accept)
 // or takes in (Turn in). Reads quest state from the QuestLog; the bootstrap grants rewards.
 
-import type { MapNpc, MapQuest } from '../world/map-format';
+import type { MapNpc, MapQuest, QuestReward } from '../world/map-format';
 import type { QuestLog } from '../game/quests';
 
 export interface DialogContext {
@@ -18,6 +18,15 @@ function el(tag: string, cls?: string, text?: string): HTMLElement {
   if (cls) n.className = cls;
   if (text != null) n.textContent = text;
   return n;
+}
+
+/** Short payout summary for the Turn-in button (the rolled gear name shows on grant). */
+function rewardLabel(r: QuestReward): string {
+  const parts: string[] = [];
+  if (r.gold) parts.push(`+${r.gold}g`);
+  if (r.xp) parts.push(`+${r.xp} XP`);
+  if (r.item) parts.push(r.item.kind === 'relic' ? '+Relic' : `+${r.item.rarity} ${r.item.slot}`);
+  return parts.join(', ') || 'reward';
 }
 
 export class DialogPanel {
@@ -82,7 +91,7 @@ export class DialogPanel {
       }
       // Turn-in (active + objective met, this NPC takes it).
       if (isTurnIn && ql.isActive(q.id) && ql.objectiveDone(q)) {
-        this.root.append(this.questBlock(q, q.completeText ?? `“Well done — here's your reward.”`, `Turn in (+${q.reward.gold}g, +${q.reward.xp} XP)`, () => {
+        this.root.append(this.questBlock(q, q.completeText ?? `“Well done — here's your reward.”`, `Turn in (${rewardLabel(q.reward)})`, () => {
           ctx.onTurnIn(q.id);
           this.render();
         }));

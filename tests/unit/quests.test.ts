@@ -9,7 +9,7 @@ const KILL_QUEST: MapQuest = {
   giver: 'npc-1',
   turnIn: 'npc-2',
   objective: { type: 'kill', enemyId: 'bloomhusk', count: 3 },
-  reward: { gold: 50, xp: 120 },
+  reward: { gold: 50, xp: 120, item: { kind: 'gear', slot: 'weapon', rarity: 'uncommon', ilvl: 4, primaryStat: 'STR' } },
 };
 
 const TALK_QUEST: MapQuest = {
@@ -47,6 +47,8 @@ describe('QuestLog — kill objective', () => {
 
     const done = ql.complete('cull');
     expect(done?.reward.gold).toBe(50);
+    // The item-reward spec is carried on the quest for the bootstrap to roll + grant.
+    expect(done?.reward.item).toEqual({ kind: 'gear', slot: 'weapon', rarity: 'uncommon', ilvl: 4, primaryStat: 'STR' });
     expect(ql.isActive('cull')).toBe(false);
     expect(ql.isCompleted('cull')).toBe(true);
     expect(changes).toBeGreaterThan(0);
