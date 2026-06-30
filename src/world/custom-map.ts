@@ -6,6 +6,7 @@
 
 import { Heightfield, type CylinderCollider, type BoxCollider } from './heightfield';
 import { clamp } from '../core/math';
+import { TERRAIN_RENDER_RES } from './layout';
 import { unpackHeights, ENEMY_IDS, BOSS_IDS, type AssetDef, type OathboundMap } from './map-format';
 import { presetById } from './presets';
 import type { Scenery } from './scenery';
@@ -16,9 +17,31 @@ import type { BossId } from '../sim/content/bosses';
 /** Collider radius (m, at scale 1) for a built-in boulder — mirrors the builder catalog. */
 const BOULDER_COLLIDER = 0.95;
 
-/** Construct the gameplay heightfield from the map's stored grid. */
+/**
+ * Construct the gameplay heightfield from the map's stored grid.
+ *
+ * The terrain *mesh* is tessellated at most TERRAIN_RENDER_RES vertices per side (a perf
+ * cap), so a higher-res authored field would be drawn as a *smoother* surface than the
+ * full-res field the player snaps to — leaving you half-buried on detailed (heightmap)
+ * terrain. To keep collision exactly on the surface that's drawn, resample the gameplay
+ * field down to the render grid whenever the map is finer than it. Maps at or below the
+ * render resolution are used as-authored (the mesh tessellates at their full res).
+ */
 export function buildCustomHeightfield(map: OathboundMap): Heightfield {
-  return new Heightfield(map.size, map.res, unpackHeights(map));
+  const heights = unpackHeights(map);
+  if (map.res <= TERRAIN_RENDER_RES) return new Heightfield(map.size, map.res, heights);
+
+  const full = new Heightfield(map.size, map.res, heights);
+  const res = TERRAIN_RENDER_RES;
+  const half = map.size / 2;
+  const cell = map.size / (res - 1);
+  const down = new Float32Array(res * res);
+  for (let z = 0; z < res; z++) {
+    for (let x = 0; x < res; x++) {
+      down[z * res + x] = full.sample(-half + x * cell, -half + z * cell);
+    }
+  }
+  return new Heightfield(map.size, res, down);
 }
 
 /** Resolve a placed asset id to its definition (preset library or per-map custom). */
