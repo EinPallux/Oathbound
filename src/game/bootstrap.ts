@@ -96,6 +96,7 @@ import { buildTerrainMesh, buildProps } from '../render/terrain-mesh';
 import { buildScenery } from '../render/scenery-view';
 import { buildCustomTerrainMesh, buildCustomScenery } from '../render/custom-map-view';
 import { CustomNpcs } from '../render/custom-npcs';
+import { CustomCritters } from '../render/custom-critters';
 import { Sky } from '../render/sky';
 import { VillageView } from '../render/village-view';
 import { AmbientLife } from '../render/ambient-life';
@@ -356,6 +357,7 @@ export function boot(options: BootOptions = {}): Game {
   const sky = new Sky(renderer.scene);
   const village = villageEnabled ? new VillageView(renderer.scene, field) : null;
   const customNpcs = customMap ? new CustomNpcs(renderer.scene, field, customMap.npcs) : null;
+  const customCritters = customMap ? new CustomCritters(renderer.scene, field, customMap.critters) : null;
   const playerView = new PlayerView(renderer.scene);
   const ambientLife = new AmbientLife(renderer.scene);
   // Buildings join the camera's occlusion obstacles so the chase camera springs off walls.
@@ -679,6 +681,7 @@ export function boot(options: BootOptions = {}): Game {
       ambientLife.update(rdt, x, z, field);
       village?.update(rdt);
       customNpcs?.update(rdt);
+      customCritters?.update(rdt);
       cameraRig.update(x, y, z);
       sky.update(renderer.camera, rdt);
 

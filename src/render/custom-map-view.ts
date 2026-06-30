@@ -85,7 +85,7 @@ function buildPlacedAssets(group: THREE.Group, map: OathboundMap, field: Heightf
     mesh.name = `asset:${assetId}`;
     for (let i = 0; i < items.length; i++) {
       const p = items[i];
-      _obj.position.set(p.x, field.sample(p.x, p.z) + assetYLift(assetId, p.scale), p.z);
+      _obj.position.set(p.x, field.sample(p.x, p.z) + assetYLift(assetId, p.scale) + (p.y ?? 0), p.z);
       _obj.rotation.set(0, p.rot, 0);
       _obj.scale.setScalar(p.scale);
       _obj.updateMatrix();

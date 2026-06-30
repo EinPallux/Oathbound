@@ -74,6 +74,8 @@ export interface PlacedAsset {
   scale: number;
   /** Y rotation (radians). */
   rot: number;
+  /** Additive vertical offset (m) on top of the terrain seating — raise/lower the prop. */
+  y?: number;
 }
 
 export interface MapSpawn {
@@ -99,6 +101,20 @@ export interface MapOathstone {
   z: number;
   /** Frontier stones double as road destinations from the hub. */
   road?: boolean;
+}
+
+/** Ambient wildlife types (decorative, render-only): wheeling birds, ground critters
+ *  (rats/rabbits), drifting butterflies, glowing fireflies. */
+export const CRITTER_TYPES = ['birds', 'critters', 'butterflies', 'fireflies'] as const;
+export type CritterType = (typeof CRITTER_TYPES)[number];
+
+/** A zone that spawns `count` ambient creatures of `type` wandering within `radius`. */
+export interface MapCritter {
+  type: CritterType;
+  x: number;
+  z: number;
+  radius: number;
+  count: number;
 }
 
 /** A friendly, non-hostile NPC that idles or strolls a closed patrol route. */
@@ -184,6 +200,8 @@ export interface OathboundMap {
   oathstones: MapOathstone[];
   /** Friendly NPCs (idle/patrolling). */
   npcs: MapNpc[];
+  /** Ambient wildlife zones (decorative). */
+  critters: MapCritter[];
   /** Where a fresh character spawns. */
   playerSpawn: { x: number; z: number };
   /** Flat shelves levelled into the terrain (arenas, town pad). */
@@ -266,6 +284,7 @@ export function blankMap(name: string, size: number, res: number): OathboundMap 
     bosses: [],
     oathstones: [],
     npcs: [],
+    critters: [],
     playerSpawn: { x: 0, z: 0 },
     flats: [],
     village: null,
@@ -311,6 +330,7 @@ export function normalizeMap(raw: unknown): OathboundMap {
     bosses: arr(m.bosses),
     oathstones: arr(m.oathstones),
     npcs: arr(m.npcs),
+    critters: arr(m.critters),
     playerSpawn: m.playerSpawn && typeof m.playerSpawn === 'object'
       ? { x: num(m.playerSpawn.x, 0), z: num(m.playerSpawn.z, 0) }
       : { x: 0, z: 0 },

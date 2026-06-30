@@ -5,6 +5,18 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Map loader — per-asset height, bridges & ambient critters (owner-requested follow-up)
+**Goal:** more range when building maps — raise/lower placed props, cross water with bridges, and bring the ambient wildlife into custom maps. Additive; the default procedural world is unchanged.
+- **Per-asset Y offset:** `PlacedAsset.y` raises/lowers a placed prop above its terrain seating (e.g. a bridge over a lake), honoured by the custom-map renderer.
+- **+24 presets** (mirror of the builder): 4 bridges (2 wooden, 2 stone), dock, rowboat, haystack, wood pile, cart, bench, table, statue, obelisk, tombstone, torch, brazier, scarecrow, hedge, berry bush, rock pile, ice spikes, lava rock, chest, banner pole — the library is now ~70 props. Bridges are walk-through (no collider); buildings keep their box footprints.
+- **Ambient critters:** `src/render/custom-critters.ts` spawns each `map.critters` zone — wheeling birds, scurrying ground critters (rats/rabbits), drifting butterflies and glowing fireflies — wandering within its radius (render-only, like AmbientLife), updated from the bootstrap frame loop.
+- Format additions (mirror): `PlacedAsset.y` and `critters[]` (`MapCritter`). The builder also gained a WASD/QE fly camera and image **heightmap import** (editor-only).
+- Demo `sample` map expanded with raised bridges + a dock over the lake and four critter zones (birds / butterflies / fireflies / ground critters).
+
+**Verified:** `typecheck` ✓ · `npm test` → 309/309 ✓ · `build` ✓ · `test:e2e` → 18/18 ✓ · headless `?map=sample` renders the raised bridges + glowing fireflies + a scurrying critter by the lake with **zero console errors**; default boot (no `?map=`) unchanged.
+
+---
+
 ## Map loader — presets, building collision & friendly NPCs (owner-requested follow-up)
 **Goal:** richer custom maps — a pre-made building/prop library, solid buildings, and friendly NPCs that walk patrol routes. Extends the map loader below; the default procedural world is unchanged.
 - **Preset asset library** (`src/world/presets.ts`, a mirror of the builder's): ~45 data-driven props placed as `preset:<id>` and built through the shared custom-asset geometry, so they render identically to the editor. A full **village set** — small/blue/green/stone houses, cottage, two-story, townhouse, manor, inn/tavern, longhouse, barn, chapel (bell tower + spire), windmill, round hut, blacksmith, shop, storehouse, guard house, fountain — plus round/square/watch/wall towers, walls, gate, fence, palisade, well, market stall, tent, ruins, and extra trees/rocks/crystals/plants.

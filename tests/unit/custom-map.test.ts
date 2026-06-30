@@ -69,6 +69,7 @@ describe('map-format height packing', () => {
     expect(m.biomes.length).toBe(16);
     expect(m.assets).toEqual([]);
     expect(m.npcs).toEqual([]);
+    expect(m.critters).toEqual([]);
     expect(m.playerSpawn).toEqual({ x: 0, z: 0 });
     expect(m.village).toBeNull();
   });

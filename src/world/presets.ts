@@ -208,6 +208,161 @@ export const PRESET_ASSETS: AssetDef[] = [
     sph(0x8fd0e8, 0.35, 0, 1.7, 0),
   ], 1.9),
 
+  // ── Bridges (decorative — walk across on the terrain beneath; raise via Height offset) ──
+  def('wooden-bridge', 'Wooden Bridge', 'structure', [
+    box(WOOD_LT, 2.4, 0.16, 7.0, 0, 0.4, 0),
+    box(WOOD, 0.12, 0.5, 7.0, 1.1, 0.7, 0),
+    box(WOOD, 0.12, 0.5, 7.0, -1.1, 0.7, 0),
+    box(WOOD_DK, 2.5, 0.16, 0.25, 0, 0.25, 2.6),
+    box(WOOD_DK, 2.5, 0.16, 0.25, 0, 0.25, -2.6),
+    box(WOOD_DK, 0.18, 1.0, 0.18, 1.0, -0.1, 2.6),
+    box(WOOD_DK, 0.18, 1.0, 0.18, -1.0, -0.1, 2.6),
+    box(WOOD_DK, 0.18, 1.0, 0.18, 1.0, -0.1, -2.6),
+    box(WOOD_DK, 0.18, 1.0, 0.18, -1.0, -0.1, -2.6),
+  ]),
+  def('rope-bridge', 'Rope Bridge', 'structure', [
+    box(WOOD, 1.8, 0.12, 6.0, 0, 0.35, 0),
+    part('cylinder', 0x6a5a3a, [0.04, 0.04, 6.4], [0.9, 1.05, 0], [Math.PI / 2, 0, 0]),
+    part('cylinder', 0x6a5a3a, [0.04, 0.04, 6.4], [-0.9, 1.05, 0], [Math.PI / 2, 0, 0]),
+    box(WOOD_DK, 0.18, 1.4, 0.18, 0.9, 0.4, 3.0),
+    box(WOOD_DK, 0.18, 1.4, 0.18, -0.9, 0.4, 3.0),
+    box(WOOD_DK, 0.18, 1.4, 0.18, 0.9, 0.4, -3.0),
+    box(WOOD_DK, 0.18, 1.4, 0.18, -0.9, 0.4, -3.0),
+  ]),
+  def('stone-bridge', 'Stone Bridge', 'structure', [
+    box(STONE, 2.6, 0.3, 7.0, 0, 0.45, 0),
+    box(STONE_DK, 0.3, 0.6, 7.0, 1.15, 0.85, 0),
+    box(STONE_DK, 0.3, 0.6, 7.0, -1.15, 0.85, 0),
+  ]),
+  def('stone-arch-bridge', 'Stone Arch Bridge', 'structure', [
+    box(STONE, 2.6, 0.35, 7.0, 0, 0.95, 0),
+    box(STONE_DK, 0.3, 0.55, 7.0, 1.15, 1.3, 0),
+    box(STONE_DK, 0.3, 0.55, 7.0, -1.15, 1.3, 0),
+    box(STONE, 2.6, 1.5, 0.9, 0, 0.2, 2.7),
+    box(STONE, 2.6, 1.5, 0.9, 0, 0.2, -2.7),
+    box(STONE_DK, 2.7, 0.45, 0.5, 0, 0.75, 0),
+  ]),
+
+  // ── More world & town props ──────────────────────────────────────────────-
+  def('dock', 'Dock / Pier', 'structure', [
+    box(WOOD_LT, 2.0, 0.16, 4.2, 0, 0.4, 0),
+    box(WOOD_DK, 0.16, 1.2, 0.16, 0.8, -0.1, 1.8),
+    box(WOOD_DK, 0.16, 1.2, 0.16, -0.8, -0.1, 1.8),
+    box(WOOD_DK, 0.16, 1.2, 0.16, 0.8, -0.1, -1.8),
+    box(WOOD_DK, 0.16, 1.2, 0.16, -0.8, -0.1, -1.8),
+  ]),
+  def('rowboat', 'Rowboat', 'misc', [
+    box(0x6e4a2e, 1.1, 0.45, 2.8, 0, 0.25, 0),
+    box(0x4f3622, 0.9, 0.35, 2.5, 0, 0.32, 0),
+    box(WOOD_LT, 0.9, 0.08, 0.28, 0, 0.4, 0.7),
+    box(WOOD_LT, 0.9, 0.08, 0.28, 0, 0.4, -0.7),
+  ]),
+  def('haystack', 'Haystack', 'misc', [
+    cyl(0xc9a94a, 1.1, 1.3, 0.9, 0, 0.45, 0),
+    cone(0xc9a94a, 1.35, 1.6, 0, 1.3, 0),
+  ], 1.1),
+  def('wood-pile', 'Wood Pile', 'misc', [
+    part('cylinder', 0x6e4a2e, [0.22, 0.22, 1.8], [0, 0.22, -0.25], [Math.PI / 2, 0, 0]),
+    part('cylinder', 0x7a5230, [0.22, 0.22, 1.8], [0, 0.22, 0.25], [Math.PI / 2, 0, 0]),
+    part('cylinder', 0x6e4a2e, [0.22, 0.22, 1.8], [0, 0.62, 0], [Math.PI / 2, 0, 0]),
+  ], 0.9),
+  def('cart', 'Hand Cart', 'misc', [
+    box(WOOD, 1.7, 0.5, 1.0, 0, 0.75, 0),
+    box(WOOD_DK, 1.7, 0.4, 0.1, 0, 0.95, -0.5),
+    part('cylinder', 0x3a2f24, [0.5, 0.5, 0.16], [0.95, 0.5, 0], [0, 0, Math.PI / 2]),
+    part('cylinder', 0x3a2f24, [0.5, 0.5, 0.16], [-0.95, 0.5, 0], [0, 0, Math.PI / 2]),
+    box(WOOD, 0.1, 0.1, 1.2, 0.7, 0.7, 1.0),
+    box(WOOD, 0.1, 0.1, 1.2, -0.7, 0.7, 1.0),
+  ], 1.1),
+  def('bench', 'Bench', 'misc', [
+    box(WOOD_LT, 1.6, 0.12, 0.5, 0, 0.5, 0),
+    box(WOOD_LT, 1.6, 0.5, 0.1, 0, 0.78, -0.2),
+    box(WOOD_DK, 0.1, 0.5, 0.4, 0.7, 0.25, 0),
+    box(WOOD_DK, 0.1, 0.5, 0.4, -0.7, 0.25, 0),
+  ]),
+  def('table', 'Table', 'misc', [
+    box(WOOD_LT, 1.6, 0.14, 1.0, 0, 0.9, 0),
+    box(WOOD_DK, 0.12, 0.9, 0.12, 0.65, 0.45, 0.35),
+    box(WOOD_DK, 0.12, 0.9, 0.12, -0.65, 0.45, 0.35),
+    box(WOOD_DK, 0.12, 0.9, 0.12, 0.65, 0.45, -0.35),
+    box(WOOD_DK, 0.12, 0.9, 0.12, -0.65, 0.45, -0.35),
+  ], 0.8),
+  def('statue', 'Statue', 'structure', [
+    box(STONE_DK, 1.3, 1.0, 1.3, 0, 0.5, 0),
+    box(STONE, 0.6, 1.1, 0.4, 0, 1.55, 0),
+    sph(STONE, 0.26, 0, 2.25, 0),
+    box(STONE, 0.2, 0.7, 0.2, 0.45, 1.6, 0),
+    box(STONE, 0.2, 0.7, 0.2, -0.45, 1.6, 0),
+  ], 0.9),
+  def('obelisk', 'Obelisk', 'structure', [
+    box(STONE_DK, 1.4, 0.5, 1.4, 0, 0.25, 0),
+    box(STONE, 0.8, 4.6, 0.8, 0, 2.8, 0),
+    cone(STONE, 0.6, 0.8, 0, 5.5, 0),
+  ], 0.8),
+  def('tombstone', 'Tombstone', 'misc', [
+    box(0x5a4a38, 1.2, 0.2, 1.8, 0, 0.1, 0.4),
+    box(STONE, 0.8, 1.1, 0.18, 0, 0.55, -0.3),
+    box(STONE, 0.5, 0.16, 0.18, 0, 1.0, -0.3),
+  ]),
+  def('standing-torch', 'Standing Torch', 'misc', [
+    cyl(WOOD, 0.08, 0.1, 1.8, 0, 0.9, 0),
+    cyl(0x3a3a40, 0.2, 0.14, 0.25, 0, 1.85, 0),
+    cone(0xff7a1e, 0.18, 0.55, 0, 2.15, 0),
+  ]),
+  def('brazier', 'Brazier', 'misc', [
+    cyl(0x3a3a40, 0.45, 0.3, 0.32, 0, 0.8, 0),
+    part('cylinder', 0x2a2a30, [0.05, 0.06, 0.9], [0.3, 0.4, 0.2], [0.3, 0, -0.3]),
+    part('cylinder', 0x2a2a30, [0.05, 0.06, 0.9], [-0.3, 0.4, 0.2], [0.3, 0, 0.3]),
+    part('cylinder', 0x2a2a30, [0.05, 0.06, 0.9], [0, 0.4, -0.35], [-0.3, 0, 0]),
+    cone(0xff7a1e, 0.4, 0.75, 0, 1.15, 0),
+  ], 0.45),
+  def('scarecrow', 'Scarecrow', 'misc', [
+    cyl(WOOD, 0.08, 0.1, 2.0, 0, 1.0, 0),
+    box(WOOD, 1.4, 0.1, 0.1, 0, 1.5, 0),
+    box(0x8a7a4a, 0.4, 0.6, 0.3, 0, 1.2, 0),
+    sph(0xcaa34a, 0.25, 0, 1.95, 0),
+    cone(0x6e4a2e, 0.38, 0.32, 0, 2.2, 0),
+  ]),
+  def('hedge', 'Hedge', 'plant', [
+    box(0x35602f, 3.0, 1.2, 0.9, 0, 0.6, 0),
+    box(0x3c6b34, 3.0, 0.25, 0.95, 0, 1.2, 0),
+  ], null, { hw: 1.5, hd: 0.45 }),
+  def('berry-bush', 'Berry Bush', 'plant', [
+    ico(0x355c2b, 0.7, 0, 0, 0.55, 0),
+    ico(0x3c6b34, 0.5, 0, 0.45, 0.5, 0.1),
+    sph(0xc0303a, 0.08, 0.3, 0.7, 0.4),
+    sph(0xc0303a, 0.08, -0.35, 0.6, -0.2),
+    sph(0xc0303a, 0.08, 0.1, 0.85, -0.3),
+  ]),
+  def('rock-pile', 'Rock Pile', 'rock', [
+    ico(0x80858f, 0.6, 0, -0.4, 0.3, -0.2),
+    ico(0x8a8f99, 0.45, 0, 0.45, 0.25, 0.3),
+    ico(0x767b85, 0.4, 0, 0.05, 0.4, -0.5),
+    ico(0x80858f, 0.35, 0, 0.1, 0.55, 0.1),
+  ], 0.8),
+  def('ice-spikes', 'Ice Spikes', 'rock', [
+    cone(0xcfe6f2, 0.3, 1.6, 0, 0.8, 0),
+    cone(0xbfe0ee, 0.22, 1.1, 0.4, 0.55, 0.1),
+    cone(0xdaeef7, 0.18, 0.9, -0.35, 0.45, -0.15),
+  ], 0.6),
+  def('lava-rock', 'Lava Rock', 'rock', [
+    ico(0x2e2a2c, 1.0, 0, 0, 0.5, 0),
+    ico(0x35302f, 0.6, 0, 0.5, 0.4, 0.3),
+    box(0xff5a1e, 0.5, 0.08, 0.12, 0.2, 0.7, 0.4),
+    box(0xff7a2e, 0.12, 0.08, 0.5, -0.3, 0.6, -0.2),
+  ], 0.9),
+  def('chest', 'Treasure Chest', 'misc', [
+    box(0x6e4a2e, 0.9, 0.5, 0.6, 0, 0.3, 0),
+    box(0x5a3a1e, 0.92, 0.26, 0.62, 0, 0.62, 0),
+    box(0xc9a94a, 0.12, 0.18, 0.66, 0, 0.45, 0),
+    box(0xc9a94a, 0.92, 0.06, 0.06, 0, 0.5, 0.3),
+  ], 0.5),
+  def('banner-pole', 'Banner Pole', 'misc', [
+    cyl(WOOD, 0.08, 0.1, 3.2, 0, 1.6, 0),
+    box(WOOD_DK, 0.06, 0.06, 0.9, 0, 3.0, 0.45),
+    box(0x8a3b3b, 0.06, 1.5, 0.8, 0, 2.3, 0.5),
+  ]),
+
   // ── Towers ───────────────────────────────────────────────────────────────-
   def('tower-round', 'Round Tower', 'structure', [
     cyl(STONE, 1.4, 1.6, 6.0, 0, 3.0, 0),
