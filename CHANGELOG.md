@@ -5,6 +5,16 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Painted water (Map Builder "Water" tool) — flood lakes, basins & gorges to a height
+**Goal:** replace the old press-drag circular **Lake** tool with a paint-based **Water** tool that fills the ground up to a chosen surface height, so you can author big/detailed water regions (e.g. gorges) — and render it in-game.
+- **Format (mirror):** new optional `waterPacked` — a per-cell water-surface-height grid (same res as heights), packed base64 Int16-cm with a "dry" sentinel. Helpers `packWater` / `unpackWater` / `hasWater` and a pure `waterSurfaceGeometry(water, heights, res, size)` that builds the surface mesh **only where the water sits above the terrain** (so it fills basins up to the level and hides where the ground pokes through). Legacy circular `lakes` still load + render.
+- **Game render** (`custom-map-view.ts`): builds the painted-water surface from `waterPacked` and adds it (a flat translucent surface at each cell's painted level). Visual only — no swimming/collision (as before).
+- `tests/unit/water.test.ts`: pack/unpack round-trip (incl. NaN dry cells), and the surface geometry (emits above terrain, clips a flooded slope, nothing when dry / below ground).
+
+**Verified:** `typecheck` ✓ · `npm test` → 328/328 ✓ · `build` ✓ · headless: authored a flooded-basin map in the Map Builder (paint + erase + export `waterPacked`) and loaded it in-game — the water surface renders flat at the painted level (all verts y=0 over an −8 m bowl), zero console errors.
+
+---
+
 ## Fix: sinking into the ground on detailed (heightmap) custom maps
 **Goal:** on custom maps finer than the terrain render cap (e.g. heightmap imports), the player stood half-buried — collision didn't match the drawn ground.
 - **Root cause:** the terrain *mesh* is tessellated at most `TERRAIN_RENDER_RES` (217) vertices/side, but the gameplay heightfield (what the player snaps to) used the **full** authored resolution. On a fine/noisy field the mesh draws a smoother surface than the player collides with, so you sink into the parts the mesh rounds off. (The default procedural world is smooth, so its 433→217 render never diverges noticeably — only authored heightmaps do.)
