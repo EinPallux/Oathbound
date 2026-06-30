@@ -5,6 +5,16 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Fix: sinking into the ground on detailed (heightmap) custom maps
+**Goal:** on custom maps finer than the terrain render cap (e.g. heightmap imports), the player stood half-buried — collision didn't match the drawn ground.
+- **Root cause:** the terrain *mesh* is tessellated at most `TERRAIN_RENDER_RES` (217) vertices/side, but the gameplay heightfield (what the player snaps to) used the **full** authored resolution. On a fine/noisy field the mesh draws a smoother surface than the player collides with, so you sink into the parts the mesh rounds off. (The default procedural world is smooth, so its 433→217 render never diverges noticeably — only authored heightmaps do.)
+- **Fix:** `buildCustomHeightfield` now resamples the gameplay field **down to the render grid** when the map is finer than it, so collision sits exactly on the surface that's drawn. Maps at/below the render resolution are untouched (used as authored).
+- `tests/unit/custom-heightfield.test.ts`: on a 433-res ripply field the new collision matches the drawn surface (Δ < 0.05 m) whereas the old full-res field diverged (Δ > 1 m); a small map is left as-is.
+
+**Verified:** `typecheck` ✓ · `npm test` → 322/322 ✓ · `build` ✓ · headless on a 433-res detailed map: across 24 probe points the player's **feet match the drawn terrain surface to 0.000 m** (was half-buried), and the player visibly stands on the ground.
+
+---
+
 ## Fix: custom maps loaded by filename (`?map=name.oathbound-map.json`) failed
 **Goal:** loading a map by its full filename — or a missing map — produced the cryptic console error *“Unexpected token '<', "<!doctype "… is not valid JSON”* and silently fell back to the default world.
 - **Root cause:** the loader treated any `?map=` value containing a dot as a literal path, so `?map=tanaria.oathbound-map.json` was fetched relative to the page (`/tanaria.oathbound-map.json`), not from `public/maps/`. Static hosts answer a missing file with the app's `index.html` (HTTP **200** + HTML), so `res.json()` choked on the leading `<`.
