@@ -81,8 +81,8 @@ export class DialogPanel {
       const isTurnIn = q.turnIn === id;
       if (!isGiver && !isTurnIn) continue;
 
-      // Offer (not yet accepted / completed).
-      if (isGiver && !ql.isActive(q.id) && !ql.isCompleted(q.id)) {
+      // Offer (not yet accepted / completed, and any prerequisite quests are done).
+      if (ql.canOffer(q, id)) {
         this.root.append(this.questBlock(q, q.offerText ?? q.description, 'Accept', () => {
           ctx.onAccept(q.id);
           this.render();

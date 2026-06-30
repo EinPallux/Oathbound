@@ -5,6 +5,17 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Questlines (prerequisite quests) + NPC quest markers (owner-requested follow-up)
+**Goal:** let authored maps form true questlines — a quest that only appears once an earlier one is turned in — and signpost them with floating `!` / `?` markers over NPCs.
+- **Follow-up quests.** `MapQuest.requires?: string[]` lists quest ids that must be **completed (turned in)** before this quest is offered. The dialog gates the offer on `QuestLog.canOffer` (not active/done + all prerequisites met), so Quest B stays hidden until Quest A is handed in. Multiple prerequisites are AND-ed, enabling straight chains and convergent lines.
+- **NPC quest markers** (`src/render/custom-npcs.ts`). A billboarded badge floats over each NPC: gold **`!`** = a quest available to accept here, gold **`?`** = a quest ready to turn in, dim **`?`** = a quest you're on that turns in here but isn't done. `QuestLog.markerFor(npcId)` computes the state; the bootstrap refreshes all markers whenever quest state changes (accept / kill / talk / turn-in / load). Render-only — no sim coupling.
+- Demo `sample` map gains a two-step questline: *A Word with the Elder* → *The Elder's Errand* (the follow-up is hidden until the first is turned in).
+- New `QuestSetup.md` documents the full authoring → export → in-game workflow, questlines, markers, and current limits.
+
+**Verified:** `typecheck` ✓ · `npm test` → 314/314 ✓ (quest tests now cover `prereqsMet` / `canOffer` / `markerFor`) · `build` ✓ · headless `?map=sample`: the `!` marker floats over the available-quest giver, the follow-up is **hidden before** and **offered after** its prerequisite is turned in, zero console errors. Editor: ticking a prerequisite sets `requires` and round-trips through export.
+
+---
+
 ## Remove the onboarding tutorial; quests can reward items (owner-requested follow-up)
 **Goal:** clear the way for an authored "get started" questline by removing the built-in tutorial, and let quests hand out gear/relics — not just gold + XP.
 - **Removed the "Getting Started" tracker completely.** Deleted the `Onboarding` sim tracker (`src/sim/onboarding.ts`), the `GoalTracker` overlay (`src/render/goal-tracker.ts`) — which also carried the ongoing Goals/Endgame guidance — their styles, the unit test, and all bootstrap wiring + the `oathbound.onboarded` localStorage flag. Nothing replaces it on-screen (the owner's questline will). The **login / character-select flow is unaffected** — that's a separate system.

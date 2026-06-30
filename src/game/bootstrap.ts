@@ -355,7 +355,15 @@ export function boot(options: BootOptions = {}): Game {
   const npcName = (id: string): string => customMap?.npcs.find((n) => n.id === id)?.name ?? id;
   const dialogPanel = new DialogPanel(uiRoot);
   const questTracker = new QuestTracker(uiRoot);
-  questLog.onChange = () => questTracker.update(questLog, npcName);
+  // Float "!" (quest available) / "?" (ready to turn in) markers over the right NPCs.
+  const refreshQuestMarkers = (): void => {
+    customMap?.npcs.forEach((n, i) => customNpcs?.setMarker(i, n.id ? questLog.markerFor(n.id) : null));
+  };
+  questLog.onChange = () => {
+    questTracker.update(questLog, npcName);
+    refreshQuestMarkers();
+  };
+  refreshQuestMarkers();
   function openDialog(npcIndex: number): void {
     const npc = customMap?.npcs[npcIndex];
     if (!npc || !npc.id) return;

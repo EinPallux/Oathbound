@@ -185,6 +185,12 @@ export interface MapQuest {
   giver: string;
   /** NPC id where it's turned in (can equal the giver). */
   turnIn: string;
+  /**
+   * Quest ids that must be completed (turned in) before this one is offered — the
+   * backbone of questlines. Empty/absent = available from the start. All listed
+   * prerequisites must be done (AND), enabling simple chains and convergent lines.
+   */
+  requires?: string[];
   objective: QuestObjective;
   reward: QuestReward;
   /** Dialog shown when offering / while in progress / on completion. */

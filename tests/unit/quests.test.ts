@@ -22,6 +22,18 @@ const TALK_QUEST: MapQuest = {
   reward: { gold: 15, xp: 60 },
 };
 
+// A follow-up that only unlocks once TALK_QUEST is turned in (a questline link).
+const FOLLOWUP_QUEST: MapQuest = {
+  id: 'errand',
+  name: "The Elder's Errand",
+  description: 'Carry word back to Mara.',
+  giver: 'npc-3',
+  turnIn: 'npc-3',
+  requires: ['word'],
+  objective: { type: 'talk', npcId: 'npc-1' },
+  reward: { gold: 40, xp: 90 },
+};
+
 describe('QuestLog — kill objective', () => {
   it('accepts, advances on matching kills, and completes only when the count is met', () => {
     const ql = new QuestLog([KILL_QUEST]);
@@ -109,5 +121,54 @@ describe('QuestLog — persistence', () => {
     expect(ql.isActive('ghost')).toBe(false);
     // Completed ids are kept even if not in the map (harmless history).
     expect(ql.isCompleted('phantom')).toBe(true);
+  });
+});
+
+describe('QuestLog — prerequisites / questlines', () => {
+  it('only offers a follow-up once its prerequisite is turned in', () => {
+    const ql = new QuestLog([TALK_QUEST, FOLLOWUP_QUEST]);
+    // Locked at the start — prereq not done, so the giver can't offer it.
+    expect(ql.prereqsMet(FOLLOWUP_QUEST)).toBe(false);
+    expect(ql.canOffer(FOLLOWUP_QUEST, 'npc-3')).toBe(false);
+    // The prerequisite itself is freely available.
+    expect(ql.canOffer(TALK_QUEST, 'npc-2')).toBe(true);
+
+    // Do + turn in the prerequisite.
+    ql.accept('word');
+    ql.onTalk('npc-3');
+    ql.complete('word');
+
+    // Now the follow-up unlocks at its giver.
+    expect(ql.prereqsMet(FOLLOWUP_QUEST)).toBe(true);
+    expect(ql.canOffer(FOLLOWUP_QUEST, 'npc-3')).toBe(true);
+    // ...but not from the wrong NPC.
+    expect(ql.canOffer(FOLLOWUP_QUEST, 'npc-1')).toBe(false);
+  });
+});
+
+describe('QuestLog — NPC quest markers', () => {
+  it('shows "!" on an available giver, "?dim" on a pending turn-in, "?" when ready', () => {
+    const ql = new QuestLog([KILL_QUEST]); // clean giver(npc-1) / turn-in(npc-2) split
+    expect(ql.markerFor('npc-1')).toBe('!'); // giver, available
+    expect(ql.markerFor('npc-2')).toBeNull(); // turn-in, but nothing accepted yet
+
+    ql.accept('cull');
+    expect(ql.markerFor('npc-1')).toBeNull(); // no longer offers it
+    expect(ql.markerFor('npc-2')).toBe('?dim'); // pending turn-in, objective unfinished
+
+    ql.onKill('bloomhusk');
+    ql.onKill('bloomhusk');
+    ql.onKill('bloomhusk');
+    expect(ql.markerFor('npc-2')).toBe('?'); // ready to hand in
+  });
+
+  it('lights up a follow-up giver only after the prerequisite is turned in', () => {
+    const ql = new QuestLog([TALK_QUEST, FOLLOWUP_QUEST]);
+    // npc-3 gives only the locked follow-up (and takes `word`, not yet active) → nothing.
+    expect(ql.markerFor('npc-3')).toBeNull();
+    ql.accept('word');
+    ql.onTalk('npc-3');
+    ql.complete('word');
+    expect(ql.markerFor('npc-3')).toBe('!'); // the follow-up is now offered here
   });
 });
