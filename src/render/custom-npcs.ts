@@ -34,6 +34,35 @@ function namePlate(text: string): THREE.Sprite {
   return sprite;
 }
 
+/** A floating quest marker badge: gold '!' / '?' (available / ready) or a dim '?' (in progress). */
+function questBadge(kind: '!' | '?' | '?dim'): THREE.Sprite {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const c = canvas.getContext('2d')!;
+  const gold = kind !== '?dim';
+  c.beginPath();
+  c.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2);
+  c.fillStyle = gold ? '#ffcf3f' : '#8b96a5';
+  c.fill();
+  c.lineWidth = 4;
+  c.strokeStyle = gold ? '#7a5b12' : '#46505e';
+  c.stroke();
+  c.fillStyle = gold ? '#3a2a05' : '#11151b';
+  c.font = '700 44px system-ui, sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText(kind === '!' ? '!' : '?', size / 2, size / 2 + 2);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  sprite.scale.set(0.85, 0.85, 1);
+  sprite.position.y = 3.3;
+  sprite.renderOrder = 51;
+  return sprite;
+}
+
 function figure(variant: number): THREE.Group {
   const g = new THREE.Group();
   const robe = ROBES[variant] ?? ROBES[0];
@@ -58,6 +87,9 @@ interface Walker {
 export class CustomNpcs {
   readonly group = new THREE.Group();
   private walkers: Walker[] = [];
+  private markerSprites: (THREE.Sprite | null)[] = [];
+  private markerKinds: (string | null)[] = [];
+  private bob = 0;
   readonly list: MapNpc[];
 
   constructor(scene: THREE.Scene, private readonly field: Heightfield, list: MapNpc[]) {
@@ -104,7 +136,31 @@ export class CustomNpcs {
     return best;
   }
 
+  /** Float a quest marker over NPC `index` (or clear it). Idempotent + cheap to call. */
+  setMarker(index: number, kind: '!' | '?' | '?dim' | null): void {
+    if (this.markerKinds[index] === kind) return;
+    this.markerKinds[index] = kind;
+    const prev = this.markerSprites[index];
+    if (prev) {
+      prev.parent?.remove(prev);
+      prev.material.map?.dispose();
+      prev.material.dispose();
+      this.markerSprites[index] = null;
+    }
+    const mesh = this.walkers[index]?.mesh;
+    if (kind && mesh) {
+      const sprite = questBadge(kind);
+      mesh.add(sprite);
+      this.markerSprites[index] = sprite;
+    }
+  }
+
   update(dt: number): void {
+    // Gentle bob so the quest markers catch the eye.
+    this.bob += dt;
+    const markerY = 3.3 + Math.sin(this.bob * 3) * 0.07;
+    for (const s of this.markerSprites) if (s) s.position.y = markerY;
+
     for (const w of this.walkers) {
       if (w.pts.length < 2) {
         // Idle: keep seated on the terrain (it may differ from the authored height).

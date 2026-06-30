@@ -1549,67 +1549,6 @@ body {
   border-radius: 8px;
 }
 
-/* ── Goal Tracker (left, under the perf overlay) ───────────────────────────── */
-.goal-tracker {
-  position: fixed;
-  top: 104px;
-  left: 12px;
-  width: 262px;
-  background: var(--hud-bg);
-  border: 1px solid var(--gold-line);
-  border-radius: 11px;
-  padding: 11px 13px;
-  font-size: 12.5px;
-  box-shadow: var(--shadow-panel), var(--edge-hi);
-  backdrop-filter: blur(5px);
-  pointer-events: none;
-}
-.goal-title {
-  font-family: var(--font-display);
-  color: var(--gold-bright);
-  font-size: 13px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--gold-line-soft);
-}
-.goal-title .ico {
-  color: var(--gold);
-}
-.goal-head {
-  color: var(--ink);
-  margin-bottom: 2px;
-  font-weight: 600;
-}
-.goal-zone {
-  color: var(--ink-dim);
-  margin-bottom: 8px;
-  font-size: 11.5px;
-}
-.goal-step {
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-  color: var(--ink-dim);
-  line-height: 1.5;
-}
-.goal-step.done {
-  color: #8ce69a;
-}
-.goal-step.current {
-  color: var(--gold-bright);
-}
-.goal-mark {
-  width: 14px;
-  flex: none;
-  text-align: center;
-  color: var(--gold);
-}
-
 /* ── Class select overlay ──────────────────────────────────────────────────── */
 .class-select {
   position: fixed;

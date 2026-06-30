@@ -49,12 +49,12 @@ import { spawnBoss, BOSS_SPAWNS } from '../sim/content/bosses';
 import { relicEffectDesc } from '../sim/loot/relics';
 import { addItem, equipItem, recomputeDerived } from '../sim/inventory';
 import { generateItem } from '../sim/loot/items';
+import { makeRelic } from '../sim/loot/relics';
 import { salvageItem, salvageAllBelow } from '../sim/salvage';
 import { reinforceItem } from '../sim/reinforce';
 import { nearestVendor, sellItem, sellAllBelow } from '../sim/vendor';
 import { fastTravel } from '../sim/travel';
 import { regionAt, regionLabel } from '../sim/content/regions';
-import { Onboarding } from '../sim/onboarding';
 import { getClass, CAPSTONE_LEVEL } from '../sim/classes';
 import { grantXp } from '../sim/progression';
 import { serialize, applySave } from '../sim/save';
@@ -120,7 +120,6 @@ import { GroundAoeView } from '../render/ground-aoe-view';
 import { InteractableView } from '../render/interactable-view';
 import { VendorPanel } from '../render/vendor-panel';
 import { TravelPanel } from '../render/travel-panel';
-import { GoalTracker } from '../render/goal-tracker';
 import { Minimap } from '../render/minimap';
 import { ClassSelect } from '../render/class-select';
 import { SettingsPanel } from '../render/settings-panel';
@@ -331,20 +330,6 @@ export function boot(options: BootOptions = {}): Game {
   createVendor(world, field, 'Quartermaster', vendorPos.x, vendorPos.z);
   telemetry.attach(world, player);
 
-  // Onboarding: the "teach the loop" checklist. Returning players (flagged in
-  // localStorage) skip it. Completion is persisted in the render loop.
-  const onboarding = new Onboarding();
-  onboarding.attach(world, player);
-  let onboardingSaved = false;
-  try {
-    if (localStorage.getItem('oathbound.onboarded')) {
-      onboarding.skip();
-      onboardingSaved = true;
-    }
-  } catch {
-    // localStorage unavailable → the tutorial simply shows.
-  }
-
   // Systems: spatial → movement → combat → enemy AI → projectiles → traps → loot →
   // waypoint → recovery → telemetry. Waypoint runs after movement so it sees the
   // updated position, and before recovery so respawn binds to the stone just visited.
@@ -374,7 +359,15 @@ export function boot(options: BootOptions = {}): Game {
   const npcName = (id: string): string => customMap?.npcs.find((n) => n.id === id)?.name ?? id;
   const dialogPanel = new DialogPanel(uiRoot);
   const questTracker = new QuestTracker(uiRoot);
-  questLog.onChange = () => questTracker.update(questLog, npcName);
+  // Float "!" (quest available) / "?" (ready to turn in) markers over the right NPCs.
+  const refreshQuestMarkers = (): void => {
+    customMap?.npcs.forEach((n, i) => customNpcs?.setMarker(i, n.id ? questLog.markerFor(n.id) : null));
+  };
+  questLog.onChange = () => {
+    questTracker.update(questLog, npcName);
+    refreshQuestMarkers();
+  };
+  refreshQuestMarkers();
   function openDialog(npcIndex: number): void {
     const npc = customMap?.npcs[npcIndex];
     if (!npc || !npc.id) return;
@@ -398,7 +391,16 @@ export function boot(options: BootOptions = {}): Game {
         const inv = world.get<Inventory>(player, C.Inventory);
         if (inv) inv.gold += q.reward.gold;
         if (q.reward.xp > 0) grantXp(world, player, q.reward.xp);
-        hud.toast(`Quest complete: ${q.name}  (+${q.reward.gold}g, +${q.reward.xp} XP)`, 'good');
+        const parts = [`+${q.reward.gold}g`, `+${q.reward.xp} XP`];
+        const ri = q.reward.item;
+        if (ri) {
+          // Gear is rolled from its spec like any loot; a relic is built whole by id.
+          const item = ri.kind === 'relic'
+            ? makeRelic(rng, ri.relicId)
+            : generateItem(rng, { slot: ri.slot, rarity: ri.rarity, ilvl: ri.ilvl, primaryStat: ri.primaryStat });
+          parts.push(addItem(world, player, item) ? item.name : `${item.name} (bag full!)`);
+        }
+        hud.toast(`Quest complete: ${q.name}  (${parts.join(', ')})`, 'good');
         autosave();
       },
     });
@@ -418,7 +420,6 @@ export function boot(options: BootOptions = {}): Game {
   const hud = new Hud(uiRoot);
   hud.setPlayerName(playerName);
   const vignette = new Vignette(uiRoot);
-  const goalTracker = new GoalTracker(uiRoot);
   const minimap = new Minimap(uiRoot, mapSize, field, scenery);
   // One shared item tooltip on <body> (outside the zoom-scaled #ui-root), used by both
   // the inventory bag and the character sheet — only one panel is open at a time.
@@ -781,18 +782,7 @@ export function boot(options: BootOptions = {}): Game {
       vendorPanel.update(world, player);
       travelPanel.update(world, player);
 
-      // Onboarding + Goal Tracker + minimap.
-      onboarding.update(world, player);
-      goalTracker.update(world, player, onboarding);
       minimap.update(world, player);
-      if (onboarding.isComplete && !onboardingSaved) {
-        onboardingSaved = true;
-        try {
-          localStorage.setItem('oathbound.onboarded', '1');
-        } catch {
-          // ignore — persistence is best-effort
-        }
-      }
 
       // Zone-discovery prompt on crossing a region boundary.
       const region = regionAt(playerTransform.x, playerTransform.z);
@@ -887,7 +877,6 @@ export function boot(options: BootOptions = {}): Game {
       input.dispose();
       music.stop();
       telemetry.detach();
-      onboarding.detach();
       window.clearInterval(saveTimer);
       window.removeEventListener('beforeunload', onHide);
       document.removeEventListener('visibilitychange', onVisibility);

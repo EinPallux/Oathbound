@@ -42,6 +42,39 @@ export class QuestLog {
     return q.objective.type === 'kill' ? p >= q.objective.count : p >= 1;
   }
 
+  /** True when every prerequisite quest has been completed (turned in). */
+  prereqsMet(q: MapQuest): boolean {
+    return (q.requires ?? []).every((id) => this.completed.has(id));
+  }
+
+  /** True when this NPC can currently offer `q` (not active/done + prerequisites met). */
+  canOffer(q: MapQuest, npcId: string): boolean {
+    return q.giver === npcId && !this.active.has(q.id) && !this.completed.has(q.id) && this.prereqsMet(q);
+  }
+
+  /**
+   * Quest-marker state to float over an NPC:
+   *   '!'    — has a quest available to accept here,
+   *   '?'    — has a quest ready to turn in here (objective done),
+   *   '?dim' — a quest you're on turns in here, but isn't done yet,
+   *   null   — nothing.
+   * Turn-in-ready wins over available, which wins over in-progress.
+   */
+  markerFor(npcId: string): '!' | '?' | '?dim' | null {
+    let available = false;
+    let pendingTurnIn = false;
+    for (const q of this.quests) {
+      if (q.turnIn === npcId && this.active.has(q.id)) {
+        if (this.objectiveDone(q)) return '?';
+        pendingTurnIn = true;
+      }
+      if (this.canOffer(q, npcId)) available = true;
+    }
+    if (available) return '!';
+    if (pendingTurnIn) return '?dim';
+    return null;
+  }
+
   accept(id: string): void {
     if (this.active.has(id) || this.completed.has(id)) return;
     if (!this.byId(id)) return;
