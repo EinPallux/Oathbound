@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import type { AssetDef, AssetPart } from '../world/map-format';
+import { presetById } from '../world/presets';
 
 type BuiltinKind =
   | 'tree' | 'boulder' | 'pebble' | 'bush' | 'grass' | 'flower' | 'fern' | 'mushroom' | 'log' | 'lily';
@@ -202,6 +203,10 @@ function customAssetGeometry(def: AssetDef): THREE.BufferGeometry {
 export function placedAssetGeometry(assetId: string, customAssets: AssetDef[]): THREE.BufferGeometry | null {
   const b = parseBuiltin(assetId);
   if (b) return builtinGeometry(b.kind, b.variant);
+  if (assetId.startsWith('preset:')) {
+    const def = presetById(assetId.slice('preset:'.length));
+    if (def) return customAssetGeometry(def);
+  }
   if (assetId.startsWith('custom:')) {
     const def = customAssets.find((d) => `custom:${d.id}` === assetId);
     if (def) return customAssetGeometry(def);

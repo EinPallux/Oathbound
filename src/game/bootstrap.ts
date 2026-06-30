@@ -17,6 +17,7 @@ import { getActiveMap } from '../world/active-map';
 import {
   buildCustomHeightfield,
   customColliders,
+  customBoxColliders,
   customSpawns,
   customBosses,
   customSceneryForMinimap,
@@ -94,6 +95,7 @@ import { Rng } from '../core/rng';
 import { buildTerrainMesh, buildProps } from '../render/terrain-mesh';
 import { buildScenery } from '../render/scenery-view';
 import { buildCustomTerrainMesh, buildCustomScenery } from '../render/custom-map-view';
+import { CustomNpcs } from '../render/custom-npcs';
 import { Sky } from '../render/sky';
 import { VillageView } from '../render/village-view';
 import { AmbientLife } from '../render/ambient-life';
@@ -252,6 +254,7 @@ export function boot(options: BootOptions = {}): Game {
   if (customMap) {
     field = buildCustomHeightfield(customMap);
     const assetCols = customColliders(customMap);
+    const boxCols = customBoxColliders(customMap); // building/wall footprints
     renderer.scene.add(buildCustomTerrainMesh(field, customMap));
     renderer.scene.add(buildCustomScenery(customMap, field));
     scenery = customSceneryForMinimap(customMap);
@@ -261,10 +264,10 @@ export function boot(options: BootOptions = {}): Game {
       // Town included: the standard Oathhold town renders at the world origin (v1 — the
       // marker's position/rotation isn't applied yet). Keep the player spawn near origin.
       colliders = [...assetCols, ...villageCylinders()];
-      movementBoxes = villageBoxes();
+      movementBoxes = [...boxCols, ...villageBoxes()];
     } else {
       colliders = assetCols;
-      movementBoxes = [];
+      movementBoxes = boxCols;
       villageEnabled = false;
     }
   } else {
@@ -356,6 +359,7 @@ export function boot(options: BootOptions = {}): Game {
   // Render / UI.
   const sky = new Sky(renderer.scene);
   const village = villageEnabled ? new VillageView(renderer.scene, field) : null;
+  const customNpcs = customMap ? new CustomNpcs(renderer.scene, field, customMap.npcs) : null;
   const playerView = new PlayerView(renderer.scene);
   const ambientLife = new AmbientLife(renderer.scene);
   // Buildings join the camera's occlusion obstacles so the chase camera springs off walls.
@@ -678,6 +682,7 @@ export function boot(options: BootOptions = {}): Game {
       playerView.update(x, y, z, yaw, rdt, speed, pcId);
       ambientLife.update(rdt, x, z, field);
       village?.update(rdt);
+      customNpcs?.update(rdt);
       cameraRig.update(x, y, z);
       sky.update(renderer.camera, rdt);
 

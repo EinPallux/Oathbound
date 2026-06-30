@@ -101,6 +101,20 @@ export interface MapOathstone {
   road?: boolean;
 }
 
+/** A friendly, non-hostile NPC that idles or strolls a closed patrol route. */
+export interface MapNpc {
+  name: string;
+  /** Home / spawn position (also the first route point). */
+  x: number;
+  z: number;
+  /** Patrol waypoints (looped). Empty = stands idle at the home position. */
+  route: { x: number; z: number }[];
+  /** Walk speed (m/s). */
+  speed: number;
+  /** Appearance variant — 0 villager · 1 guard · 2 merchant · 3 elder. */
+  variant?: number;
+}
+
 // ── Custom assets (Asset Builder output) ─────────────────────────────────────
 
 export type PrimitiveShape = 'box' | 'cylinder' | 'cone' | 'sphere' | 'icosahedron';
@@ -131,8 +145,14 @@ export interface AssetDef {
   name: string;
   category: AssetCategory;
   parts: AssetPart[];
-  /** Physical collider radius (metres) added to the sim, or null for none (decor). */
+  /** Round physical collider radius (metres), or null for none (decor). */
   collider: number | null;
+  /**
+   * Rectangular footprint collider (half-extents, metres) — for buildings/walls so they
+   * block movement precisely. Rotated by the placement's rotation, scaled by its scale.
+   * null/absent = no box.
+   */
+  box?: { hw: number; hd: number } | null;
 }
 
 // ── The map ──────────────────────────────────────────────────────────────────
@@ -162,6 +182,8 @@ export interface OathboundMap {
   spawns: MapSpawn[];
   bosses: MapBoss[];
   oathstones: MapOathstone[];
+  /** Friendly NPCs (idle/patrolling). */
+  npcs: MapNpc[];
   /** Where a fresh character spawns. */
   playerSpawn: { x: number; z: number };
   /** Flat shelves levelled into the terrain (arenas, town pad). */
@@ -243,6 +265,7 @@ export function blankMap(name: string, size: number, res: number): OathboundMap 
     spawns: [],
     bosses: [],
     oathstones: [],
+    npcs: [],
     playerSpawn: { x: 0, z: 0 },
     flats: [],
     village: null,
@@ -287,6 +310,7 @@ export function normalizeMap(raw: unknown): OathboundMap {
     spawns: arr(m.spawns),
     bosses: arr(m.bosses),
     oathstones: arr(m.oathstones),
+    npcs: arr(m.npcs),
     playerSpawn: m.playerSpawn && typeof m.playerSpawn === 'object'
       ? { x: num(m.playerSpawn.x, 0), z: num(m.playerSpawn.z, 0) }
       : { x: 0, z: 0 },

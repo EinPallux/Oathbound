@@ -11,6 +11,7 @@ import {
 import {
   buildCustomHeightfield,
   customColliders,
+  customBoxColliders,
   customSpawns,
   customBosses,
   biomeIndexAt,
@@ -67,6 +68,7 @@ describe('map-format height packing', () => {
     const m = normalizeMap({ name: 'Partial', size: 200, res: 4 });
     expect(m.biomes.length).toBe(16);
     expect(m.assets).toEqual([]);
+    expect(m.npcs).toEqual([]);
     expect(m.playerSpawn).toEqual({ x: 0, z: 0 });
     expect(m.village).toBeNull();
   });
@@ -101,6 +103,24 @@ describe('custom-map builders', () => {
 
   it('reads the painted biome at a position', () => {
     expect(biomeIndexAt(sampleMap(), 0, 0)).toBe(4);
+  });
+
+  it('resolves preset round colliders and rectangular box footprints', () => {
+    const m = blankMap('P', 100, 5);
+    m.assets = [
+      { asset: 'preset:tower-round', x: 5, z: 5, scale: 1, rot: 0 }, // round collider 1.7
+      { asset: 'preset:house-small', x: -5, z: -5, scale: 2, rot: 0.3 }, // box hw1.6 hd1.3
+      { asset: 'preset:fence', x: 0, z: 0, scale: 1, rot: 0 }, // box only
+    ];
+    const cyl = customColliders(m);
+    expect(cyl.length).toBe(1);
+    expect(cyl[0].radius).toBeCloseTo(1.7, 3);
+    const boxes = customBoxColliders(m);
+    expect(boxes.length).toBe(2);
+    const house = boxes.find((b) => Math.abs(b.x + 5) < 0.01)!;
+    expect(house.hw).toBeCloseTo(1.6 * 2, 3);
+    expect(house.hd).toBeCloseTo(1.3 * 2, 3);
+    expect(house.rot).toBeCloseTo(0.3, 3);
   });
 
   it('exposes rivers/roads to the minimap scenery', () => {

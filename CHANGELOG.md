@@ -5,6 +5,18 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Map loader — presets, building collision & friendly NPCs (owner-requested follow-up)
+**Goal:** richer custom maps — a pre-made building/prop library, solid buildings, and friendly NPCs that walk patrol routes. Extends the map loader below; the default procedural world is unchanged.
+- **Preset asset library** (`src/world/presets.ts`, a mirror of the builder's): ~45 data-driven props placed as `preset:<id>` and built through the shared custom-asset geometry, so they render identically to the editor. A full **village set** — small/blue/green/stone houses, cottage, two-story, townhouse, manor, inn/tavern, longhouse, barn, chapel (bell tower + spire), windmill, round hut, blacksmith, shop, storehouse, guard house, fountain — plus round/square/watch/wall towers, walls, gate, fence, palisade, well, market stall, tent, ruins, and extra trees/rocks/crystals/plants.
+- **Building collision:** an `AssetDef.box` footprint becomes a **BoxCollider** (precise wall/house blocking for the player) via `customBoxColliders`, fed into the movement system; towers/wells keep a round collider. Decorative presets stay visual-only.
+- **Friendly NPCs:** `src/render/custom-npcs.ts` renders each `map.npcs` entry as a low-poly figure with an overhead name plate that strolls its looped route (or idles), snapping to the terrain and facing its travel direction — render-only/ambient like the village walkers (no ECS/combat), updated from the bootstrap frame loop.
+- Format additions (mirror): `AssetDef.box` + an `npcs[]` array on the map.
+- Tests: the `custom-map` unit suite gained preset round-collider + box-footprint coverage → **309 unit**; the demo `sample` map now includes a hamlet of preset buildings + patrolling NPCs.
+
+**Verified:** `typecheck` ✓ · `npm test` → 309/309 ✓ · `build` ✓ · `test:e2e` → 18/18 ✓ · headless `?map=sample` renders the preset hamlet (solid buildings) + walking named NPCs with **zero console errors**; default boot (no `?map=`) unchanged.
+
+---
+
 ## Map loader — load custom maps from the Admin Tools Map Builder (owner-requested, additive)
 **Goal:** let maps designed in the new web **Map Builder** (the separate `Oathbound-AdminTools` repo) load straight into the game. **Non-destructive:** with no `?map=`, `getActiveMap()` is null and the procedural world boots exactly as before (all 18 e2e unchanged).
 - **Map format** (`src/world/map-format.ts`, byte-for-byte mirror of the builder's `src/format/map.ts`): a versioned JSON — base64 Int16-centimetre heightfield + per-cell biome grid, lakes/rivers/roads, placed assets (built-in props + custom primitive-built assets), enemy spawns/bosses/Oathstones, player spawn, optional town. Pure (no `three`/DOM).
