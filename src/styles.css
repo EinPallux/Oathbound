@@ -2179,3 +2179,38 @@ body {
   font-size: 14px;
   padding: 11px 22px;
 }
+
+/* ── NPC dialog box + quest tracker (custom maps) ──────────────────────────── */
+.dialog-panel {
+  position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%);
+  width: min(560px, 90vw); max-height: 52vh; overflow-y: auto;
+  background: rgba(16, 20, 27, 0.96); border: 1px solid #3a4658; border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5); padding: 14px 16px; z-index: 40;
+  font-family: system-ui, sans-serif; color: #dce3ec;
+  pointer-events: auto; /* #ui-root is pointer-events:none — opt back in so buttons are clickable */
+}
+.dialog-panel.hidden { display: none; }
+.dlg-header { display: flex; align-items: baseline; gap: 10px; border-bottom: 1px solid #2a3340; padding-bottom: 8px; margin-bottom: 8px; }
+.dlg-name { font-size: 18px; font-weight: 700; color: #f6e7c1; }
+.dlg-title { font-size: 13px; color: #9fb0c2; font-style: italic; }
+.dlg-close { margin-left: auto; background: none; border: none; color: #8b97a7; font-size: 16px; cursor: pointer; }
+.dlg-close:hover { color: #fff; }
+.dlg-line { margin: 6px 0; line-height: 1.5; }
+.dlg-line.dim { color: #8b97a7; }
+.dlg-quest { background: rgba(40, 52, 74, 0.6); border: 1px solid #38445a; border-radius: 9px; padding: 10px 12px; margin-top: 10px; }
+.dlg-quest-name { font-weight: 600; color: #ffd98a; margin-bottom: 4px; }
+.dlg-quest-text { margin: 4px 0 8px; font-size: 13px; color: #cdd6e0; line-height: 1.45; }
+.dlg-btn { background: #4ea1ff; border: none; color: #07223f; font-weight: 600; border-radius: 7px; padding: 7px 14px; cursor: pointer; }
+.dlg-btn:hover { background: #6bb2ff; }
+
+.quest-tracker {
+  position: fixed; left: 12px; top: 120px; width: 230px; z-index: 12;
+  background: rgba(16, 20, 27, 0.78); border: 1px solid #2a3340; border-radius: 9px;
+  padding: 8px 10px; font-family: system-ui, sans-serif; pointer-events: none;
+}
+.quest-tracker.hidden { display: none; }
+.qt-head { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #ffd98a; margin-bottom: 5px; }
+.qt-item { margin-bottom: 7px; }
+.qt-name { font-size: 13px; font-weight: 600; color: #e7edf4; }
+.qt-obj { font-size: 12px; color: #9fb0c2; }
+.qt-obj.done { color: #6fe0a0; }

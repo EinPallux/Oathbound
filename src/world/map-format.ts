@@ -119,6 +119,8 @@ export interface MapCritter {
 
 /** A friendly, non-hostile NPC that idles or strolls a closed patrol route. */
 export interface MapNpc {
+  /** Stable id referenced by quests/dialog (auto-assigned by the editor). */
+  id?: string;
   name: string;
   /** Home / spawn position (also the first route point). */
   x: number;
@@ -129,6 +131,33 @@ export interface MapNpc {
   speed: number;
   /** Appearance variant — 0 villager · 1 guard · 2 merchant · 3 elder. */
   variant?: number;
+  /** Role/subtitle shown in the dialog header (e.g. "Blacksmith"). */
+  title?: string;
+  /** Lines shown when the player talks to this NPC (one per click-through). */
+  dialog?: string[];
+}
+
+// ── Quests / dialog ──────────────────────────────────────────────────────────
+
+export type QuestObjective =
+  | { type: 'kill'; enemyId: EnemyId; count: number }
+  | { type: 'talk'; npcId: string };
+
+/** A quest accepted at `giver`, completed at `turnIn`, with one objective + a reward. */
+export interface MapQuest {
+  id: string;
+  name: string;
+  description: string;
+  /** NPC id that offers the quest. */
+  giver: string;
+  /** NPC id where it's turned in (can equal the giver). */
+  turnIn: string;
+  objective: QuestObjective;
+  reward: { gold: number; xp: number };
+  /** Dialog shown when offering / while in progress / on completion. */
+  offerText?: string;
+  progressText?: string;
+  completeText?: string;
 }
 
 // ── Custom assets (Asset Builder output) ─────────────────────────────────────
@@ -200,6 +229,8 @@ export interface OathboundMap {
   oathstones: MapOathstone[];
   /** Friendly NPCs (idle/patrolling). */
   npcs: MapNpc[];
+  /** Quests offered/turned in at NPCs. */
+  quests: MapQuest[];
   /** Ambient wildlife zones (decorative). */
   critters: MapCritter[];
   /** Where a fresh character spawns. */
@@ -284,6 +315,7 @@ export function blankMap(name: string, size: number, res: number): OathboundMap 
     bosses: [],
     oathstones: [],
     npcs: [],
+    quests: [],
     critters: [],
     playerSpawn: { x: 0, z: 0 },
     flats: [],
@@ -329,7 +361,8 @@ export function normalizeMap(raw: unknown): OathboundMap {
     spawns: arr(m.spawns),
     bosses: arr(m.bosses),
     oathstones: arr(m.oathstones),
-    npcs: arr(m.npcs),
+    npcs: ensureNpcIds(arr<MapNpc>(m.npcs)),
+    quests: arr(m.quests),
     critters: arr(m.critters),
     playerSpawn: m.playerSpawn && typeof m.playerSpawn === 'object'
       ? { x: num(m.playerSpawn.x, 0), z: num(m.playerSpawn.z, 0) }
@@ -347,6 +380,30 @@ function num(v: unknown, fallback: number): number {
 }
 function arr<T>(v: unknown): T[] {
   return Array.isArray(v) ? (v as T[]) : [];
+}
+
+/** Backfill stable ids onto NPCs that don't have one (quests reference them by id). */
+function ensureNpcIds(npcs: MapNpc[]): MapNpc[] {
+  const used = new Set(npcs.map((n) => n.id).filter(Boolean) as string[]);
+  let counter = 1;
+  for (const n of npcs) {
+    if (!n.id) {
+      let id = `npc-${counter++}`;
+      while (used.has(id)) id = `npc-${counter++}`;
+      n.id = id;
+      used.add(id);
+    }
+  }
+  return npcs;
+}
+
+/** Generate a fresh unique NPC id given the existing NPCs. */
+export function nextNpcId(npcs: MapNpc[]): string {
+  const used = new Set(npcs.map((n) => n.id).filter(Boolean) as string[]);
+  let counter = 1;
+  let id = `npc-${counter}`;
+  while (used.has(id)) id = `npc-${++counter}`;
+  return id;
 }
 
 /** Serialize a map for export — packs heights and drops the bulky plain array. */

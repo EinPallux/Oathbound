@@ -58,18 +58,50 @@ interface Walker {
 export class CustomNpcs {
   readonly group = new THREE.Group();
   private walkers: Walker[] = [];
+  readonly list: MapNpc[];
 
   constructor(scene: THREE.Scene, private readonly field: Heightfield, list: MapNpc[]) {
     this.group.name = 'custom-npcs';
-    for (const n of list) {
+    this.list = list;
+    list.forEach((n, i) => {
       const mesh = figure(n.variant ?? 0);
+      mesh.userData.npcIndex = i; // so a raycast/click resolves back to the NPC
       mesh.add(namePlate(n.name));
       mesh.position.set(n.x, field.sample(n.x, n.z), n.z);
       this.group.add(mesh);
       const pts = [{ x: n.x, z: n.z }, ...n.route.map((p) => ({ x: p.x, z: p.z }))];
       this.walkers.push({ mesh, pts, seg: 0, t: 0, speed: Math.max(0.1, n.speed) });
-    }
+    });
     scene.add(this.group);
+  }
+
+  /** Raycast the NPC figures; returns the hit NPC index (into `list`) or null. */
+  pick(raycaster: THREE.Raycaster): number | null {
+    const hits = raycaster.intersectObjects(this.group.children, true);
+    for (const h of hits) {
+      let o: THREE.Object3D | null = h.object;
+      while (o) {
+        const idx = o.userData.npcIndex;
+        if (typeof idx === 'number') return idx;
+        o = o.parent;
+      }
+    }
+    return null;
+  }
+
+  /** Nearest NPC (by current position) within `maxDist` of (x,z), or null. */
+  nearest(x: number, z: number, maxDist: number): number | null {
+    let best: number | null = null;
+    let bestD = maxDist * maxDist;
+    for (let i = 0; i < this.walkers.length; i++) {
+      const p = this.walkers[i].mesh.position;
+      const d = (p.x - x) ** 2 + (p.z - z) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    return best;
   }
 
   update(dt: number): void {

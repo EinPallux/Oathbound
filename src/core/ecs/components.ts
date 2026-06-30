@@ -173,6 +173,8 @@ export type EnemyState = 'idle' | 'engage' | 'attack' | 'leash' | 'dead';
 export interface Enemy {
   archetype: 'melee_bruiser' | 'ranged_skirmisher' | 'caster' | 'support' | 'pack_leader';
   family: string;
+  /** Template id (e.g. 'bloomhusk') — used by quest kill-objective tracking. */
+  template: string;
   tier: 'standard' | 'elite' | 'rare' | 'boss';
   state: EnemyState;
   /** Spawn point — leash + reset returns here. */

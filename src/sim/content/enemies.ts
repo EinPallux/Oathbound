@@ -674,6 +674,7 @@ export function spawnEnemy(
   world.set<Enemy>(e, C.Enemy, {
     archetype: tpl.archetype,
     family: tpl.family,
+    template: id,
     tier,
     state: 'idle',
     homeX: x,
