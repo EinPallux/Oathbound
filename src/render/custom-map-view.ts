@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { Heightfield } from '../world/heightfield';
 import { TERRAIN_RENDER_RES } from '../world/layout';
 import { biomeIndexAt } from '../world/custom-map';
-import type { OathboundMap, PlacedAsset } from '../world/map-format';
+import { unpackHeights, unpackWater, waterSurfaceGeometry, type OathboundMap, type PlacedAsset } from '../world/map-format';
 import { placedAssetGeometry, assetYLift, isSmoothAsset } from './asset-geometry';
 
 // Per-biome palette (synced with terrain-mesh.ts) — coloured by painted biome index.
@@ -153,6 +153,23 @@ export function buildCustomScenery(map: OathboundMap, field: Heightfield): THREE
   buildPlacedAssets(group, map, field);
 
   const lakeMat = new THREE.MeshStandardMaterial({ color: 0x356f96, transparent: true, opacity: 0.84, roughness: 0.18, metalness: 0.2, side: THREE.DoubleSide });
+
+  // Painted water (the Water tool): a surface mesh filling the ground up to each cell's level.
+  const water = unpackWater(map);
+  if (water) {
+    const { positions, indices } = waterSurfaceGeometry(water, unpackHeights(map), map.res, map.size);
+    if (positions.length) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, lakeMat);
+      mesh.name = 'painted-water';
+      mesh.frustumCulled = false;
+      group.add(mesh);
+    }
+  }
+
   for (let i = 0; i < map.lakes.length; i++) {
     const lk = map.lakes[i];
     const disc = new THREE.Mesh(new THREE.CircleGeometry(Math.max(0.5, lk.r * 0.82), 40), lakeMat);

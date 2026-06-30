@@ -257,6 +257,12 @@ export interface OathboundMap {
   heightsPacked?: string;
   /** Row-major biome index (into BIOME_IDS), one per height sample. */
   biomes: number[];
+  /**
+   * Optional painted water: a row-major grid (same res) of water-surface heights, packed as
+   * base64 Int16-cm with a "dry" sentinel. Read with unpackWater(). Newer than `lakes`, which
+   * remain for back-compat.
+   */
+  waterPacked?: string;
   lakes: MapLake[];
   rivers: MapPath[];
   roads: MapPath[];
@@ -318,6 +324,98 @@ export function unpackHeights(map: OathboundMap): Float32Array {
   if (map.heightsPacked) return unpackHeightsPacked(map.heightsPacked);
   if (map.heights) return Float32Array.from(map.heights);
   return new Float32Array(map.res * map.res);
+}
+
+// ── Painted water (per-cell surface height, parallel to the height grid) ─────────
+//
+// A row-major grid (same res as heights) of water *surface* heights in metres; a cell whose
+// value is NaN has no water. Packed like heights but reserving the minimum Int16 as a "dry"
+// sentinel. Use unpackWater() to read (null = the map has no painted water).
+
+const WATER_DRY_CM = -32768; // packed sentinel meaning "no water here"
+
+/** Pack a row-major water-level grid (NaN = dry) into a base64 Int16-cm string. */
+export function packWater(levels: ArrayLike<number>): string {
+  const n = levels.length;
+  const ints = new Int16Array(n);
+  for (let i = 0; i < n; i++) {
+    const v = levels[i];
+    if (!Number.isFinite(v)) { ints[i] = WATER_DRY_CM; continue; }
+    const cm = Math.round(v * 100);
+    // Keep WATER_DRY_CM reserved; clamp real levels to just inside the Int16 cm range.
+    ints[i] = cm <= -32767 ? -32767 : cm > 32767 ? 32767 : cm;
+  }
+  const bytes = new Uint8Array(ints.buffer);
+  let bin = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  return base64Encode(bin);
+}
+
+/** Unpack a base64 Int16-cm water string into a Float32Array of metres (NaN where dry). */
+export function unpackWaterPacked(packed: string): Float32Array {
+  const bin = base64Decode(packed);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const ints = new Int16Array(bytes.buffer);
+  const out = new Float32Array(ints.length);
+  for (let i = 0; i < ints.length; i++) out[i] = ints[i] === WATER_DRY_CM ? NaN : ints[i] / 100;
+  return out;
+}
+
+/** A map's painted water grid (NaN = dry cells), or null if it has none. */
+export function unpackWater(map: OathboundMap): Float32Array | null {
+  return map.waterPacked ? unpackWaterPacked(map.waterPacked) : null;
+}
+
+/** True if a water-level grid has at least one wet (finite) cell. */
+export function hasWater(levels: ArrayLike<number>): boolean {
+  for (let i = 0; i < levels.length; i++) if (Number.isFinite(levels[i])) return true;
+  return false;
+}
+
+/**
+ * Build a water-surface geometry from a painted water grid. Each grid cell (between four
+ * samples) gets a quad at its painted level — but only where the water sits *above* the
+ * terrain, so it fills basins/gorges up to the level and hides where the ground pokes
+ * through. Pure (no three): returns triangle data the renderer wraps in a BufferGeometry.
+ */
+export function waterSurfaceGeometry(
+  water: ArrayLike<number>,
+  heights: ArrayLike<number>,
+  res: number,
+  size: number,
+): { positions: Float32Array; indices: number[] } {
+  const half = size / 2;
+  const cell = size / (res - 1);
+  const pos: number[] = [];
+  const indices: number[] = [];
+  const EPS = 0.02;
+  for (let z = 0; z < res - 1; z++) {
+    for (let x = 0; x < res - 1; x++) {
+      const i00 = z * res + x, i10 = i00 + 1, i01 = i00 + res, i11 = i01 + 1;
+      const w00 = water[i00], w10 = water[i10], w01 = water[i01], w11 = water[i11];
+      let sum = 0, cnt = 0;
+      if (Number.isFinite(w00)) { sum += w00; cnt++; }
+      if (Number.isFinite(w10)) { sum += w10; cnt++; }
+      if (Number.isFinite(w01)) { sum += w01; cnt++; }
+      if (Number.isFinite(w11)) { sum += w11; cnt++; }
+      if (cnt === 0) continue; // no water touches this cell
+      const avg = sum / cnt;
+      const l00 = Number.isFinite(w00) ? w00 : avg;
+      const l10 = Number.isFinite(w10) ? w10 : avg;
+      const l01 = Number.isFinite(w01) ? w01 : avg;
+      const l11 = Number.isFinite(w11) ? w11 : avg;
+      // Skip cells where the water is at/below the ground on all corners (nothing to show).
+      if (l00 <= heights[i00] + EPS && l10 <= heights[i10] + EPS && l01 <= heights[i01] + EPS && l11 <= heights[i11] + EPS) continue;
+      const wx0 = -half + x * cell, wx1 = -half + (x + 1) * cell;
+      const wz0 = -half + z * cell, wz1 = -half + (z + 1) * cell;
+      const b = pos.length / 3;
+      pos.push(wx0, l00, wz0, wx1, l10, wz0, wx0, l01, wz1, wx1, l11, wz1);
+      indices.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
+    }
+  }
+  return { positions: Float32Array.from(pos), indices };
 }
 
 // base64 that works in both the browser (btoa/atob) and Node (Buffer), so the
@@ -392,6 +490,7 @@ export function normalizeMap(raw: unknown): OathboundMap {
     heights,
     heightsPacked: typeof m.heightsPacked === 'string' ? m.heightsPacked : undefined,
     biomes,
+    waterPacked: typeof m.waterPacked === 'string' ? m.waterPacked : undefined,
     lakes: arr(m.lakes),
     rivers: arr(m.rivers),
     roads: arr(m.roads),
