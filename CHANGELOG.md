@@ -5,6 +5,15 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Fix: "+ Add quest" silently did nothing with no NPCs (Map Builder) + full quest-system audit
+**Goal:** the owner couldn't add a quest in the Quests & Dialog editor. Root cause: a quest needs a giver / turn-in NPC, so the button guarded against zero NPCs — but silently (only a fleeting status-bar line), so it looked broken.
+- **Fix (Map Builder):** when no NPCs exist, the **"+ Add quest" button is now disabled** (greyed, with a tooltip) and the Quests pane shows a clear inline notice — *"⚠ Add an NPC first. Quests are given out and turned in by NPCs…"*. The moment an NPC is placed, the button enables and works.
+- **Full audit (editor → export → game):** authored a 2-step questline map entirely through the editor UI (real "+ Add quest" clicks + the prerequisite checkbox), exported it, loaded it in the game, and played it through headlessly: dialog → accept → talk objective → turn-in → **gold + item reward** → the follow-up was **hidden before / offered after** its prerequisite → second turn-in → **persistence across reload**. All green, zero console errors. NPC-id backfill on import (`ensureNpcIds`) confirmed, so older maps load cleanly.
+
+**Verified:** Map Builder `typecheck` + `build` ✓; game `npm test` → 314/314 ✓, `build` ✓; headless author-and-play of a custom questline map passes end-to-end.
+
+---
+
 ## Questlines (prerequisite quests) + NPC quest markers (owner-requested follow-up)
 **Goal:** let authored maps form true questlines — a quest that only appears once an earlier one is turned in — and signpost them with floating `!` / `?` markers over NPCs.
 - **Follow-up quests.** `MapQuest.requires?: string[]` lists quest ids that must be **completed (turned in)** before this quest is offered. The dialog gates the offer on `QuestLog.canOffer` (not active/done + all prerequisites met), so Quest B stays hidden until Quest A is handed in. Multiple prerequisites are AND-ed, enabling straight chains and convergent lines.
