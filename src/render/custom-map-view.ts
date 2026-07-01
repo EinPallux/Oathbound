@@ -9,7 +9,9 @@ import { biomeIndexAt } from '../world/custom-map';
 import { unpackHeights, unpackWater, waterSurfaceGeometry, type OathboundMap, type PlacedAsset } from '../world/map-format';
 import { placedAssetGeometry, assetYLift, isSmoothAsset } from './asset-geometry';
 
-// Per-biome palette (synced with terrain-mesh.ts) — coloured by painted biome index.
+// Per-ground palette — an identical copy of the Map Builder's src/oathbound/palette.ts so a
+// custom map's painted ground reads the same in-engine. 0–6 are gameplay biomes; 7+ are
+// cosmetic ground surfaces (city, desert, mesa, …). Keep the two copies in sync.
 const PALETTE = {
   greenLow: new THREE.Color(0x375a32),
   greenHigh: new THREE.Color(0x7d8a55),
@@ -21,22 +23,60 @@ const PALETTE = {
   snow: new THREE.Color(0xe8eef6),
   grave: new THREE.Color(0x49455a),
   hub: new THREE.Color(0x6e7a4e),
+  city: new THREE.Color(0x70737a),
+  desert: new THREE.Color(0xcbb074),
+  mesaLow: new THREE.Color(0x8a4326),
+  mesaHigh: new THREE.Color(0xbc7d4c),
+  savanna: new THREE.Color(0x9d9a54),
+  tundra: new THREE.Color(0xc6d1d7),
+  dirt: new THREE.Color(0x6b4f33),
+  sand: new THREE.Color(0xe2d29a),
+  mud: new THREE.Color(0x463726),
+  cobble: new THREE.Color(0x8a8278),
+  ash: new THREE.Color(0x47443f),
+  jungleLow: new THREE.Color(0x1d3a1b),
+  jungleHigh: new THREE.Color(0x386030),
+  ice: new THREE.Color(0xb9d4e6),
+  basalt: new THREE.Color(0x2c2c31),
 };
-const _ghi = new THREE.Color();
 
-function colorForBiome(biome: number, h: number, out: THREE.Color): THREE.Color {
+function paveShade(wx: number, wz: number, tile: number): number {
+  const tx = Math.floor(wx / tile);
+  const tz = Math.floor(wz / tile);
+  const fx = wx / tile - tx;
+  const fz = wz / tile - tz;
+  const edge = Math.min(fx, 1 - fx, fz, 1 - fz);
+  let h = (tx * 374761393 + tz * 668265263) | 0;
+  h = ((h ^ (h >>> 13)) * 1274126177) | 0;
+  const rnd = ((h >>> 0) % 1000) / 1000;
+  let s = 0.84 + rnd * 0.3;
+  if (edge < 0.07) s *= 0.62;
+  return s;
+}
+
+export function colorForBiome(biome: number, h: number, wx: number, wz: number, out: THREE.Color): THREE.Color {
   const t = THREE.MathUtils.clamp((h + 2) / 5, 0, 1);
   switch (biome) {
     case 1: return out.copy(PALETTE.thorn).lerp(PALETTE.greenHigh, t * 0.25);
     case 2: return out.copy(PALETTE.fen);
     case 3: return out.copy(PALETTE.ember).lerp(PALETTE.emberHot, t);
-    case 4: {
-      const snow = THREE.MathUtils.clamp((h - 24) / 22, 0, 1);
-      return out.copy(PALETTE.rivenRock).lerp(PALETTE.snow, snow);
-    }
+    case 4: { const sn = THREE.MathUtils.clamp((h - 24) / 22, 0, 1); return out.copy(PALETTE.rivenRock).lerp(PALETTE.snow, sn); }
     case 5: return out.copy(PALETTE.grave);
     case 6: return out.copy(PALETTE.hub);
-    default: return out.copy(PALETTE.greenLow).lerp(_ghi.copy(PALETTE.greenHigh), t);
+    case 7: return out.copy(PALETTE.city).multiplyScalar(paveShade(wx, wz, 12));  // City — paved stone
+    case 8: return out.copy(PALETTE.desert);                                       // Desert sand
+    case 9: { const band = Math.sin(h * 0.8) * 0.5 + 0.5; return out.copy(PALETTE.mesaLow).lerp(PALETTE.mesaHigh, band); } // Mesa
+    case 10: return out.copy(PALETTE.savanna);                                     // Savanna
+    case 11: { const sn = THREE.MathUtils.clamp((h - 6) / 20, 0, 1); return out.copy(PALETTE.tundra).lerp(PALETTE.snow, sn); } // Tundra
+    case 12: return out.copy(PALETTE.dirt);                                        // Dirt
+    case 13: return out.copy(PALETTE.sand);                                        // Beach sand
+    case 14: return out.copy(PALETTE.mud);                                         // Mud
+    case 15: return out.copy(PALETTE.cobble).multiplyScalar(paveShade(wx, wz, 7)); // Cobblestone road
+    case 16: return out.copy(PALETTE.ash);                                         // Ash / wasteland
+    case 17: return out.copy(PALETTE.jungleLow).lerp(PALETTE.jungleHigh, t * 0.5); // Jungle
+    case 18: return out.copy(PALETTE.ice);                                         // Ice
+    case 19: return out.copy(PALETTE.basalt);                                      // Basalt
+    default: return out.copy(PALETTE.greenLow).lerp(PALETTE.greenHigh, t);         // 0 — grass
   }
 }
 
@@ -53,7 +93,7 @@ export function buildCustomTerrainMesh(field: Heightfield, map: OathboundMap): T
     const z = pos.getZ(i);
     const h = field.sample(x, z);
     pos.setY(i, h);
-    colorForBiome(biomeIndexAt(map, x, z), h, c);
+    colorForBiome(biomeIndexAt(map, x, z), h, x, z, c);
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;

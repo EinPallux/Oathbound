@@ -5,6 +5,17 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## "Ground" tool: rename Biome → Ground + many more ground surfaces (incl. paved City)
+**Goal:** more ground variety for custom maps — grass/forest/desert/mesa/city and more — with a believable **city** surface (paved stone, not grass).
+- **Format (mirror):** `BIOME_IDS` extended from 7 to **20** — appends `city, desert, mesa, savanna, tundra, dirt, sand, mud, cobblestone, ash, jungle, ice, basalt` after the original gameplay biomes (0–6). Append-only, so old maps keep their indices; the new ones are **cosmetic ground colours** on custom maps (they don't drive gameplay/scatter).
+- **Colour mapping** (`colorForBiome`, synced editor `palette.ts` ↔ game `custom-map-view.ts`): now takes world (x,z) and colours each ground type. **City** and **cobblestone** use a deterministic per-slab paving shade (flagstone tiles + darker seams) so they read as real paved stone at terrain-mesh resolution; mesa gets red strata by height, tundra a snow cap, etc.
+- **Editor:** the **Biome** tool is now **Ground**, with a 20-entry palette dropdown (Grass, Forest, Desert, Mesa, City (paved stone), Cobblestone road, …).
+- `tests/unit/ground.test.ts`: every index colours; grass is green, city near-grey (not grassy), desert warm, mesa red, basalt dark; city/cobble vary by position (paving) while flat grounds don't.
+
+**Verified:** `typecheck` ✓ · `npm test` → 331/331 ✓ · `build` ✓ · headless: painted City/Desert/Mesa/Grass bands in the editor (City shows grey paved slabs) and loaded the same in-game — the city band samples near-grey stone (r≈g≈b≈0.15) vs green grass, zero console errors.
+
+---
+
 ## Painted water (Map Builder "Water" tool) — flood lakes, basins & gorges to a height
 **Goal:** replace the old press-drag circular **Lake** tool with a paint-based **Water** tool that fills the ground up to a chosen surface height, so you can author big/detailed water regions (e.g. gorges) — and render it in-game.
 - **Format (mirror):** new optional `waterPacked` — a per-cell water-surface-height grid (same res as heights), packed base64 Int16-cm with a "dry" sentinel. Helpers `packWater` / `unpackWater` / `hasWater` and a pure `waterSurfaceGeometry(water, heights, res, size)` that builds the surface mesh **only where the water sits above the terrain** (so it fills basins up to the level and hides where the ground pokes through). Legacy circular `lakes` still load + render.
