@@ -45,10 +45,30 @@ const ROOF_BLUE = 0x4a5a78;
 const ROOF_GREEN = 0x47683f;
 const ROOF_DARK = 0x39343f;
 const BARN_RED = 0x8c4030;
+// City / grand-building palette (Stormwind-ish stonework, blue slate, gold trim, banners).
+const STONE_LT = 0xb2ab9c;
+const STORM_BLUE = 0x3f63a0;
+const GOLD = 0xc9a94e;
+const BANNER_RED = 0x9a2f2f;
+const BANNER_BLUE = 0x2f4f9a;
 
 function merlons(y: number, half: number, color: number): AssetPart[] {
   const xs = [-half + 0.4, -half * 0.34, half * 0.34, half - 0.4];
   return xs.map((x) => box(color, 0.55, 0.5, 0.95, x, y, 0));
+}
+
+// A realistic pitched gable roof: two tilted slate planes meeting at a ridge running along Z.
+// `baseY` = eave height (top of the walls), `rise` = ridge height above the eaves, `cx` shifts
+// the whole roof in X (for side wings). Looks far crisper than a pyramid cone on long buildings.
+function gableRoof(color: number, width: number, length: number, rise: number, baseY: number, z = 0, cx = 0): AssetPart[] {
+  const halfW = width / 2;
+  const slope = Math.atan2(rise, halfW);
+  const planeLen = Math.hypot(halfW, rise);
+  const y = baseY + rise / 2;
+  return [
+    part('box', color, [planeLen, 0.18, length], [cx - halfW / 2, y, z], [0, 0, slope]),
+    part('box', color, [planeLen, 0.18, length], [cx + halfW / 2, y, z], [0, 0, -slope]),
+  ];
 }
 
 export const PRESET_ASSETS: AssetDef[] = [
@@ -207,6 +227,209 @@ export const PRESET_ASSETS: AssetDef[] = [
     cyl(STONE_DK, 0.35, 0.4, 1.4, 0, 0.9, 0),
     sph(0x8fd0e8, 0.35, 0, 1.7, 0),
   ], 1.9),
+
+  // ── City & grand buildings (Stormwind-style: big stone, blue slate, spires, banners) ──
+  def('cathedral', 'Cathedral', 'structure', [
+    box(STONE_LT, 5.4, 6.5, 9.0, 0, 3.25, -0.5),
+    ...gableRoof(STORM_BLUE, 5.9, 9.1, 2.6, 6.5, -0.5),
+    box(STONE_LT, 6.0, 5.2, 1.4, 0, 2.6, 4.2),
+    box(STONE, 1.9, 11.0, 1.9, -2.4, 5.5, 4.6),
+    box(STONE, 1.9, 11.0, 1.9, 2.4, 5.5, 4.6),
+    box(STONE_DK, 2.1, 0.5, 2.1, -2.4, 11.0, 4.6),
+    box(STONE_DK, 2.1, 0.5, 2.1, 2.4, 11.0, 4.6),
+    cone(STORM_BLUE, 1.55, 3.4, -2.4, 12.95, 4.6),
+    cone(STORM_BLUE, 1.55, 3.4, 2.4, 12.95, 4.6),
+    sph(GOLD, 0.24, -2.4, 14.85, 4.6),
+    sph(GOLD, 0.24, 2.4, 14.85, 4.6),
+    part('cylinder', WINDOW, [1.2, 1.2, 0.2], [0, 4.4, 4.94], [Math.PI / 2, 0, 0]),
+    box(DOOR, 1.8, 2.8, 0.24, 0, 1.4, 4.94),
+    box(STONE_DK, 2.4, 0.4, 0.5, 0, 2.95, 4.96),
+    ...[-3.2, -0.9, 1.4].flatMap((z) => [
+      box(WINDOW, 0.5, 2.2, 0.14, -2.72, 3.4, z),
+      box(WINDOW, 0.5, 2.2, 0.14, 2.72, 3.4, z),
+    ]),
+  ], null, { hw: 3.3, hd: 5.2 }),
+  def('castle-keep', 'Castle Keep', 'structure', [
+    box(STONE, 7.0, 8.0, 7.0, 0, 4.0, 0),
+    box(STONE_DK, 7.3, 0.5, 7.3, 0, 8.0, 0),
+    ...([[-3.5, -3.5], [3.5, -3.5], [-3.5, 3.5], [3.5, 3.5]] as [number, number][]).flatMap(([x, z]) => [
+      cyl(STONE, 1.15, 1.25, 10.5, x, 5.25, z),
+      cyl(STONE_DK, 1.4, 1.4, 0.5, x, 10.5, z),
+      cone(STORM_BLUE, 1.55, 2.6, x, 12.05, z),
+      sph(GOLD, 0.16, x, 13.5, z),
+    ]),
+    ...merlons(8.35, 3.0, STONE_DK).map((p) => ({ ...p, pos: [p.pos[0], p.pos[1], -3.4] as V3 })),
+    ...merlons(8.35, 3.0, STONE_DK).map((p) => ({ ...p, pos: [p.pos[0], p.pos[1], 3.4] as V3 })),
+    box(DOOR, 1.6, 2.6, 0.24, 0, 1.3, 3.62),
+    box(STONE_DK, 2.2, 0.5, 0.4, 0, 2.8, 3.66),
+    ...[2.0, 4.5, 6.5].flatMap((y) => [
+      box(WINDOW, 0.5, 0.9, 0.14, -1.4, y, 3.52),
+      box(WINDOW, 0.5, 0.9, 0.14, 1.4, y, 3.52),
+    ]),
+  ], null, { hw: 4.7, hd: 4.7 }),
+  def('town-hall', 'Town Hall', 'structure', [
+    box(PLASTER_W, 8.0, 4.6, 5.0, 0, 2.3, 0),
+    box(STONE_LT, 8.3, 0.5, 5.3, 0, 4.6, 0),
+    ...gableRoof(ROOF_RED, 8.5, 5.3, 2.2, 4.85, 0),
+    box(STONE_LT, 2.6, 9.5, 2.6, 0, 4.75, 0.4),
+    box(STONE_DK, 2.9, 0.5, 2.9, 0, 9.5, 0.4),
+    part('cylinder', 0xf2ecd8, [0.7, 0.7, 0.2], [0, 7.6, 1.72], [Math.PI / 2, 0, 0]),
+    cone(STORM_BLUE, 2.0, 3.0, 0, 11.25, 0.4),
+    sph(GOLD, 0.24, 0, 13.0, 0.4),
+    ...[-2.6, -1.3, 1.3, 2.6].map((x) => cyl(STONE_LT, 0.28, 0.3, 3.4, x, 1.7, 3.0)),
+    box(STONE_LT, 6.0, 0.4, 1.4, 0, 3.6, 3.0),
+    box(DOOR, 1.8, 2.6, 0.2, 0, 1.3, 2.54),
+    box(STONE_LT, 5.0, 0.3, 1.0, 0, 0.15, 3.8),
+    box(STONE_LT, 4.4, 0.3, 0.7, 0, 0.45, 3.6),
+    box(BANNER_BLUE, 0.5, 1.6, 0.08, -2.4, 3.2, 2.55),
+    box(BANNER_RED, 0.5, 1.6, 0.08, 2.4, 3.2, 2.55),
+    ...[-3.2, 3.2].flatMap((x) => [
+      box(WINDOW, 0.6, 1.0, 0.14, x, 1.7, 2.52),
+      box(WINDOW, 0.6, 1.0, 0.14, x, 3.3, 2.52),
+    ]),
+  ], null, { hw: 4.0, hd: 2.6 }),
+  def('guildhall', 'Guildhall', 'structure', [
+    box(STONE_LT, 5.5, 3.0, 4.5, 0, 1.5, 0),
+    box(WOOD_DK, 5.6, 0.3, 4.6, 0, 3.0, 0),
+    box(PLASTER_W, 5.8, 2.8, 4.8, 0, 4.4, 0),
+    box(WOOD_DK, 5.8, 0.16, 0.1, 0, 4.4, 2.42),
+    ...[-2.5, -1.25, 0, 1.25, 2.5].map((x) => box(WOOD_DK, 0.12, 2.8, 0.1, x, 4.4, 2.42)),
+    ...gableRoof(ROOF_SLATE, 6.2, 5.0, 2.6, 5.8, 0),
+    box(PLASTER_W, 1.2, 1.0, 0.8, -1.4, 6.4, 2.0),
+    box(PLASTER_W, 1.2, 1.0, 0.8, 1.4, 6.4, 2.0),
+    cone(ROOF_SLATE, 0.9, 0.8, -1.4, 7.3, 2.0),
+    cone(ROOF_SLATE, 0.9, 0.8, 1.4, 7.3, 2.0),
+    box(DOOR, 1.4, 2.2, 0.2, 0, 1.1, 2.34),
+    box(WOOD_DK, 0.1, 0.7, 0.9, 2.4, 2.5, 2.6),
+    box(GOLD, 0.06, 0.5, 0.7, 2.42, 2.5, 2.6),
+    ...[-1.8, 1.8].map((x) => box(WINDOW, 0.7, 0.9, 0.14, x, 1.9, 2.28)),
+    ...[-1.8, 0, 1.8].map((x) => box(WINDOW, 0.6, 0.9, 0.14, x, 4.4, 2.44)),
+  ], null, { hw: 2.9, hd: 2.4 }),
+  def('city-manor', 'City Manor', 'structure', [
+    box(PLASTER_W, 6.0, 4.0, 4.0, 0, 2.0, 0),
+    ...gableRoof(STORM_BLUE, 6.4, 4.2, 2.0, 4.0, 0),
+    box(PLASTER_W, 2.6, 3.2, 3.4, -4.0, 1.6, 0),
+    box(PLASTER_W, 2.6, 3.2, 3.4, 4.0, 1.6, 0),
+    ...gableRoof(STORM_BLUE, 3.0, 3.6, 1.4, 3.2, 0, -4.0),
+    ...gableRoof(STORM_BLUE, 3.0, 3.6, 1.4, 3.2, 0, 4.0),
+    box(STONE_DK, 0.6, 1.4, 0.6, -1.8, 6.0, 0),
+    box(STONE_DK, 0.6, 1.4, 0.6, 1.8, 6.0, 0),
+    cyl(STONE_LT, 0.2, 0.22, 2.4, -0.9, 1.2, 2.4),
+    cyl(STONE_LT, 0.2, 0.22, 2.4, 0.9, 1.2, 2.4),
+    box(STONE_LT, 2.4, 0.3, 1.0, 0, 2.5, 2.4),
+    box(DOOR, 1.4, 2.2, 0.2, 0, 1.1, 2.04),
+    ...[-2.0, 2.0].flatMap((x) => [
+      box(WINDOW, 0.7, 0.9, 0.14, x, 1.6, 2.04),
+      box(WINDOW, 0.7, 0.9, 0.14, x, 3.0, 2.04),
+    ]),
+    box(WINDOW, 0.6, 0.8, 0.14, -4.0, 1.7, 1.74),
+    box(WINDOW, 0.6, 0.8, 0.14, 4.0, 1.7, 1.74),
+  ], null, { hw: 5.2, hd: 2.1 }),
+  def('grand-gatehouse', 'Grand Gatehouse', 'structure', [
+    box(STONE, 3.0, 8.0, 3.0, -3.5, 4.0, 0),
+    box(STONE, 3.0, 8.0, 3.0, 3.5, 4.0, 0),
+    box(STONE_DK, 3.3, 0.5, 3.3, -3.5, 8.0, 0),
+    box(STONE_DK, 3.3, 0.5, 3.3, 3.5, 8.0, 0),
+    box(STONE, 4.0, 2.4, 3.0, 0, 6.8, 0),
+    ...merlons(8.35, 1.5, STONE_DK).map((p) => ({ ...p, pos: [p.pos[0] - 3.5, p.pos[1], p.pos[2]] as V3 })),
+    ...merlons(8.35, 1.5, STONE_DK).map((p) => ({ ...p, pos: [p.pos[0] + 3.5, p.pos[1], p.pos[2]] as V3 })),
+    ...merlons(8.35, 2.0, STONE_DK),
+    box(0x1a1712, 3.0, 4.8, 0.5, 0, 2.4, 0),
+    ...[-1.2, -0.6, 0, 0.6, 1.2].map((x) => box(WOOD_DK, 0.12, 4.4, 0.12, x, 2.3, 1.4)),
+    box(WOOD_DK, 2.8, 0.12, 0.12, 0, 3.8, 1.4),
+    box(WOOD_DK, 2.8, 0.12, 0.12, 0, 1.4, 1.4),
+    box(BANNER_RED, 0.7, 2.4, 0.08, -3.5, 5.0, 1.55),
+    box(BANNER_BLUE, 0.7, 2.4, 0.08, 3.5, 5.0, 1.55),
+    box(0x1a1712, 0.2, 1.0, 0.14, -3.5, 5.5, 1.52),
+    box(0x1a1712, 0.2, 1.0, 0.14, 3.5, 5.5, 1.52),
+  ]),
+  def('mage-tower', 'Mage Tower', 'structure', [
+    cyl(STONE_LT, 1.3, 1.7, 9.0, 0, 4.5, 0),
+    cyl(STONE_DK, 1.5, 2.1, 0.6, 0, 9.3, 0),
+    cyl(STONE, 2.1, 2.1, 1.6, 0, 9.8, 0),
+    cone(STORM_BLUE, 2.3, 3.6, 0, 12.4, 0),
+    cyl(GOLD, 0.05, 0.05, 1.0, 0, 14.7, 0),
+    sph(0x9fe8ff, 0.3, 0, 15.4, 0),
+    box(DOOR, 0.9, 1.8, 0.2, 0, 0.9, 1.62),
+    sph(0x9fe8ff, 0.22, 0, 3.0, 1.55),
+    sph(0x9fe8ff, 0.22, 1.25, 4.6, 1.0),
+    sph(0x9fe8ff, 0.22, -1.3, 6.2, 0.9),
+    sph(0x9fe8ff, 0.22, 0.4, 7.6, 1.45),
+    box(0x9fe8ff, 0.5, 0.8, 0.14, 0, 9.8, 2.04),
+    box(0x9fe8ff, 0.5, 0.8, 0.14, 0, 9.8, -2.04),
+  ], 1.9),
+  def('barracks', 'City Barracks', 'structure', [
+    box(STONE_LT, 9.0, 3.4, 4.5, 0, 1.7, 0),
+    box(WOOD_DK, 9.1, 0.3, 4.6, 0, 3.4, 0),
+    ...gableRoof(ROOF_DARK, 9.3, 4.7, 2.0, 3.55, 0),
+    box(STONE, 2.0, 3.0, 0.8, 0, 1.5, 2.25),
+    box(DOOR, 1.4, 2.2, 0.2, 0, 1.1, 2.68),
+    box(STONE_DK, 0.6, 1.0, 0.6, -3.0, 5.4, 0),
+    box(BANNER_RED, 0.6, 1.8, 0.08, -3.6, 2.4, 2.3),
+    box(BANNER_BLUE, 0.6, 1.8, 0.08, 3.6, 2.4, 2.3),
+    ...[-3.2, -1.6, 1.6, 3.2].map((x) => box(WINDOW, 0.6, 0.9, 0.14, x, 2.0, 2.28)),
+  ], null, { hw: 4.6, hd: 2.3 }),
+  def('city-townhouse', 'City Townhouse', 'structure', [
+    box(STONE_LT, 3.0, 2.6, 3.0, 0, 1.3, 0),
+    box(WOOD_DK, 3.25, 0.2, 3.25, 0, 2.6, 0),
+    box(PLASTER_W, 3.2, 2.4, 3.2, 0, 3.8, 0),
+    box(WOOD_DK, 3.45, 0.2, 3.45, 0, 5.0, 0),
+    box(PLASTER_W, 3.4, 2.4, 3.4, 0, 6.2, 0),
+    ...[-1.4, 0, 1.4].map((x) => box(WOOD_DK, 0.14, 2.4, 0.1, x, 3.8, 1.62)),
+    ...[-1.4, 0, 1.4].map((x) => box(WOOD_DK, 0.14, 2.4, 0.1, x, 6.2, 1.72)),
+    ...gableRoof(ROOF_RED, 3.8, 3.6, 1.8, 7.4, 0),
+    box(0x2a2018, 1.8, 1.3, 0.1, 0, 1.2, 1.52),
+    box(BANNER_RED, 2.0, 0.1, 0.6, 0, 1.95, 1.75),
+    box(DOOR, 0.8, 1.7, 0.16, 1.05, 0.85, 1.52),
+    box(WINDOW, 0.7, 0.9, 0.14, 0, 3.8, 1.63),
+    box(WINDOW, 0.7, 0.9, 0.14, 0, 6.2, 1.73),
+  ], null, { hw: 1.7, hd: 1.7 }),
+  def('bell-tower', 'Bell Tower', 'structure', [
+    box(STONE_LT, 2.6, 10.0, 2.6, 0, 5.0, 0),
+    box(STONE_DK, 2.8, 0.3, 2.8, 0, 3.5, 0),
+    box(STONE_DK, 2.8, 0.3, 2.8, 0, 6.8, 0),
+    box(STONE, 3.0, 2.4, 3.0, 0, 11.2, 0),
+    box(0x1a1712, 1.4, 1.8, 0.4, 0, 11.2, 1.35),
+    box(0x1a1712, 1.4, 1.8, 0.4, 0, 11.2, -1.35),
+    cyl(0x8a6a2a, 0.55, 0.75, 0.9, 0, 11.0, 0),
+    box(STONE_DK, 3.3, 0.5, 3.3, 0, 12.4, 0),
+    cone(STORM_BLUE, 2.4, 3.4, 0, 14.35, 0),
+    sph(GOLD, 0.26, 0, 16.3, 0),
+    box(DOOR, 1.0, 2.0, 0.2, 0, 1.0, 1.32),
+    box(WINDOW, 0.5, 1.6, 0.14, 0, 4.6, 1.32),
+    box(WINDOW, 0.5, 1.6, 0.14, 0, 7.6, 1.32),
+    part('cylinder', 0xf2ecd8, [0.55, 0.55, 0.2], [0, 8.9, 1.32], [Math.PI / 2, 0, 0]),
+  ], null, { hw: 1.5, hd: 1.5 }),
+  def('market-hall', 'Market Hall', 'structure', [
+    box(STONE_LT, 8.0, 0.4, 5.0, 0, 0.2, 0),
+    ...([-3.2, -1.6, 0, 1.6, 3.2] as number[]).flatMap((x) => [
+      cyl(STONE, 0.35, 0.4, 3.2, x, 2.0, -2.0),
+      cyl(STONE, 0.35, 0.4, 3.2, x, 2.0, 2.0),
+    ]),
+    box(WOOD_DK, 8.2, 0.4, 5.2, 0, 3.8, 0),
+    box(PLASTER_W, 7.2, 1.6, 4.2, 0, 4.8, 0),
+    ...gableRoof(ROOF_RED, 8.4, 5.4, 2.4, 5.6, 0),
+    box(BANNER_RED, 2.0, 0.15, 1.4, -2.4, 2.4, 1.6),
+    box(BANNER_BLUE, 2.0, 0.15, 1.4, 2.4, 2.4, -1.6),
+    box(WOOD, 0.7, 0.7, 0.7, -2.4, 0.75, 1.6),
+    box(WOOD, 0.7, 0.7, 0.7, 2.4, 0.75, -1.6),
+  ], null, { hw: 4.0, hd: 2.6 }),
+  def('citadel-tower', 'Citadel Tower', 'structure', [
+    cyl(STONE_DK, 3.2, 3.8, 2.0, 0, 1.0, 0),
+    cyl(STONE, 2.8, 3.0, 9.0, 0, 6.5, 0),
+    cyl(STONE_DK, 3.0, 3.0, 0.4, 0, 8.0, 0),
+    cyl(STONE_DK, 3.4, 3.0, 1.0, 0, 11.2, 0),
+    cyl(STONE, 3.4, 3.4, 1.0, 0, 12.0, 0),
+    ...Array.from({ length: 8 }, (_, k) => {
+      const a = (k / 8) * Math.PI * 2;
+      return box(STONE_DK, 0.7, 0.7, 0.5, Math.cos(a) * 3.1, 12.7, Math.sin(a) * 3.1);
+    }),
+    cone(STORM_BLUE, 3.0, 3.2, 0, 14.1, 0),
+    cyl(WOOD, 0.06, 0.06, 2.0, 0, 18.0, 0),
+    box(BANNER_RED, 0.06, 0.9, 0.6, 0.35, 18.6, 0),
+    box(DOOR, 1.2, 2.2, 0.24, 0, 1.1, 3.55),
+    ...[4.0, 6.0, 8.0].map((y) => box(0x1a1712, 0.24, 1.2, 0.14, 0, y, 2.9)),
+  ], 3.4),
 
   // ── Bridges (decorative — walk across on the terrain beneath; raise via Height offset) ──
   def('wooden-bridge', 'Wooden Bridge', 'structure', [
