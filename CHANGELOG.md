@@ -5,6 +5,17 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Paving polish + Mountains ground + 12 medieval city buildings
+**Goal:** three follow-ups to the Ground work — shrink the oversized paving stones, add a rocky **Mountains** ground, and add grand **city** buildings (Stormwind-style, not villagey).
+- **Smaller paving (City + Cobblestone):** the paved look moved off the terrain vertex colours (which were mesh-resolution-limited, so slabs looked huge) onto a **repeat-tiled texture overlay** — a procedural cobblestone canvas (`src/render/paving.ts`, mirrored in the Map Builder) laid on a thin mesh over paved cells with world-scaled UVs (`pavedSurfaceGeometry`, ~2.2 m repeat → ~0.44 m stones). Stone size is now independent of terrain resolution; City & Cobblestone share the texture (City cool grey, Cobblestone a touch warmer). The terrain vertex colour under paving is now a flat base tone.
+- **Mountains ground (index 20):** appended to `BIOME_IDS` (now **21**). `colorForBiome` gives it a rocky grey-brown that lightens with height, a positional rock-mottle, and a snow cap on the peaks (synced editor `palette.ts` ↔ game `custom-map-view.ts`). Selectable in the Ground tool as “Mountains (rocky)”.
+- **12 medieval city buildings** (`presets.ts`, mirrored): `cathedral, castle-keep, town-hall, guildhall, city-manor, grand-gatehouse, mage-tower, barracks, city-townhouse, bell-tower, market-hall, citadel-tower` — big stonework, blue-slate **pitched gable roofs** (new `gableRoof` helper builds real tilted roof planes instead of pyramid cones), spires with gold finials, crenellations, banners. All are `structure` presets with box/round colliders (the gatehouse is intentionally walk-through, like `gate`).
+- `tests/unit/ground.test.ts`: adds Mountains (rocky low → snow-bright peaks) and asserts City/Cobblestone are now **flat** vertex colours with a non-empty `pavedSurfaceGeometry` overlay. `tests/unit/presets.test.ts` (new): every preset is structurally valid with a unique id, and all 12 city buildings resolve as colliding structures.
+
+**Verified:** `typecheck` ✓ (both repos) · `npm test` → 335/335 ✓ · `build` ✓ (both repos) · headless (editor): placed all 12 buildings on a paved plaza with a snow-capped mountain ridge — buildings render varied and grand, paving stones are now small running-bond cobbles (well under the ~2.4 m spawn-marker scale), zero console errors.
+
+---
+
 ## "Ground" tool: rename Biome → Ground + many more ground surfaces (incl. paved City)
 **Goal:** more ground variety for custom maps — grass/forest/desert/mesa/city and more — with a believable **city** surface (paved stone, not grass).
 - **Format (mirror):** `BIOME_IDS` extended from 7 to **20** — appends `city, desert, mesa, savanna, tundra, dirt, sand, mud, cobblestone, ash, jungle, ice, basalt` after the original gameplay biomes (0–6). Append-only, so old maps keep their indices; the new ones are **cosmetic ground colours** on custom maps (they don't drive gameplay/scatter).

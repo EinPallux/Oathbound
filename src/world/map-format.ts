@@ -41,6 +41,7 @@ export const BIOME_IDS = [
   'jungle',
   'ice',
   'basalt',
+  'mountains',
 ] as const;
 export type BiomeId = (typeof BIOME_IDS)[number];
 
@@ -436,6 +437,53 @@ export function waterSurfaceGeometry(
     }
   }
   return { positions: Float32Array.from(pos), indices };
+}
+
+/** Paved-ground indices (City / Cobblestone) that get the tiled paving-texture overlay. */
+export const PAVED_GROUND = new Set([7, 15]);
+
+/**
+ * Overlay geometry for paved ground (City = 7, Cobblestone = 15): one quad per paved cell,
+ * sitting just above the terrain, with *world-scaled UVs* so a small repeating paving texture
+ * shows fine stones regardless of the (coarse) terrain mesh resolution. Per-vertex colour
+ * tints City grey and Cobblestone warmer. Pure — the renderer supplies the texture + material.
+ */
+export function pavedSurfaceGeometry(
+  biomes: ArrayLike<number>,
+  heights: ArrayLike<number>,
+  res: number,
+  size: number,
+): { positions: Float32Array; uvs: Float32Array; colors: Float32Array; indices: number[] } {
+  const half = size / 2;
+  const cell = size / (res - 1);
+  const REPEAT = 1 / 2.2; // one texture tile every 2.2 m → fine stones
+  const LIFT = 0.05; // sit just above the ground to beat z-fighting
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const col: number[] = [];
+  const indices: number[] = [];
+  for (let z = 0; z < res - 1; z++) {
+    for (let x = 0; x < res - 1; x++) {
+      const i00 = z * res + x, i10 = i00 + 1, i01 = i00 + res, i11 = i01 + 1;
+      const b00 = biomes[i00], b10 = biomes[i10], b01 = biomes[i01], b11 = biomes[i11];
+      if (!PAVED_GROUND.has(b00) && !PAVED_GROUND.has(b10) && !PAVED_GROUND.has(b01) && !PAVED_GROUND.has(b11)) continue;
+      const wx0 = -half + x * cell, wx1 = -half + (x + 1) * cell;
+      const wz0 = -half + z * cell, wz1 = -half + (z + 1) * cell;
+      const base = pos.length / 3;
+      const corner = (wx: number, wz: number, hh: number, bio: number): void => {
+        pos.push(wx, hh + LIFT, wz);
+        uv.push(wx * REPEAT, wz * REPEAT);
+        if (bio === 15) col.push(0.74, 0.68, 0.58); // cobblestone — warmer
+        else col.push(0.68, 0.68, 0.71); // city / other — cool grey
+      };
+      corner(wx0, wz0, heights[i00], b00);
+      corner(wx1, wz0, heights[i10], b10);
+      corner(wx0, wz1, heights[i01], b01);
+      corner(wx1, wz1, heights[i11], b11);
+      indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
+    }
+  }
+  return { positions: Float32Array.from(pos), uvs: Float32Array.from(uv), colors: Float32Array.from(col), indices };
 }
 
 // base64 that works in both the browser (btoa/atob) and Node (Buffer), so the
