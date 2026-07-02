@@ -5,6 +5,15 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Cube World is now the game's only style (toggle removed)
+**Goal:** the owner picked the Cube World look, so the game drops the smooth/voxel switch — it always renders as fine cubes. The **Map Builder keeps** its `Terrain: Smooth ⇄ Cubic` toggle (handy for visual editing).
+- Removed the `voxelTerrain` setting + the Settings → Graphics toggle and the `?voxel=` override; bootstrap always builds the cube bubble, switches on the voxel collision grid, and pulls the fog in. The unused smooth-terrain build paths are no longer called in-game (the builders stay exported for the editor/tests).
+- **Overlay audit** (checked everything else drawn on the terrain for the same "smooth over cubes" problem): **placed assets** sit on `field.sample` — now the quantized cube tops — so they stand on the cubes (models stay low-poly by design, not cubes); **painted water** is a flat plane at the water level, which is already correct blocky water; **paving** was the one real offender and is fixed (per-cube). **Rivers / roads / legacy lakes** are smooth ribbons/discs draped on the terrain and would ramp over the steps — but Talar uses none, so they're left as a known minor limitation (easy to cube-ify if you start using them).
+
+**Verified:** `typecheck` ✓ · `npm test` → 344/344 ✓ · `build` ✓ · headless: booting with no `?voxel=` renders Cube World (cube + per-cube paving), the Settings panel has no voxel toggle, player stands on the cube tops — zero console errors.
+
+---
+
 ## Voxel paving fix — paved ground steps with the cubes
 **Goal:** City/Cobblestone ground was drawing as one smooth coarse sheet draped over the fine voxel terrain (it was built at the map's authoring resolution, ~15 m quads, so on a slope it looked like a flat plane amid the cubes). Now the voxel bubble emits **one flat, stone-textured quad per paved cube top** (world-scaled UVs so stones tile seamlessly across cubes), so paved ground reads as textured cubes — flat where the ground is flat, stepped (paved tops + grey risers) on slopes — matching the terrain. The old smooth overlay is hidden in voxel mode. `render/voxel-terrain.ts` + bootstrap wiring; no format change.
 
