@@ -5,6 +5,18 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Voxel / "Cube World" terrain toggle (render-only)
+**Goal:** an evaluation toggle to see the world (and the Map Builder) rendered as stepped cubes — Cube World / Trove style — before deciding whether to adopt the theme. Purely a rendering change: the sim, collision, colliders, map format and export are all unchanged.
+- **Shared builder** (`cubicTerrainGeometry`, mirrored `map-format.ts` ↔ Map Builder `map.ts`): pure, three-free geometry — the heightfield sampled onto a grid of flat-topped columns, each height quantized to a step, with vertical side walls dropping to lower neighbours so cliffs show. Flat per-face normals + a per-tile colour give the faceted blocky look (side faces darkened for depth). The renderer passes in the height sampler + colour fn, so one builder serves the procedural world, custom maps, and the editor.
+- **Game:** a `voxelTerrain` setting (Settings → Graphics: "Voxel terrain (Cube World style)"), applied by swapping the terrain mesh **live** — no reload. `?voxel=1` / `?voxel=0` overrides the saved setting at boot. Works on the procedural world and custom maps (Talar). `buildCubicTerrainMesh` in `terrain-mesh.ts`.
+- **Map Builder:** a top-bar "Terrain: Smooth ⇄ Cubic" toggle previews the look live while you author; the smooth mesh stays present (hidden) so sculpt/paint picking is unaffected, and the toggle rides through map load/resize. The exported `.json` is identical either way.
+- **Caveat (documented):** render-only, so in cubic mode placed assets/paving/water still sit at their true (smooth) heights and can float or clip against the quantized ground on slopes. Collision follows the smooth heightfield, not the visible cubes. Both are intentional for a look-only toggle — if we adopt the theme, we'd quantize placement + collision too.
+- `tests/unit/cubic-terrain.test.ts` (new): flat ground → tops only; height quantization; cliffs emit darker side walls; finite attributes + Uint32 indices. `settings.test.ts` covers the new field.
+
+**Verified:** `typecheck` ✓ (both repos) · `npm test` → 339/339 ✓ · `build` ✓ (both repos) · headless: editor smooth↔cubic on sculpted hills (+ live step tuning), in-game smooth vs cubic on Talar at a hillside, and the in-game Settings toggle swapping the terrain live (47,089 → 415,136 verts) — zero console errors throughout.
+
+---
+
 ## Blue-Roof Tavern preset (owner-requested — built from a reference image)
 **Goal:** turn an owner-supplied reference image (a timber-framed medieval tavern with a blue slate roof) into a placeable Three.js asset for the Map Builder + game.
 - **New `structure` preset `tavern-blueroof` ("Blue-Roof Tavern")** (`presets.ts`, mirrored editor ↔ game): a grand two-storey **timber-framed inn** built from the shared primitive + `gableRoof` vocabulary — a grey **stone ground floor** (plinth + corner quoins), a **jettied** cream **upper floor** with dark timber framing (corner posts, rails, studs, chevron braces) and a stepped plaster front gable, a steep **blue-slate gable roof** (ridge cap + bargeboards + fascia), a tall **stone chimney** with cap + flue pots, **warm glowing lattice windows** (front, sides, and a diamond attic light), an iron-strapped arched **door** with a stone surround + steps, a **covered porch** (posts, blue lean-to roof, two barrels + a crate), a leafy planter, and a **hanging beer-mug sign**. Box-footprint collider `{ hw: 2.5, hd: 2.1 }`; it lists in the **Structures** library right after Inn/Tavern.

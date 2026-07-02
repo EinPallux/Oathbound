@@ -34,6 +34,9 @@ export interface Settings {
    *  pixels shaded), the main FPS lever on integrated GPUs. Clamped by the display's
    *  own devicePixelRatio, so "Ultra" never upscales past native. */
   maxPixelRatio: number;
+  /** Render the terrain as stepped cubes (Cube World look) instead of a smooth mesh. Visual
+   *  only — collision still uses the smooth heightfield. Applies on the next terrain rebuild. */
+  voxelTerrain: boolean;
 }
 
 /** Discrete UI-scale steps offered in the panel (continuous values are clamped to range). */
@@ -60,6 +63,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mouseSensitivity: 1,
   invertY: false,
   maxPixelRatio: 1.5,
+  voxelTerrain: false,
 };
 
 const STORAGE_KEY = 'oathbound.settings';
@@ -116,6 +120,7 @@ export function mergeSettings(raw: unknown): Settings {
       typeof r.maxPixelRatio === 'number' && Number.isFinite(r.maxPixelRatio)
         ? Math.min(2, Math.max(0.5, r.maxPixelRatio))
         : DEFAULT_SETTINGS.maxPixelRatio,
+    voxelTerrain: typeof r.voxelTerrain === 'boolean' ? r.voxelTerrain : DEFAULT_SETTINGS.voxelTerrain,
   };
 }
 
