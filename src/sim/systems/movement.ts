@@ -17,6 +17,10 @@ import { resolveCircleVsCylinders, resolveCircleVsBoxes, type BoxCollider } from
 import { statusMagnitude, Status } from '../combat/statuses';
 
 const GRAVITY = 20;
+/** Seconds of standing still to summon the mount (a channelled cast; moving cancels it). */
+export const MOUNT_CAST_TIME = 2;
+/** Move-speed multiplier while mounted (+60%). */
+export const MOUNT_SPEED_MULT = 1.6;
 
 export interface MovementDeps {
   input: ControlState;
@@ -64,9 +68,27 @@ export function createMovementSystem(deps: MovementDeps): System {
         const moveX = sy * fwd - cy * strafe;
         const moveZ = cy * fwd + sy * strafe;
 
-        // Fleet (Disengage) gives a brief move-speed bonus.
+        // Mount (Shift): toggle. Dismount is instant; summoning is a MOUNT_CAST_TIME channel
+        // that any movement cancels. On a completed channel the rider is mounted.
+        if (input.consumeMount()) {
+          if (ch.mounted) ch.mounted = false;
+          else if (ch.mountCast > 0) ch.mountCast = 0; // cancel a summon in progress
+          else ch.mountCast = MOUNT_CAST_TIME;
+        }
+        if (ch.mountCast > 0) {
+          if (mag > 0) ch.mountCast = 0; // moving cancels the summon
+          else {
+            ch.mountCast -= dt;
+            if (ch.mountCast <= 0) {
+              ch.mountCast = 0;
+              ch.mounted = true;
+            }
+          }
+        }
+
+        // Fleet (Disengage) gives a brief move-speed bonus; the mount grants a flat bonus.
         const fleet = statusMagnitude(world.get<Statuses>(e, C.Statuses), Status.Fleet);
-        const speed = (input.sprint ? ch.sprintSpeed : ch.runSpeed) * (1 + fleet);
+        const speed = ch.runSpeed * (ch.mounted ? MOUNT_SPEED_MULT : 1) * (1 + fleet);
         v.x = moveX * speed;
         v.z = moveZ * speed;
 

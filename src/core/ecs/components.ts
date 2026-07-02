@@ -67,9 +67,12 @@ export interface Character {
   /** Half the capsule height (m); the Transform.y is the capsule centre. */
   halfHeight: number;
   runSpeed: number;
-  sprintSpeed: number;
   jumpSpeed: number;
   grounded: boolean;
+  /** Riding a summoned mount (grants a flat move-speed bonus). */
+  mounted: boolean;
+  /** Remaining summon-cast time (s) while calling the mount; 0 = not summoning. */
+  mountCast: number;
 }
 
 /** Marker component: this entity is driven by player input. */

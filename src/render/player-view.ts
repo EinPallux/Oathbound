@@ -29,6 +29,8 @@ const HEAD_TOP = 2.42;
 const HOLD_ANGLE = ((90 - 65) * Math.PI) / 180;
 /** Sideways tilt for the warrior's shield. */
 const SHIELD_ANGLE = (50 * Math.PI) / 180;
+/** How far the rider lifts (local m) to sit on the wolf's saddle when mounted. */
+const SEAT_Y = 0.78;
 
 const SKIN = 0xd9a878;
 const HAIR = 0x6b4526;
@@ -99,6 +101,7 @@ export class PlayerView {
   private npCtx: CanvasRenderingContext2D | null = null;
   private npTexture: THREE.CanvasTexture | null = null;
   private npKey = '';
+  private figure = new THREE.Group(); // the whole rider (body + legs + drapery) — lifts when mounted
   private body = new THREE.Group(); // upper body (torso/head/arms) — bobs/leans/spins
   private legL = new THREE.Group();
   private legR = new THREE.Group();
@@ -107,6 +110,10 @@ export class PlayerView {
   private orb: THREE.Mesh | null = null; // priest staff gem (emissive flash)
   private orbBase = 0.6;
   private classId: ClassId | '' = '';
+  private mount: THREE.Group | null = null; // persistent wolf mount (shown only while riding)
+  private mountLegs: THREE.Group[] = []; // [FL, FR, BL, BR] leg pivots for the trot cycle
+  private mountBlend = 0; // 0 on foot → 1 fully mounted (smooths the seat/pose transition)
+  private wolfPhase = 0;
 
   private t = 0;
   private walkPhase = 0;
@@ -156,24 +163,37 @@ export class PlayerView {
   /** (Re)build the voxel figure for a class — fresh body + rig + class kit. */
   private build(classId: ClassId): void {
     for (const c of [...this.group.children]) {
+      if (c === this.mount) continue; // keep the persistent mount across class rebuilds
       this.group.remove(c);
       disposeTree(c);
     }
     this.classId = classId;
     this.orb = null;
 
-    // Fresh rig. Arms pivot at the shoulders (children of the body so they follow its lean);
-    // legs pivot at the hips (children of the root so they stay grounded as the body bobs).
+    // Fresh rig under a `figure` group (so the whole rider can lift onto the mount). Arms
+    // pivot at the shoulders (children of the body so they follow its lean); legs pivot at
+    // the hips (children of the figure so they stay grounded as the body bobs).
+    this.figure = new THREE.Group();
+    this.group.add(this.figure);
     this.body = new THREE.Group();
-    this.group.add(this.body);
+    this.figure.add(this.body);
     this.armL = new THREE.Group(); this.armL.position.set(0.56, 1.82, 0); this.body.add(this.armL);
     this.armR = new THREE.Group(); this.armR.position.set(-0.56, 1.82, 0); this.body.add(this.armR);
-    this.legL = new THREE.Group(); this.legL.position.set(0.24, 0.92, 0); this.group.add(this.legL);
-    this.legR = new THREE.Group(); this.legR.position.set(-0.24, 0.92, 0); this.group.add(this.legR);
+    this.legL = new THREE.Group(); this.legL.position.set(0.24, 0.92, 0); this.figure.add(this.legL);
+    this.legR = new THREE.Group(); this.legR.position.set(-0.24, 0.92, 0); this.figure.add(this.legR);
 
     if (classId === 'warrior') this.buildWarrior();
     else if (classId === 'hunter') this.buildHunter();
     else this.buildPriest();
+
+    // Build the wolf mount once; it persists across class switches (hidden until riding).
+    if (!this.mount) {
+      const wolf = buildWolf();
+      this.mount = wolf.group;
+      this.mountLegs = wolf.legs;
+      this.mount.visible = false;
+      this.group.add(this.mount);
+    }
   }
 
   /** Skin+hair+eyes shared by every class (hair styling is added by the caller). */
@@ -247,10 +267,11 @@ export class PlayerView {
       put(leg, 0.36, 0.14, 0.18, LEATHER_DK, 0, -0.88, 0.24);
     }
 
-    // Red tabard hanging over the groin (root-parented so it stays put over the legs).
-    put(this.group, 0.42, 0.82, 0.08, RED, 0, 0.56, 0.25);
-    put(this.group, 0.3, 0.2, 0.08, RED, 0, 0.18, 0.25);
-    put(this.group, 0.44, 0.06, 0.09, GOLD, 0, 0.94, 0.25);
+    // Red tabard hanging over the groin (figure-parented so it stays over the legs and
+    // lifts with the rider when mounted).
+    put(this.figure, 0.42, 0.82, 0.08, RED, 0, 0.56, 0.25);
+    put(this.figure, 0.3, 0.2, 0.08, RED, 0, 0.18, 0.25);
+    put(this.figure, 0.44, 0.06, 0.09, GOLD, 0, 0.94, 0.25);
 
     // Sword slung diagonally across the back (hilt over the left shoulder).
     const back = new THREE.Group();
@@ -345,29 +366,30 @@ export class PlayerView {
       put(leg, 0.36, 0.14, 0.18, LEATHER_DK, 0, -0.88, 0.24);
     }
 
-    // Quiver of arrows over the right shoulder (on the body).
+    // Big quiver spanning the whole back (leather case + a fan of arrows over the shoulder).
     const quiver = new THREE.Group();
-    quiver.position.set(-0.34, 1.5, -0.28);
-    quiver.rotation.z = 0.22;
-    put(quiver, 0.22, 0.66, 0.22, LEATHER, 0, 0, 0);
-    put(quiver, 0.24, 0.08, 0.24, LEATHER_LT, 0, 0.28, 0);
-    for (const [ax, az] of [[-0.06, 0.02], [0.06, -0.04], [0, 0.08]] as const) {
-      put(quiver, 0.04, 0.5, 0.04, WOOD, ax, 0.5, az);
-      put(quiver, 0.07, 0.16, 0.07, FLETCH, ax, 0.82, az);
+    quiver.position.set(-0.02, 1.34, -0.34);
+    quiver.rotation.z = 0.12;
+    put(quiver, 0.44, 1.06, 0.24, LEATHER, 0, 0, 0);      // case (covers the back)
+    put(quiver, 0.48, 0.1, 0.28, LEATHER_LT, 0, 0.5, 0);  // top rim
+    put(quiver, 0.48, 0.1, 0.28, LEATHER_DK, 0, -0.42, 0); // bottom cap
+    put(quiver, 0.5, 0.08, 0.26, LEATHER_DK, 0, 0.16, 0);  // strap band
+    for (const [ax, az] of [[-0.14, 0], [-0.05, 0.05], [0.05, 0.02], [0.14, -0.03]] as const) {
+      put(quiver, 0.045, 0.6, 0.045, WOOD, ax, 0.62, az);  // shafts
+      put(quiver, 0.08, 0.2, 0.08, FLETCH, ax, 0.98, az);  // white fletching
     }
     b.add(quiver);
 
-    // Recurve wooden bow carried in the left hand — gripped mid-riser, tilted to a forward
-    // angle (matches the other classes) so it reads dynamically instead of dead-vertical.
+    // Bigger recurve bow carried in the left hand — gripped mid-riser, nearly vertical.
     const bow = new THREE.Group();
-    bow.position.set(0.18, -0.86, 0.2);
-    bow.rotation.x = HOLD_ANGLE;
-    put(bow, 0.1, 0.5, 0.1, WOOD, 0, 0, 0);               // riser (grip, at the hand)
-    put(bow, 0.07, 0.5, 0.08, WOOD, 0, 0.44, 0.07).rotation.x = -0.4;  // upper limb (bows forward)
-    put(bow, 0.06, 0.32, 0.07, WOOD, 0, 0.74, 0.03).rotation.x = 0.5;  // upper tip (recurves back)
-    put(bow, 0.07, 0.5, 0.08, WOOD, 0, -0.44, 0.07).rotation.x = 0.4;  // lower limb
-    put(bow, 0.06, 0.32, 0.07, WOOD, 0, -0.74, 0.03).rotation.x = -0.5; // lower tip
-    put(bow, 0.025, 1.72, 0.025, STRING, 0, 0, -0.03, 0.5); // string (straight, near side)
+    bow.position.set(0.2, -0.86, 0.2);
+    bow.rotation.x = (12 * Math.PI) / 180; // only a slight forward lean (mostly vertical)
+    put(bow, 0.12, 0.62, 0.12, WOOD, 0, 0, 0);              // riser (grip, at the hand)
+    put(bow, 0.09, 0.64, 0.1, WOOD, 0, 0.56, 0.08).rotation.x = -0.4;  // upper limb (bows forward)
+    put(bow, 0.07, 0.42, 0.09, WOOD, 0, 0.94, 0.03).rotation.x = 0.5;  // upper tip (recurves back)
+    put(bow, 0.09, 0.64, 0.1, WOOD, 0, -0.56, 0.08).rotation.x = 0.4;  // lower limb
+    put(bow, 0.07, 0.42, 0.09, WOOD, 0, -0.94, 0.03).rotation.x = -0.5; // lower tip
+    put(bow, 0.03, 2.2, 0.03, STRING, 0, 0, -0.04, 0.5);   // string (straight, near side)
     this.armL.add(bow);
   }
 
@@ -430,27 +452,28 @@ export class PlayerView {
       put(leg, 0.35, 0.05, 0.47, GOLD, 0, -0.72, 0.06);
     }
     // Short blue front drape from the belt (keeps the robe's blue + gold front, no leg skirt).
-    put(this.group, 0.32, 0.66, 0.1, BLUE, 0, 0.62, 0.24);
-    put(this.group, 0.05, 0.66, 0.11, GOLD, 0.17, 0.62, 0.24);
-    put(this.group, 0.05, 0.66, 0.11, GOLD, -0.17, 0.62, 0.24);
-    put(this.group, 0.34, 0.06, 0.12, GOLD, 0, 0.31, 0.24);
+    put(this.figure, 0.32, 0.66, 0.1, BLUE, 0, 0.62, 0.24);
+    put(this.figure, 0.05, 0.66, 0.11, GOLD, 0.17, 0.62, 0.24);
+    put(this.figure, 0.05, 0.66, 0.11, GOLD, -0.17, 0.62, 0.24);
+    put(this.figure, 0.34, 0.06, 0.12, GOLD, 0, 0.31, 0.24);
 
-    // Ornate staff in the right hand, held at a forward angle (matches the other classes).
+    // Ornate staff in the right hand, gripped near the MIDDLE of the shaft (shaft centred on
+    // the group origin) and held at a bolder forward angle than the other classes.
     const staff = new THREE.Group();
     staff.position.set(0, -0.82, 0.12);
-    staff.rotation.set(HOLD_ANGLE, 0, 0.1);
-    put(staff, 0.08, 2.0, 0.08, STAFF, 0, 0.5, 0);
-    put(staff, 0.1, 0.07, 0.1, GOLD, 0, 0.0, 0);
-    put(staff, 0.1, 0.07, 0.1, GOLD, 0, 0.7, 0);
-    put(staff, 0.1, 0.07, 0.1, GOLD_DK, 0, -0.42, 0);
-    // Gold diamond frame around the gem (four bars).
+    staff.rotation.set((42 * Math.PI) / 180, 0, 0.1);
+    put(staff, 0.08, 2.0, 0.08, STAFF, 0, 0, 0);          // shaft (centre at the hand)
+    put(staff, 0.1, 0.07, 0.1, GOLD, 0, -0.9, 0);         // butt cap
+    put(staff, 0.1, 0.07, 0.1, GOLD_DK, 0, -0.25, 0);     // grip ring
+    put(staff, 0.1, 0.07, 0.1, GOLD, 0, 0.55, 0);         // upper ring
+    // Gold diamond frame around the gem near the top (four bars).
     for (const [dx, dy] of [[0, 0.22], [0, -0.22], [0.22, 0], [-0.22, 0]] as const)
-      put(staff, 0.12, 0.12, 0.07, GOLD, dx, 1.5 + dy, 0).rotation.z = Math.PI / 4;
+      put(staff, 0.12, 0.12, 0.07, GOLD, dx, 0.92 + dy, 0).rotation.z = Math.PI / 4;
     const gem = new THREE.Mesh(
       new THREE.IcosahedronGeometry(0.17, 0),
       new THREE.MeshStandardMaterial({ color: 0x9fd8ff, emissive: GEM, emissiveIntensity: this.orbBase, roughness: 0.25 }),
     );
-    gem.position.set(0, 1.5, 0);
+    gem.position.set(0, 0.92, 0);
     staff.add(gem);
     this.armR.add(staff);
     this.orb = gem;
@@ -525,46 +548,159 @@ export class PlayerView {
     dt: number,
     speed: number,
     classId: ClassId,
+    mounted = false,
   ): void {
     if (classId !== this.classId) this.build(classId);
     this.t += dt;
 
     this.group.position.set(x, y - FEET, z);
     this.group.rotation.y = yaw;
-    // Float the name+level plate above the (scaled) head (sprites self-billboard to the camera).
-    if (this.nameplate) this.nameplate.position.set(x, y - FEET + (HEAD_TOP + 0.55) * MODEL_SCALE, z);
 
-    // Walk blend + phase from movement speed.
+    // Mount blend (smooth seat/dismount) + lift the rider onto the wolf.
+    this.mountBlend += ((mounted ? 1 : 0) - this.mountBlend) * Math.min(1, dt * 8);
+    const mb = this.mountBlend;
+    if (this.mount) this.mount.visible = mb > 0.02;
+    this.figure.position.y = SEAT_Y * mb;
+
+    // Float the name+level plate above the (scaled) head — higher when sat up on the wolf.
+    if (this.nameplate)
+      this.nameplate.position.set(x, y - FEET + (HEAD_TOP + 0.55 + SEAT_Y * mb) * MODEL_SCALE, z);
+
+    // Walk blend + phase from movement speed (leg-walk is suppressed while mounted).
     const target = Math.min(1, speed / 3.5);
     this.walkBlend += (target - this.walkBlend) * Math.min(1, dt * 10);
     if (speed > 0.05) this.walkPhase += dt * (4.5 + speed * 0.9);
-    const wb = this.walkBlend;
+    const wb = this.walkBlend * (1 - mb);
     const sw = Math.sin(this.walkPhase);
 
-    // Legs always follow the walk cycle; arms do unless an action overrides them.
-    this.legR.rotation.x = sw * 0.6 * wb;
-    this.legL.rotation.x = -sw * 0.6 * wb;
-    let armRx = -sw * 0.45 * wb;
-    let armLx = sw * 0.45 * wb;
+    // Legs: walk cycle on foot; astride (dropped down the wolf's sides, splayed) while
+    // mounted — mostly hanging with a slight forward angle so they clear the barrel.
+    this.legR.rotation.x = sw * 0.6 * wb + 0.36 * mb;
+    this.legL.rotation.x = -sw * 0.6 * wb + 0.36 * mb;
+    this.legR.rotation.z = -0.44 * mb;
+    this.legL.rotation.z = 0.44 * mb;
+    let armRx = -sw * 0.45 * wb + 0.3 * mb;
+    let armLx = sw * 0.45 * wb + 0.3 * mb;
 
-    // Body bob (walk) + subtle idle breathing + a slight forward lean while moving.
-    const breathe = Math.sin(this.t * 1.6) * 0.025 * (1 - wb);
-    this.body.position.y = Math.abs(Math.sin(this.walkPhase * 2)) * 0.07 * wb + breathe;
-    this.body.rotation.x = 0.06 * wb;
+    // Body bob/breathing (suppressed while mounted) + a slight forward lean.
+    const breathe = Math.sin(this.t * 1.6) * 0.025 * (1 - this.walkBlend);
+    this.body.position.y = (Math.abs(Math.sin(this.walkPhase * 2)) * 0.07 * wb + breathe) * (1 - mb);
+    this.body.rotation.x = 0.06 * wb + 0.1 * mb;
     this.body.rotation.y = 0;
 
+    // Ability action overrides the arms (and body) — suppressed while mounted to avoid odd
+    // seated swings, but its timer/orb still resolve.
     if (this.actionT > 0) {
       this.actionT = Math.max(0, this.actionT - dt);
-      const p = this.actionDur > 0 ? 1 - this.actionT / this.actionDur : 1;
-      [armRx, armLx] = this.applyAction(p, armRx, armLx);
+      if (mb < 0.5) {
+        const p = this.actionDur > 0 ? 1 - this.actionT / this.actionDur : 1;
+        [armRx, armLx] = this.applyAction(p, armRx, armLx);
+      }
       if (this.actionT === 0) this.flashOrb(this.orbBase);
     }
 
     this.armR.rotation.x = armRx;
     this.armL.rotation.x = armLx;
+
+    // Trot the wolf's legs (diagonal pairs) by speed while ridden.
+    if (this.mount && mb > 0.02) {
+      const trot = Math.min(1, speed / 6);
+      if (speed > 0.05) this.wolfPhase += dt * (2.5 + speed * 0.8);
+      const ws = Math.sin(this.wolfPhase) * 0.5 * trot * mb;
+      const signs = [1, -1, -1, 1]; // FL, FR, BL, BR
+      for (let i = 0; i < this.mountLegs.length; i++) this.mountLegs[i].rotation.x = ws * signs[i];
+    }
   }
 }
 
 function easeOut(p: number): number {
   return 1 - (1 - p) * (1 - p);
+}
+
+// ── The wolf mount ────────────────────────────────────────────────────────────
+// A chunky voxel dire-wolf (grey back, cream underside + legs, amber eyes) with a leather
+// saddle, chest harness with a gold medallion, and rear saddlebags — faithful to the
+// reference. Feet at y=0, facing +Z (same as the rider). Returns the group plus the four
+// leg pivots [FL, FR, BL, BR] for the trot cycle. Scaled with the player (a child of the
+// scaled root). The saddle seat sits at ~y1.82 so the lifted rider (SEAT_Y) straddles it.
+function buildWolf(): { group: THREE.Group; legs: THREE.Group[] } {
+  const g = new THREE.Group();
+  g.name = 'wolf-mount';
+  const FUR_DK = 0x4a4952, FUR = 0x6d6a70, FUR_LT = 0xcdbb98, FUR_TAN = 0xa8906e;
+  const NOSE = 0x1b1a1e, EYE = 0xd8a12a;
+  const SADDLE = 0x6e4a2e, SADDLE_DK = 0x4f3622, SEATR = 0x7d3a2a, GOLD = 0xc9a94e, STRAP = 0x5a3a1e;
+
+  // Body: torso + dark back, cream belly, rear haunch, front chest.
+  put(g, 0.82, 0.8, 1.5, FUR, 0, 1.2, -0.15);
+  put(g, 0.72, 0.26, 1.5, FUR_DK, 0, 1.5, -0.15);
+  put(g, 0.7, 0.32, 1.4, FUR_LT, 0, 0.9, -0.15);
+  put(g, 0.86, 0.86, 0.62, FUR, 0, 1.16, -0.95);
+  put(g, 0.72, 0.3, 0.62, FUR_DK, 0, 1.52, -0.95);
+  put(g, 0.78, 0.78, 0.5, FUR, 0, 1.14, 0.62);
+  put(g, 0.62, 0.42, 0.5, FUR_LT, 0, 0.9, 0.64);
+
+  // Neck + head.
+  put(g, 0.52, 0.66, 0.5, FUR, 0, 1.54, 0.95);
+  put(g, 0.44, 0.32, 0.5, FUR_DK, 0, 1.82, 0.92);
+  put(g, 0.56, 0.52, 0.56, FUR, 0, 1.72, 1.42);
+  put(g, 0.5, 0.28, 0.32, FUR_LT, 0, 1.55, 1.56);
+  put(g, 0.34, 0.34, 0.42, FUR_LT, 0, 1.6, 1.8);
+  put(g, 0.18, 0.14, 0.12, NOSE, 0, 1.66, 2.0);
+  // Ears (pointed) + amber eyes + brow.
+  for (const s of [1, -1]) {
+    put(g, 0.16, 0.26, 0.14, FUR_DK, 0.18 * s, 2.02, 1.34);
+    put(g, 0.09, 0.14, 0.09, FUR_TAN, 0.18 * s, 2.0, 1.4);
+    put(g, 0.1, 0.12, 0.08, EYE, 0.17 * s, 1.78, 1.69);
+    put(g, 0.15, 0.05, 0.07, FUR_DK, 0.17 * s, 1.87, 1.68);
+  }
+
+  // Bushy tail sweeping up and back.
+  put(g, 0.32, 0.32, 0.5, FUR, 0, 1.5, -1.34).rotation.x = -0.6;
+  put(g, 0.36, 0.36, 0.5, FUR_DK, 0, 1.78, -1.58).rotation.x = -0.5;
+  put(g, 0.26, 0.26, 0.3, FUR_LT, 0, 2.0, -1.78).rotation.x = -0.5;
+
+  // Four legs (pivot groups for the trot): upper fur, cream shin, dark paw.
+  const legs: THREE.Group[] = [];
+  const makeLeg = (x: number, z: number, topY: number): THREE.Group => {
+    const L = new THREE.Group();
+    L.position.set(x, topY, z);
+    put(L, 0.26, 0.5, 0.28, FUR, 0, -0.24, 0);
+    put(L, 0.2, 0.52, 0.22, FUR_LT, 0, -0.72, 0.02);
+    put(L, 0.24, 0.16, 0.34, NOSE, 0, -1.0, 0.07);
+    g.add(L);
+    legs.push(L);
+    return L;
+  };
+  makeLeg(0.3, 0.52, 1.14);   // FL
+  makeLeg(-0.3, 0.52, 1.14);  // FR
+  makeLeg(0.32, -0.78, 1.2);  // BL
+  makeLeg(-0.32, -0.78, 1.2); // BR
+
+  // Saddle: blanket, seat + gold rim, pommel/cantle, side skirts.
+  put(g, 0.88, 0.14, 1.02, SADDLE_DK, 0, 1.62, -0.1);
+  put(g, 0.68, 0.16, 0.82, SADDLE, 0, 1.74, -0.1);
+  put(g, 0.52, 0.14, 0.58, SEATR, 0, 1.82, -0.1);
+  put(g, 0.56, 0.05, 0.64, GOLD, 0, 1.9, -0.1);
+  put(g, 0.36, 0.22, 0.16, SADDLE_DK, 0, 1.92, 0.26);   // pommel
+  put(g, 0.4, 0.05, 0.18, GOLD, 0, 2.03, 0.26);
+  put(g, 0.42, 0.26, 0.16, SADDLE_DK, 0, 1.96, -0.46);  // cantle
+  put(g, 0.46, 0.05, 0.18, GOLD, 0, 2.09, -0.46);
+  put(g, 0.1, 0.42, 0.72, SADDLE, 0.45, 1.48, -0.1);    // side skirts
+  put(g, 0.1, 0.42, 0.72, SADDLE, -0.45, 1.48, -0.1);
+  // Rear saddlebags with gold buckles.
+  for (const s of [1, -1]) {
+    put(g, 0.16, 0.42, 0.36, SADDLE, 0.48 * s, 1.32, -0.6);
+    put(g, 0.18, 0.14, 0.38, SADDLE_DK, 0.48 * s, 1.5, -0.6);
+    put(g, 0.08, 0.1, 0.1, GOLD, 0.55 * s, 1.34, -0.44);
+  }
+
+  // Harness: chest strap + a gold medallion, and a girth band round the barrel.
+  put(g, 0.82, 0.14, 0.14, STRAP, 0, 1.16, 0.86);
+  put(g, 0.14, 0.6, 0.12, STRAP, 0.34, 1.35, 0.7).rotation.x = -0.3;
+  put(g, 0.14, 0.6, 0.12, STRAP, -0.34, 1.35, 0.7).rotation.x = -0.3;
+  put(g, 0.22, 0.22, 0.1, GOLD, 0, 1.02, 0.9);
+  put(g, 0.11, 0.11, 0.12, SADDLE_DK, 0, 1.02, 0.93);
+  put(g, 0.86, 0.14, 0.34, STRAP, 0, 1.18, 0.18);
+
+  return { group: g, legs };
 }

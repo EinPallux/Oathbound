@@ -56,10 +56,11 @@ export function createPlayer(
   world.set<Character>(e, C.Character, {
     radius: 0.4,
     halfHeight: PLAYER_HALF,
-    runSpeed: 6,
-    sprintSpeed: 9.5,
+    runSpeed: 6.6,
     jumpSpeed: 7,
     grounded: true,
+    mounted: false,
+    mountCast: 0,
   });
   world.set(e, C.PlayerControlled, true);
   world.set<Progression>(e, C.Progression, { level: 1, xp: 0, xpToNext: xpToNext(1) });

@@ -9,7 +9,7 @@ export type BindableAction =
   | 'back'
   | 'left'
   | 'right'
-  | 'sprint'
+  | 'mount'
   | 'jump'
   | 'ability1'
   | 'ability2'
@@ -36,7 +36,7 @@ export const DEFAULT_KEYBINDS: Keybinds = {
   back: 'KeyS',
   left: 'KeyA',
   right: 'KeyD',
-  sprint: 'ShiftLeft',
+  mount: 'ShiftLeft',
   jump: 'Space',
   ability1: 'Digit1',
   ability2: 'Digit2',
@@ -63,7 +63,7 @@ export const ACTION_LABEL: Record<BindableAction, string> = {
   back: 'Move back',
   left: 'Strafe left',
   right: 'Strafe right',
-  sprint: 'Sprint',
+  mount: 'Call Mount',
   jump: 'Jump',
   ability1: 'Ability 1',
   ability2: 'Ability 2',
@@ -85,7 +85,7 @@ export const ACTION_LABEL: Record<BindableAction, string> = {
 };
 
 export const ACTION_ORDER: BindableAction[] = [
-  'forward', 'back', 'left', 'right', 'sprint', 'jump',
+  'forward', 'back', 'left', 'right', 'mount', 'jump',
   'ability1', 'ability2', 'ability3', 'ability4', 'ability5',
   'ability6', 'ability7', 'ability8', 'ability9', 'ability10',
   'interact', 'inventory', 'character', 'travel', 'map', 'settings', 'pause',

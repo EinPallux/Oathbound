@@ -76,6 +76,7 @@ import {
   type Oathstone,
   type AbilityState,
   type Velocity,
+  type Character,
 } from '../core/ecs/components';
 import {
   CombatEvent,
@@ -774,8 +775,9 @@ export function boot(options: BootOptions = {}): Game {
       const pv = world.get<Velocity>(player, C.Velocity)!;
       const speed = Math.hypot(pv.x, pv.z);
       const pcId = world.get<PlayerClass>(player, C.PlayerClass)?.id ?? 'warrior';
+      const mounted = world.get<Character>(player, C.Character)?.mounted ?? false;
       playerView.setLabel(playerName, world.get<Progression>(player, C.Progression)?.level ?? 1);
-      playerView.update(x, y, z, yaw, rdt, speed, pcId);
+      playerView.update(x, y, z, yaw, rdt, speed, pcId, mounted);
       ambientLife.update(rdt, x, z, field);
       village?.update(rdt);
       customNpcs?.update(rdt);

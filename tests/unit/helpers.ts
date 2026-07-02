@@ -39,11 +39,11 @@ export function makeInput(): { ctrl: ControlState; state: InputState } {
     back: false,
     left: false,
     right: false,
-    sprint: false,
     yaw: 0,
     pitch: 0.5,
     dist: 10,
     consumeJump: () => false,
+    consumeMount: () => false,
     consumeAbility: () => {
       const a = state.ability;
       state.ability = null;
