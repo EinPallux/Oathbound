@@ -453,6 +453,7 @@ export function pavedSurfaceGeometry(
   heights: ArrayLike<number>,
   res: number,
   size: number,
+  heightAt?: (x: number, z: number) => number,
 ): { positions: Float32Array; uvs: Float32Array; colors: Float32Array; indices: number[] } {
   const half = size / 2;
   const cell = size / (res - 1);
@@ -470,8 +471,10 @@ export function pavedSurfaceGeometry(
       const wx0 = -half + x * cell, wx1 = -half + (x + 1) * cell;
       const wz0 = -half + z * cell, wz1 = -half + (z + 1) * cell;
       const base = pos.length / 3;
+      // In voxel mode `heightAt` snaps each corner to the cube top so the stone texture lays on
+      // the cubes; otherwise the paving follows the smooth heights[] array.
       const corner = (wx: number, wz: number, hh: number, bio: number): void => {
-        pos.push(wx, hh + LIFT, wz);
+        pos.push(wx, (heightAt ? heightAt(wx, wz) : hh) + LIFT, wz);
         uv.push(wx * REPEAT, wz * REPEAT);
         if (bio === 15) col.push(0.74, 0.68, 0.58); // cobblestone — warmer
         else col.push(0.68, 0.68, 0.71); // city / other — cool grey

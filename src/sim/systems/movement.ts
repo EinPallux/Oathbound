@@ -85,8 +85,21 @@ export function createMovementSystem(deps: MovementDeps): System {
         // Resolve against static props (cylinders) then buildings (boxes), then clamp.
         let r = resolveCircleVsCylinders(t.x, t.z, ch.radius, colliders);
         if (boxes && boxes.length) r = resolveCircleVsBoxes(r.x, r.z, ch.radius, boxes);
-        t.x = clamp(r.x, -bound, bound);
-        t.z = clamp(r.z, -bound, bound);
+        let nx = clamp(r.x, -bound, bound);
+        let nz = clamp(r.z, -bound, bound);
+
+        // Voxel ("Cube World") mode: cube side-faces act as walls. While grounded, block a
+        // horizontal move that would raise the ground by more than ~1.5 cube steps, resolved
+        // per-axis so you slide along a cliff instead of sticking. Gentle stepped slopes (one
+        // step) still auto-climb, and jumping (airborne) is unaffected so you can hop up ledges.
+        if (field.voxelCube > 0 && ch.grounded) {
+          const maxStep = field.voxelStep * 1.5 + 0.05;
+          const g0 = field.sample(t.prevX, t.prevZ);
+          if (field.sample(nx, t.prevZ) - g0 > maxStep) nx = t.prevX;
+          if (field.sample(nx, nz) - g0 > maxStep) nz = t.prevZ;
+        }
+        t.x = nx;
+        t.z = nz;
 
         // Ground-snap: the capsule centre sits halfHeight above the terrain.
         const groundY = field.sample(t.x, t.z) + ch.halfHeight;

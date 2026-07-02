@@ -49,6 +49,15 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Adjust the distance fog. Voxel mode pulls it in so the cube bubble's edge is hidden. */
+  setFogRange(near: number, far: number): void {
+    const fog = this.scene.fog as THREE.Fog | null;
+    if (fog) {
+      fog.near = near;
+      fog.far = far;
+    }
+  }
+
   /** Set the render resolution cap (Graphics quality). Applied live, never above native. */
   setMaxPixelRatio(mpr: number): void {
     this.maxPixelRatio = mpr;

@@ -5,6 +5,19 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Voxel terrain v2 — fine cubes, textured tops, real cube collision
+**Goal:** the follow-ups on the Cube World toggle — much finer cubes (the coarse ~23 m blocks made the player look ant-sized), ground textures that read correctly on the cubes, and collision that stands on the cubes instead of clipping through their edges.
+- **Fine cubes via a player-centred bubble** (`render/voxel-terrain.ts`): the map is far too large to voxelize whole at a fine size, but the scene fog only shows a few hundred metres, so the game builds just a bubble of ~3 m cubes around the player and rebuilds it as they roam (the fog hides the edge; the voxel-mode fog is pulled in to match). ~3 m cubes ≈ 1.5× the player instead of ~11×.
+- **Real cube collision** — no longer render-only. `Heightfield` gains a voxel grid: `sample()` snaps to a fixed world cube grid and quantizes (`voxelHeightAt`), so the player, enemies and placed assets all stand on the exact cube tops the renderer draws (render + collision share the one function, so they always agree). Movement adds cube-wall step-blocking (`movement.ts`): grounded moves that would climb more than ~1.5 steps are blocked per-axis, so you slide along cliff faces instead of walking up them — gentle stepped slopes still auto-climb and jumping is unaffected.
+- **Ground textures on the cubes**: `pavedSurfaceGeometry` takes an optional height function, so in voxel mode the City/Cobblestone paved-stone overlay lays on the cube tops (it showed flat grey before). Mirrored in the Map Builder, where the cubic preview is also finer and shows the paving.
+- Settings copy updated ("you walk on the cube tops"). `tests/unit/voxel-collision.test.ts` (snap + quantize + render/collision agreement) and `movement.test.ts` (cube-wall blocking vs smooth climb-through) added.
+
+**Trade-offs (documented):** the voxel bubble rebuilds when the player crosses ~a third of its radius — a brief hitch on that frame (fine on a real GPU; movable to a worker later). Voxel mode pulls the view distance in to the fog bubble (as Cube World does). The Map Builder preview is a whole-map mesh, so huge maps (Talar) show a little coarser there than the game's near-field.
+
+**Verified:** `typecheck` ✓ (both) · `npm test` → 344/344 ✓ · `build` ✓ (both) · headless on Talar: fine cubes on rolling + mountain terrain, cobblestone texture on the plaza cubes, player feet quantized onto cube tops (66.0 → 72.0 across a step); editor shows fine cubes + paving — zero console errors.
+
+---
+
 ## Voxel / "Cube World" terrain toggle (render-only)
 **Goal:** an evaluation toggle to see the world (and the Map Builder) rendered as stepped cubes — Cube World / Trove style — before deciding whether to adopt the theme. Purely a rendering change: the sim, collision, colliders, map format and export are all unchanged.
 - **Shared builder** (`cubicTerrainGeometry`, mirrored `map-format.ts` ↔ Map Builder `map.ts`): pure, three-free geometry — the heightfield sampled onto a grid of flat-topped columns, each height quantized to a step, with vertical side walls dropping to lower neighbours so cliffs show. Flat per-face normals + a per-tile colour give the faceted blocky look (side faces darkened for depth). The renderer passes in the height sampler + colour fn, so one builder serves the procedural world, custom maps, and the editor.

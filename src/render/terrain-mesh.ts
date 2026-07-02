@@ -6,10 +6,14 @@ import * as THREE from 'three';
 import type { Heightfield, CylinderCollider } from '../world/heightfield';
 import { biomeFactors, dominantBiome } from '../world/biomes';
 import { TERRAIN_RENDER_RES } from '../world/layout';
-import { cubicTerrainGeometry } from '../world/map-format';
 
-/** Vertical quantization (metres) for the voxel / Cube-World terrain toggle. */
-export const VOXEL_TERRAIN_STEP = 3;
+// ── Voxel / Cube-World terrain constants (shared by the sim collision grid + the renderer) ──
+/** Horizontal cube size (m). Fine enough to read as "Cube World" (≈1.5× the player). */
+export const VOXEL_CUBE = 3;
+/** Vertical quantization (m) — the height step between stacked cubes. */
+export const VOXEL_STEP = 2;
+/** Half-extent (m) of the fine-cube bubble rendered around the player (≈ the voxel-mode fog far). */
+export const VOXEL_VIEW = 340;
 
 // Per-biome terrain palette (low ground → high ground within each biome).
 const PALETTE = {
@@ -82,41 +86,12 @@ export function buildTerrainMesh(field: Heightfield): THREE.Mesh {
   return mesh;
 }
 
-// ── Voxel / Cube-World terrain (render-only toggle) ──────────────────────────
+// The voxel terrain itself is a player-centred bubble — see render/voxel-terrain.ts.
 const _tc = new THREE.Color();
-/** Procedural-world terrain colour as an [r,g,b] tuple — the colour source for the voxel mesh. */
+/** Procedural-world terrain colour as an [r,g,b] tuple — the colour source for the voxel cubes. */
 export function terrainColorRGB(x: number, z: number, h: number, out: [number, number, number]): void {
   terrainColor(x, z, h, _tc);
   out[0] = _tc.r; out[1] = _tc.g; out[2] = _tc.b;
-}
-
-/** Cube grid resolution for a field — matches the smooth mesh's render tessellation. */
-export function cubicCellsForField(field: Heightfield): number {
-  return Math.min(field.res - 1, TERRAIN_RENDER_RES - 1);
-}
-
-/**
- * Build the terrain as a grid of stepped cubes (the "Cube World" look) instead of a smooth
- * mesh. `colorAt` supplies each tile-top's colour (procedural or custom-map palette), so this
- * one builder serves both worlds. Named 'terrain', so it swaps in for the smooth mesh 1:1.
- */
-export function buildCubicTerrainMesh(
-  field: Heightfield,
-  colorAt: (x: number, z: number, h: number, out: [number, number, number]) => void,
-  step: number = VOXEL_TERRAIN_STEP,
-): THREE.Mesh {
-  const { positions, normals, colors, indices } = cubicTerrainGeometry(
-    field.size, cubicCellsForField(field), step, (x, z) => field.sample(x, z), colorAt,
-  );
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geo.setIndex(new THREE.BufferAttribute(indices, 1));
-  geo.computeBoundingSphere();
-  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
-  mesh.name = 'terrain';
-  return mesh;
 }
 
 // Biome tints for the collidable rocks.
