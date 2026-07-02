@@ -40,6 +40,16 @@ export class Heightfield {
   readonly heights: Float32Array;
   private readonly cell: number;
 
+  /**
+   * Voxel / "Cube World" collision grid. When `voxelCube > 0`, {@link sample} snaps to a fixed
+   * world grid of `voxelCube`-metre cells and quantizes the height to `voxelStep`, so the player,
+   * enemies and placed assets all stand on the exact flat cube tops the renderer draws (no more
+   * clipping through the smooth surface). 0 = smooth terrain (default). Set by the renderer/boot.
+   */
+  voxelCube = 0;
+  /** Vertical quantization (m) for the voxel grid; 0 = no vertical stepping. */
+  voxelStep = 0;
+
   constructor(size: number, res: number, heights: Float32Array) {
     this.size = size;
     this.res = res;
@@ -47,8 +57,8 @@ export class Heightfield {
     this.cell = size / (res - 1);
   }
 
-  /** Bilinearly sample the terrain height at world (x, z); clamps to edges. */
-  sample(x: number, z: number): number {
+  /** Raw bilinear terrain height at world (x, z) — the smooth surface; clamps to edges. */
+  private raw(x: number, z: number): number {
     const half = this.size / 2;
     const fx = (x + half) / this.cell;
     const fz = (z + half) / this.cell;
@@ -65,6 +75,28 @@ export class Heightfield {
     const a = h00 + (h10 - h00) * tx;
     const b = h01 + (h11 - h01) * tx;
     return a + (b - a) * tz;
+  }
+
+  /**
+   * Ground height for collision & placement. Smooth (bilinear) by default; in voxel mode it
+   * returns the flat top of the cube containing (x, z) — snapped to the fixed cube grid and
+   * quantized — so gameplay sits exactly on the rendered cubes.
+   */
+  sample(x: number, z: number): number {
+    return this.voxelCube > 0 ? this.voxelHeightAt(x, z) : this.raw(x, z);
+  }
+
+  /**
+   * Flat top height of the voxel cube containing (x, z): snap to the fixed `voxelCube` grid
+   * (cell centres at (k+0.5)·cube), sample there, quantize to `voxelStep`. The renderer builds
+   * its cubes from this exact function, so collision and the visible cubes always agree.
+   */
+  voxelHeightAt(x: number, z: number): number {
+    if (this.voxelCube <= 0) return this.raw(x, z);
+    const cx = (Math.floor(x / this.voxelCube) + 0.5) * this.voxelCube;
+    const cz = (Math.floor(z / this.voxelCube) + 0.5) * this.voxelCube;
+    const h = this.raw(cx, cz);
+    return this.voxelStep > 0 ? Math.round(h / this.voxelStep) * this.voxelStep : h;
   }
 }
 

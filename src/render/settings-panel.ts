@@ -88,7 +88,7 @@ export class SettingsPanel {
     });
     const vHint = document.createElement('div');
     vHint.className = 'inv-hint';
-    vHint.textContent = 'Renders the ground as stepped cubes. Visual only — collision is unchanged.';
+    vHint.textContent = 'Renders the world as fine cubes (Cube World style); you walk on the cube tops.';
     groups.appendChild(vHint);
 
     groups.appendChild(this.sectionHead('Combat text'));
