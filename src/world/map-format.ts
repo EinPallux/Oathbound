@@ -486,6 +486,89 @@ export function pavedSurfaceGeometry(
   return { positions: Float32Array.from(pos), uvs: Float32Array.from(uv), colors: Float32Array.from(col), indices };
 }
 
+/**
+ * Voxel / "Cube World" terrain geometry: the heightfield rendered as a grid of flat-topped
+ * columns (cubes) instead of a smooth mesh. Each of `cells`×`cells` square tiles gets a flat
+ * top quad at its height quantized to `step` metres, plus vertical side walls dropping to any
+ * lower neighbour so cliffs and steps show. Flat per-face normals + a per-tile colour give the
+ * faceted blocky look; side faces are the tile colour darkened for depth.
+ *
+ * Render-only and pure (no three): the renderer supplies `sampleHeight` (terrain height at a
+ * world x,z — the same sampler the smooth mesh uses, so landforms match) and `colorAt` (writes
+ * the tile-top colour into an [r,g,b] scratch). Duplicated in the Map Builder — keep in sync.
+ */
+export function cubicTerrainGeometry(
+  size: number,
+  cells: number,
+  step: number,
+  sampleHeight: (x: number, z: number) => number,
+  colorAt: (x: number, z: number, h: number, out: [number, number, number]) => void,
+  sideDarken = 0.7,
+): { positions: Float32Array; normals: Float32Array; colors: Float32Array; indices: Uint32Array } {
+  const half = size / 2;
+  const t = size / cells;
+  const n = cells * cells;
+  const H = new Float32Array(n); // quantized height per tile
+  const CR = new Float32Array(n), CG = new Float32Array(n), CB = new Float32Array(n);
+  const rgb: [number, number, number] = [0, 0, 0];
+  for (let iz = 0; iz < cells; iz++) {
+    for (let ix = 0; ix < cells; ix++) {
+      const cx = -half + (ix + 0.5) * t;
+      const cz = -half + (iz + 0.5) * t;
+      const raw = sampleHeight(cx, cz);
+      const k = iz * cells + ix;
+      H[k] = step > 0 ? Math.round(raw / step) * step : raw;
+      colorAt(cx, cz, H[k], rgb);
+      CR[k] = rgb[0]; CG[k] = rgb[1]; CB[k] = rgb[2];
+    }
+  }
+
+  const pos: number[] = [], nrm: number[] = [], col: number[] = [], idx: number[] = [];
+  // Push a quad a→b→c→d (wound CCW as seen from the +normal side) with a flat normal + colour.
+  const quad = (
+    ax: number, ay: number, az: number, bx: number, by: number, bz: number,
+    cx: number, cy: number, cz: number, dx: number, dy: number, dz: number,
+    nx: number, ny: number, nz: number, r: number, g: number, b: number,
+  ): void => {
+    const base = pos.length / 3;
+    pos.push(ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz);
+    for (let i = 0; i < 4; i++) { nrm.push(nx, ny, nz); col.push(r, g, b); }
+    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  };
+
+  for (let iz = 0; iz < cells; iz++) {
+    for (let ix = 0; ix < cells; ix++) {
+      const k = iz * cells + ix;
+      const y = H[k];
+      const x0 = -half + ix * t, x1 = x0 + t;
+      const z0 = -half + iz * t, z1 = z0 + t;
+      const r = CR[k], g = CG[k], b = CB[k];
+      const dr = r * sideDarken, dg = g * sideDarken, db = b * sideDarken;
+
+      // Flat top (normal +y).
+      quad(x0, y, z0, x0, y, z1, x1, y, z1, x1, y, z0, 0, 1, 0, r, g, b);
+
+      // Vertical walls dropping to any lower neighbour (emit from the higher tile only, so each
+      // cliff is drawn once). Map-edge tiles get no outer skirt.
+      const hxp = ix + 1 < cells ? H[k + 1] : y;
+      if (y > hxp) quad(x1, y, z0, x1, y, z1, x1, hxp, z1, x1, hxp, z0, 1, 0, 0, dr, dg, db);
+      const hxn = ix - 1 >= 0 ? H[k - 1] : y;
+      if (y > hxn) quad(x0, y, z1, x0, y, z0, x0, hxn, z0, x0, hxn, z1, -1, 0, 0, dr, dg, db);
+      const hzp = iz + 1 < cells ? H[k + cells] : y;
+      if (y > hzp) quad(x1, y, z1, x0, y, z1, x0, hzp, z1, x1, hzp, z1, 0, 0, 1, dr, dg, db);
+      const hzn = iz - 1 >= 0 ? H[k - cells] : y;
+      if (y > hzn) quad(x0, y, z0, x1, y, z0, x1, hzn, z0, x0, hzn, z0, 0, 0, -1, dr, dg, db);
+    }
+  }
+
+  return {
+    positions: Float32Array.from(pos),
+    normals: Float32Array.from(nrm),
+    colors: Float32Array.from(col),
+    indices: Uint32Array.from(idx),
+  };
+}
+
 // base64 that works in both the browser (btoa/atob) and Node (Buffer), so the
 // format module is usable from the game's tests too.
 function base64Encode(bin: string): string {

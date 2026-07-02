@@ -21,6 +21,7 @@ import {
   customSpawns,
   customBosses,
   customSceneryForMinimap,
+  biomeIndexAt,
 } from '../world/custom-map';
 import {
   VILLAGE_FLAT,
@@ -93,9 +94,9 @@ import {
 } from '../sim/combat/events';
 import type { TelemetrySnapshot } from '../sim/telemetry';
 import { Rng } from '../core/rng';
-import { buildTerrainMesh, buildProps } from '../render/terrain-mesh';
+import { buildTerrainMesh, buildProps, buildCubicTerrainMesh, terrainColorRGB } from '../render/terrain-mesh';
 import { buildScenery } from '../render/scenery-view';
-import { buildCustomTerrainMesh, buildCustomScenery } from '../render/custom-map-view';
+import { buildCustomTerrainMesh, buildCustomScenery, colorForBiome } from '../render/custom-map-view';
 import { CustomNpcs } from '../render/custom-npcs';
 import { CustomCritters } from '../render/custom-critters';
 import { QuestLog } from './quests';
@@ -259,7 +260,6 @@ export function boot(options: BootOptions = {}): Game {
     field = buildCustomHeightfield(customMap);
     const assetCols = customColliders(customMap);
     const boxCols = customBoxColliders(customMap); // building/wall footprints
-    renderer.scene.add(buildCustomTerrainMesh(field, customMap));
     renderer.scene.add(buildCustomScenery(customMap, field));
     scenery = customSceneryForMinimap(customMap);
     props = new THREE.Group(); // custom maps add no separate collidable-rock mesh
@@ -281,7 +281,6 @@ export function boot(options: BootOptions = {}): Game {
     // Collidable rocks (the only physical props — scenery below is purely visual). Count
     // scales with the larger world; the generator keeps them clear of the spawn.
     colliders = [...generateColliders(WORLD_SIZE, 160, 99), ...villageCylinders()];
-    renderer.scene.add(buildTerrainMesh(field));
     const rocks = buildProps(colliders, field);
     renderer.scene.add(rocks);
     props = rocks;
@@ -298,7 +297,27 @@ export function boot(options: BootOptions = {}): Game {
     scenery = generateScenery(WORLD_SIZE, { clearings, roadTargets, seed: 7777 });
     renderer.scene.add(buildScenery(scenery, field));
   }
-  const terrain = renderer.scene.getObjectByName('terrain')!;
+  // Terrain mesh — smooth by default, or stepped cubes ("Cube World") when the voxel-terrain
+  // setting is on. Built here (not in the branches above) so it can be swapped live when the
+  // setting toggles. Render-only: the heightfield + colliders above are identical either way,
+  // so movement/collision don't change. ?voxel=1 / ?voxel=0 overrides the saved setting.
+  const voxelOverride = new URLSearchParams(location.search).get('voxel');
+  if (voxelOverride != null) settings.voxelTerrain = !(voxelOverride === '0' || voxelOverride === 'off' || voxelOverride === 'false');
+  const _terrCol = new THREE.Color();
+  const cm = customMap; // non-null capture for the colour closure
+  const customColorAt = cm
+    ? (x: number, z: number, h: number, out: [number, number, number]): void => {
+        colorForBiome(biomeIndexAt(cm, x, z), h, x, z, _terrCol);
+        out[0] = _terrCol.r; out[1] = _terrCol.g; out[2] = _terrCol.b;
+      }
+    : null;
+  const makeTerrain = (voxel: boolean): THREE.Mesh => {
+    if (cm && customColorAt) return voxel ? buildCubicTerrainMesh(field, customColorAt) : buildCustomTerrainMesh(field, cm);
+    return voxel ? buildCubicTerrainMesh(field, terrainColorRGB) : buildTerrainMesh(field);
+  };
+  let terrain = makeTerrain(settings.voxelTerrain);
+  let voxelApplied = settings.voxelTerrain;
+  renderer.scene.add(terrain);
 
   // Entities.
   const world = new World();
@@ -408,7 +427,18 @@ export function boot(options: BootOptions = {}): Game {
   const playerView = new PlayerView(renderer.scene);
   const ambientLife = new AmbientLife(renderer.scene);
   // Buildings join the camera's occlusion obstacles so the chase camera springs off walls.
-  const cameraRig = new CameraRig(renderer.camera, input, [terrain, props, ...(village ? [village.buildings] : [])]);
+  // The array is mutable so a live terrain swap (voxel toggle) can replace the terrain entry.
+  const cameraObstacles: THREE.Object3D[] = [terrain, props, ...(village ? [village.buildings] : [])];
+  const cameraRig = new CameraRig(renderer.camera, input, cameraObstacles);
+  // Rebuild + swap the terrain mesh in place when the voxel-terrain setting toggles.
+  const applyVoxelTerrain = (): void => {
+    renderer.scene.remove(terrain);
+    terrain.geometry.dispose();
+    (terrain.material as THREE.Material).dispose();
+    terrain = makeTerrain(settings.voxelTerrain);
+    renderer.scene.add(terrain);
+    cameraObstacles[0] = terrain; // keep the camera's occlusion ray pointing at the live mesh
+  };
   const enemyView = new EnemyView(renderer.scene);
   const lootView = new LootView(renderer.scene);
   const projectileView = new ProjectileView(renderer.scene, projectiles);
@@ -436,6 +466,10 @@ export function boot(options: BootOptions = {}): Game {
     renderer.setMaxPixelRatio(settings.maxPixelRatio);
     applyVolume();
     input.setLook(settings.mouseSensitivity, settings.invertY);
+    if (settings.voxelTerrain !== voxelApplied) {
+      voxelApplied = settings.voxelTerrain;
+      applyVoxelTerrain();
+    }
   };
   settingsPanel.onKeybindsChange = () => {
     saveKeybinds(keybinds);

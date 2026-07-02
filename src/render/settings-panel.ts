@@ -34,6 +34,7 @@ export class SettingsPanel {
   private volume!: HTMLInputElement;
   private sensitivity!: HTMLInputElement;
   private invertY!: HTMLInputElement;
+  private voxel!: HTMLInputElement;
   private keybindsList!: HTMLDivElement;
   private captureHandler: ((e: KeyboardEvent) => void) | null = null;
 
@@ -81,6 +82,14 @@ export class SettingsPanel {
     qHint.className = 'inv-hint';
     qHint.textContent = 'Lower this for more FPS on weaker GPUs.';
     groups.appendChild(qHint);
+    this.voxel = this.checkRow(groups, 'Voxel terrain (Cube World style)', () => {
+      this.settings.voxelTerrain = this.voxel.checked;
+      this.onChange();
+    });
+    const vHint = document.createElement('div');
+    vHint.className = 'inv-hint';
+    vHint.textContent = 'Renders the ground as stepped cubes. Visual only — collision is unchanged.';
+    groups.appendChild(vHint);
 
     groups.appendChild(this.sectionHead('Combat text'));
     this.dmgOn = this.checkRow(groups, 'Show damage numbers', () => {
@@ -284,6 +293,7 @@ export class SettingsPanel {
     this.volume.value = String(Math.round(this.settings.masterVolume * 100));
     this.sensitivity.value = String(Math.round(this.settings.mouseSensitivity * 100));
     this.invertY.checked = this.settings.invertY;
+    this.voxel.checked = this.settings.voxelTerrain;
     this.renderKeybinds();
   }
 
