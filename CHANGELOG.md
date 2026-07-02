@@ -13,6 +13,7 @@ Each entry is an **independently testable build**. After each phase, work pauses
   - **Priest** — a **hooded cream robe** with gold trim, a blue front panel + **gold cross**, an ornate gem-studded gold mantle, wide sleeves, a long robe skirt, and a **gold-framed glowing-gem staff** (the staff gem keeps the cast-flash emissive).
 - **Bigger avatar:** a new `MODEL_SCALE = 1.22` uniformly enlarges the figure (feet stay grounded on the terrain); the overhead nameplate floats up to match.
 - **Editor mirror:** the Map Builder's Player-Spawn **size reference** (`src/oathbound/player-model.ts`) now renders the new warrior at the same scale, and the spawn marker reads `~3.0m (1:1)`.
+- **Owner polish pass:** dropped the Ranger's back cape; every class now holds its weapon at a shared **~65°-above-ground** forward angle (`HOLD_ANGLE`) instead of dead-vertical/point-down; the Warrior's **sword is beefier** and its **kite shield bigger + turned 50° to the side** (`SHIELD_ANGLE`); and the Priest lost the odd leg-skirt in favour of full robed legs + a short blue front drape (shoes with a gold ankle trim peek out).
 
 **Verified:** `typecheck` ✓ (both repos) · `npm test` → 344/344 ✓ · `build` ✓ (both repos) · headless renders of the **shipped** `player-view.ts` (all three classes from front / ¾ / back) and of the editor's `buildPlayerModel()` — models match the reference art with clean silhouettes, no clipping, and zero console errors.
 

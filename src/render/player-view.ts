@@ -24,6 +24,11 @@ const FEET = 0.9; // = PLAYER_HALF
 const MODEL_SCALE = 1.22;
 /** Unscaled height (m) to the top of the head — used to float the nameplate above the model. */
 const HEAD_TOP = 2.42;
+/** Rest tilt for a held weapon: leaned so it sits at ~65° above the ground (i.e. 25° off
+ *  vertical) — a clean forward diagonal, shared so all three classes match. */
+const HOLD_ANGLE = ((90 - 65) * Math.PI) / 180;
+/** Sideways tilt for the warrior's shield. */
+const SHIELD_ANGLE = (50 * Math.PI) / 180;
 
 const SKIN = 0xd9a878;
 const HAIR = 0x6b4526;
@@ -257,26 +262,28 @@ export class PlayerView {
     put(back, 0.13, 0.13, 0.13, GOLD, 0, 0.9, 0);
     b.add(back);
 
-    // Sword in the right hand, pointing down at rest (swings up on attack).
+    // Bigger (beefier) sword in the right hand, held at a forward angle (swings up on attack).
     const sword = new THREE.Group();
-    sword.position.set(0, -0.9, 0.14);
-    put(sword, 0.11, 0.11, 0.11, GOLD, 0, 0.14, 0);       // pommel
-    put(sword, 0.08, 0.24, 0.08, LEATHER, 0, 0, 0);        // grip
-    put(sword, 0.36, 0.1, 0.11, GOLD, 0, -0.15, 0);        // crossguard
-    put(sword, 0.14, 0.88, 0.05, BLADE, 0, -0.62, 0, 0.3); // blade
-    put(sword, 0.1, 0.18, 0.05, BLADE, 0, -1.12, 0, 0.3);  // tip
+    sword.position.set(0, -0.84, 0.16);
+    sword.rotation.x = -HOLD_ANGLE;
+    put(sword, 0.15, 0.15, 0.15, GOLD, 0, 0.18, 0);        // pommel
+    put(sword, 0.1, 0.3, 0.1, LEATHER, 0, 0, 0);           // grip
+    put(sword, 0.5, 0.14, 0.15, GOLD, 0, -0.2, 0);         // crossguard
+    put(sword, 0.2, 0.82, 0.07, BLADE, 0, -0.63, 0, 0.3);  // blade (wider)
+    put(sword, 0.14, 0.22, 0.07, BLADE, 0, -1.14, 0, 0.3); // tip
     this.armR.add(sword);
 
-    // Navy kite shield with a gold border + gold diamond emblem, on the left forearm.
+    // Bigger navy kite shield (gold border + gold diamond emblem) angled out to the side.
     const shield = new THREE.Group();
-    shield.position.set(0, -0.5, 0.24);
-    put(shield, 0.66, 1.02, 0.06, GOLD, 0, 0.02, -0.02);   // gold border (shows around the plates)
-    put(shield, 0.58, 0.5, 0.08, SHIELD, 0, 0.22, 0.02);
-    put(shield, 0.5, 0.4, 0.08, SHIELD, 0, -0.18, 0.02);
-    put(shield, 0.3, 0.32, 0.08, SHIELD, 0, -0.52, 0.02);
-    put(shield, 0.16, 0.44, 0.05, GOLD, 0, 0.02, 0.08);    // emblem: vertical bar
-    put(shield, 0.24, 0.24, 0.05, GOLD, 0, 0.02, 0.08).rotation.z = Math.PI / 4; // emblem: diamond
-    put(shield, 0.12, 0.12, 0.06, SHIELD, 0, 0.02, 0.1).rotation.z = Math.PI / 4; // diamond centre
+    shield.position.set(0.14, -0.5, 0.2);
+    shield.rotation.y = SHIELD_ANGLE;
+    put(shield, 0.84, 1.3, 0.07, GOLD, 0, 0.02, -0.02);    // gold border (shows around the plates)
+    put(shield, 0.74, 0.64, 0.09, SHIELD, 0, 0.28, 0.02);
+    put(shield, 0.64, 0.5, 0.09, SHIELD, 0, -0.22, 0.02);
+    put(shield, 0.4, 0.42, 0.09, SHIELD, 0, -0.66, 0.02);
+    put(shield, 0.2, 0.56, 0.05, GOLD, 0, 0.02, 0.09);     // emblem: vertical bar
+    put(shield, 0.3, 0.3, 0.05, GOLD, 0, 0.02, 0.09).rotation.z = Math.PI / 4; // emblem: diamond
+    put(shield, 0.15, 0.15, 0.06, SHIELD, 0, 0.02, 0.12).rotation.z = Math.PI / 4; // diamond centre
     this.armL.add(shield);
   }
 
@@ -338,12 +345,6 @@ export class PlayerView {
       put(leg, 0.36, 0.14, 0.18, LEATHER_DK, 0, -0.88, 0.24);
     }
 
-    // Flowing green cloak behind (root-parented, swept to one side).
-    put(this.group, 0.9, 1.7, 0.08, GREEN, 0, 1.05, -0.32);
-    put(this.group, 1.02, 0.5, 0.08, GREEN_DK, 0.04, 0.32, -0.34);
-    put(this.group, 0.5, 0.95, 0.08, GREEN, 0.5, 0.7, -0.3).rotation.z = 0.28;
-    put(this.group, 0.42, 0.06, 0.09, GOLD, 0, 0.24, -0.34);
-
     // Quiver of arrows over the right shoulder (on the body).
     const quiver = new THREE.Group();
     quiver.position.set(-0.34, 1.5, -0.28);
@@ -356,10 +357,11 @@ export class PlayerView {
     }
     b.add(quiver);
 
-    // Recurve wooden bow carried in the left hand — gripped mid-riser, D-profile facing
-    // forward so it reads as a bow from the front (and in profile from behind in-game).
+    // Recurve wooden bow carried in the left hand — gripped mid-riser, tilted to a forward
+    // angle (matches the other classes) so it reads dynamically instead of dead-vertical.
     const bow = new THREE.Group();
     bow.position.set(0.18, -0.86, 0.2);
+    bow.rotation.x = HOLD_ANGLE;
     put(bow, 0.1, 0.5, 0.1, WOOD, 0, 0, 0);               // riser (grip, at the hand)
     put(bow, 0.07, 0.5, 0.08, WOOD, 0, 0.44, 0.07).rotation.x = -0.4;  // upper limb (bows forward)
     put(bow, 0.06, 0.32, 0.07, WOOD, 0, 0.74, 0.03).rotation.x = 0.5;  // upper tip (recurves back)
@@ -420,24 +422,23 @@ export class PlayerView {
       put(arm, 0.24, 0.2, 0.28, BELT, 0, -0.86, 0);
     }
 
-    // Short lower legs + shoes (the robe skirt hides the thighs).
+    // Full robed legs (cream) + shoes with a gold ankle trim (no separate skirt).
     for (const leg of [this.legL, this.legR]) {
-      put(leg, 0.3, 0.42, 0.34, ROBE_SH, 0, -0.6, 0);
-      put(leg, 0.34, 0.2, 0.44, BELT, 0, -0.84, 0.06);
+      put(leg, 0.36, 0.72, 0.4, ROBE, 0, -0.42, 0);
+      put(leg, 0.37, 0.06, 0.42, ROBE_SH, 0, -0.06, 0);
+      put(leg, 0.34, 0.24, 0.46, BELT, 0, -0.84, 0.06);
+      put(leg, 0.35, 0.05, 0.47, GOLD, 0, -0.72, 0.06);
     }
+    // Short blue front drape from the belt (keeps the robe's blue + gold front, no leg skirt).
+    put(this.group, 0.32, 0.66, 0.1, BLUE, 0, 0.62, 0.24);
+    put(this.group, 0.05, 0.66, 0.11, GOLD, 0.17, 0.62, 0.24);
+    put(this.group, 0.05, 0.66, 0.11, GOLD, -0.17, 0.62, 0.24);
+    put(this.group, 0.34, 0.06, 0.12, GOLD, 0, 0.31, 0.24);
 
-    // Long cream robe skirt (root-parented) with a blue front panel + gold hem.
-    put(this.group, 0.92, 0.98, 0.58, ROBE, 0, 0.56, 0);
-    put(this.group, 1.04, 0.32, 0.64, ROBE_LT, 0, 0.2, 0);
-    put(this.group, 0.32, 0.94, 0.6, BLUE, 0, 0.55, 0.02);
-    put(this.group, 0.05, 0.94, 0.61, GOLD, 0.17, 0.55, 0.03);
-    put(this.group, 0.05, 0.94, 0.61, GOLD, -0.17, 0.55, 0.03);
-    put(this.group, 1.06, 0.08, 0.65, GOLD, 0, 0.09, 0);
-
-    // Ornate staff in the right hand: dark shaft, gold rings, a diamond frame + glowing gem.
+    // Ornate staff in the right hand, held at a forward angle (matches the other classes).
     const staff = new THREE.Group();
     staff.position.set(0, -0.82, 0.12);
-    staff.rotation.set(0.12, 0, 0.1);
+    staff.rotation.set(HOLD_ANGLE, 0, 0.1);
     put(staff, 0.08, 2.0, 0.08, STAFF, 0, 0.5, 0);
     put(staff, 0.1, 0.07, 0.1, GOLD, 0, 0.0, 0);
     put(staff, 0.1, 0.07, 0.1, GOLD, 0, 0.7, 0);
