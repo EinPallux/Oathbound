@@ -5,6 +5,18 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Wolf mount + faster travel (owner-requested)
+**Goal:** replace hold-Shift *sprint* with a summonable **wolf mount**, nudge base walk speed up, and refine the priest/ranger weapon holds.
+- **Faster on foot:** base `runSpeed` 6 → **6.6**.
+- **Call Mount (Shift):** sprint is gone; **Shift** now toggles a mount. Off a mount, Shift starts a **2-second summon channel** (any movement cancels it) — shown on the HUD cast bar; on completion a **wolf** appears and you ride it at **+60% move speed**. Pressing **Shift** while mounted **dismounts instantly**. Pure sim state on `Character` (`mounted`, `mountCast`); the movement system owns the toggle/channel/speed (`MOUNT_CAST_TIME`, `MOUNT_SPEED_MULT`). Input turned the held `sprint` flag into a `consumeMount()` press; the keybind/label is now **`mount` → "Call Mount"** (still Shift).
+- **The wolf** (`src/render/player-view.ts`, `buildWolf`): a chunky voxel dire-wolf voxelised from the reference — grey back, cream underside/legs, amber eyes, pointed ears, bushy tail, with a leather saddle (gold trim), a chest harness + gold medallion, and rear saddlebags. It has a 4-leg diagonal **trot** driven by speed, persists across class switches, and is hidden until you ride.
+- **Rider on the mount:** the whole rider now lives under a liftable `figure` group; while mounted it lifts onto the saddle, the legs drop **astride** down the wolf's sides (splayed, not walking), the body sits upright, and the nameplate floats higher — the blend is smoothed so mount/dismount isn't a pop. Verified from front/¾/side for all three classes: no clipping, weapons hang naturally.
+- **Weapon holds:** the Priest now grips the staff at the **middle** of the shaft and at a **bolder angle**; the Ranger's **bow is bigger and more vertical**, and the **quiver is enlarged to span the whole back**.
+
+**Verified:** `typecheck` ✓ · `npm test` → 344/344 ✓ · `build` ✓ · headless renders of the shipped `player-view.ts` (all classes, on-foot + mounted — no clipping) + an in-game `?autostart` smoke test: **Shift summons the wolf, mounted move speed is higher, Shift dismounts** — zero console errors. e2e: the movement test (`WASD moves the player`) passes; the enemy-spawn-dependent e2e tests time out on the Talar/Cube-World `?autostart` map — a **pre-existing** failure (confirmed identical on the base branch with this change stashed; they wait for enemies that don't spawn near the autostart point), unrelated to this change.
+
+---
+
 ## New class player models (owner-requested — voxelised from reference art)
 **Goal:** replace the plain blocky avatars with detailed, Cube-World-style class models matching owner-supplied reference art, and scale the avatar up a touch so the extra detail doesn't look squished.
 - **Rebuilt `src/render/player-view.ts`** — each class is now a richly voxel-skinned figure on the **same animation rig** (walk / idle / one-shot swing-draw-cast untouched, still driven by `AbilityUsed`; still purely cosmetic — equipped gear deliberately doesn't show):

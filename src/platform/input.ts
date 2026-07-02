@@ -11,7 +11,6 @@ export interface ControlState {
   back: boolean;
   left: boolean;
   right: boolean;
-  sprint: boolean;
   /** Camera/movement yaw (radians). */
   yaw: number;
   /** Camera pitch (radians). */
@@ -20,6 +19,8 @@ export interface ControlState {
   dist: number;
   /** Returns true once if a jump was requested since the last call. */
   consumeJump(): boolean;
+  /** Returns true once if the mount toggle (Shift) was pressed (summon / dismount). */
+  consumeMount(): boolean;
   /** Returns a queued ability index (0-based) requested since the last call, or null. */
   consumeAbility(): number | null;
   /** Returns true once if Tab (cycle target) was pressed since the last call. */
@@ -48,12 +49,12 @@ export class InputController implements ControlState {
   back = false;
   left = false;
   right = false;
-  sprint = false;
   yaw = 0;
   pitch = 0.5;
   dist = 10;
 
   private jumpQueued = false;
+  private mountQueued = false;
   private pauseQueued = false;
   private abilityQueued: number | null = null;
   private cycleQueued = false;
@@ -166,7 +167,7 @@ export class InputController implements ControlState {
       if (code) this.codeToAction.set(code, action);
     }
     // Drop any held movement so a rebind mid-press can't leave a key stuck "down".
-    this.forward = this.back = this.left = this.right = this.sprint = false;
+    this.forward = this.back = this.left = this.right = false;
   }
 
   /** Mouse-look options: sensitivity multiplier + invert vertical axis. */
@@ -223,8 +224,8 @@ export class InputController implements ControlState {
       case 'right':
         this.right = down;
         break;
-      case 'sprint':
-        this.sprint = down;
+      case 'mount':
+        if (down) this.mountQueued = true;
         break;
       case 'jump':
         if (down) this.jumpQueued = true;
@@ -257,6 +258,12 @@ export class InputController implements ControlState {
     const j = this.jumpQueued;
     this.jumpQueued = false;
     return j;
+  }
+
+  consumeMount(): boolean {
+    const m = this.mountQueued;
+    this.mountQueued = false;
+    return m;
   }
 
   consumePauseToggle(): boolean {

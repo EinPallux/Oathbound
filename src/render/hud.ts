@@ -16,8 +16,10 @@ import {
   type PlayerClass,
   type Shield,
   type CastState,
+  type Character,
 } from '../core/ecs/components';
 import { getClass, resolveKit, empowerKit } from '../sim/classes';
+import { MOUNT_CAST_TIME } from '../sim/systems/movement';
 import { hasStatus, Status } from '../sim/combat/statuses';
 import { icon } from './ui/icons';
 
@@ -258,12 +260,16 @@ export class Hud {
       }
     }
 
-    // Cast bar (Searing Light etc.).
+    // Cast bar (Searing Light etc., or the "Call Mount" summon channel).
     const castState = world.get<CastState>(player, C.CastState);
+    const mountCast = world.get<Character>(player, C.Character)?.mountCast ?? 0;
     if (castState) {
       const ct = abilities[castState.index]?.castTime ?? 1;
       this.castBar.style.display = 'block';
       this.castFill.style.width = `${Math.min(1, 1 - castState.remaining / ct) * 100}%`;
+    } else if (mountCast > 0) {
+      this.castBar.style.display = 'block';
+      this.castFill.style.width = `${Math.min(1, 1 - mountCast / MOUNT_CAST_TIME) * 100}%`;
     } else {
       this.castBar.style.display = 'none';
     }
