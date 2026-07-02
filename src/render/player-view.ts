@@ -1,32 +1,33 @@
-// The player's avatar: a chunky, low-poly, blocky humanoid built from primitives (no
-// asset files) with a class-distinct weapon — Warrior sword + shield, Hunter bow, Priest
-// staff — so other players can read your class at a glance. Bold and simple on purpose
-// (few parts, solid colours). Animated procedurally: a walk cycle + idle breathing driven
-// by speed, and a one-shot swing/draw/cast motion triggered by the AbilityUsed sim event.
-// Render-only; the simulation is unaware of it.
+// The player's avatar: a chunky, voxel-style humanoid built from box primitives (no asset
+// files), skinned per class to read at a glance — a plate Warrior with sword + kite shield,
+// a cloaked Ranger with bow + quiver, a robed Priest with a glowing staff. Bold, blocky and
+// solid-coloured to match the game's Cube World look. Animated procedurally: a walk cycle +
+// idle breathing driven by speed, and a one-shot swing/draw/cast motion triggered by the
+// AbilityUsed sim event. Render-only; the simulation is unaware of it.
 //
-// Non-destructive note: weapons here are purely cosmetic class identity. They are NOT the
-// equipped item — equipped armour/weapons intentionally don't show on the model (yet), so
-// a later "show equipped gear" feature can layer on without conflicting with this.
+// Non-destructive note: the class kit (armour + weapon) here is purely cosmetic class
+// identity, NOT the equipped item — equipped gear intentionally doesn't show on the model
+// (yet), so a later "show equipped gear" feature can layer on without conflicting.
+//
+// The rig: a `body` group (torso/head/arms/pauldrons — bobs/leans/spins) with two arm pivots
+// at the shoulders; two leg pivots parented to the root so they stay grounded while the body
+// bobs; static drapery (tabards/cloaks/robe skirt) is parented to the root so it hangs clean
+// over the swinging legs. Feet sit at local y=0; the whole figure is uniformly scaled by
+// MODEL_SCALE (owner-requested: a touch bigger so the detailed models don't look squished).
 
 import * as THREE from 'three';
 import type { ClassId } from '../core/ecs/components';
 
 /** Vertical offset from the Transform centre (capsule centre) down to the feet. */
 const FEET = 0.9; // = PLAYER_HALF
-
-interface Palette {
-  torso: number;
-  limb: number;
-  head: number;
-}
+/** Uniform visual scale of the whole avatar (feet stay grounded — the group origin is at the feet). */
+const MODEL_SCALE = 1.22;
+/** Unscaled height (m) to the top of the head — used to float the nameplate above the model. */
+const HEAD_TOP = 2.42;
 
 const SKIN = 0xd9a878;
-const PALETTES: Record<ClassId, Palette> = {
-  warrior: { torso: 0x4a5670, limb: 0x39435a, head: SKIN },
-  hunter: { torso: 0x3f6b44, limb: 0x2f4d34, head: SKIN },
-  priest: { torso: 0xeae4d4, limb: 0xd6cfbc, head: SKIN },
-};
+const HAIR = 0x6b4526;
+const BROW = 0x4a3018;
 
 function box(w: number, h: number, d: number, color: number, rough = 0.75): THREE.Mesh {
   return new THREE.Mesh(
@@ -35,14 +36,16 @@ function box(w: number, h: number, d: number, color: number, rough = 0.75): THRE
   );
 }
 
-/** A pivot group at a joint, with a chunky limb box hanging below it (rotates about it). */
-function limb(x: number, y: number, w: number, h: number, d: number, color: number): THREE.Group {
-  const g = new THREE.Group();
-  g.position.set(x, y, 0);
-  const m = box(w, h, d, color);
-  m.position.y = -h / 2;
-  g.add(m);
-  return g;
+/** Create a box, place it at (x,y,z) in `parent`'s local space, add it, and return it (for rotation). */
+function put(
+  parent: THREE.Object3D,
+  w: number, h: number, d: number, color: number,
+  x: number, y: number, z: number, rough = 0.75,
+): THREE.Mesh {
+  const m = box(w, h, d, color, rough);
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
 }
 
 function disposeTree(obj: THREE.Object3D): void {
@@ -96,8 +99,8 @@ export class PlayerView {
   private legR = new THREE.Group();
   private armL = new THREE.Group(); // off-hand (shield / bow-hold)
   private armR = new THREE.Group(); // weapon hand (sword / staff / draw)
-  private orb: THREE.Mesh | null = null; // priest staff orb (emissive flash)
-  private orbBase = 0.5;
+  private orb: THREE.Mesh | null = null; // priest staff gem (emissive flash)
+  private orbBase = 0.6;
   private classId: ClassId | '' = '';
 
   private t = 0;
@@ -110,6 +113,7 @@ export class PlayerView {
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.build('warrior');
+    this.group.scale.setScalar(MODEL_SCALE);
     scene.add(this.group);
     this.initNameplate();
   }
@@ -130,7 +134,7 @@ export class PlayerView {
     const sprite = new THREE.Sprite(
       new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }),
     );
-    sprite.scale.set(2.8, 0.77, 1);
+    sprite.scale.set(2.9, 0.8, 1);
     this.nameplate = sprite;
     this.scene.add(sprite);
   }
@@ -144,111 +148,311 @@ export class PlayerView {
     this.npTexture.needsUpdate = true;
   }
 
-  /** (Re)build the chunky figure for a class — swaps body colour + weapon. */
+  /** (Re)build the voxel figure for a class — fresh body + rig + class kit. */
   private build(classId: ClassId): void {
     for (const c of [...this.group.children]) {
       this.group.remove(c);
       disposeTree(c);
     }
     this.classId = classId;
-    const p = PALETTES[classId];
+    this.orb = null;
 
+    // Fresh rig. Arms pivot at the shoulders (children of the body so they follow its lean);
+    // legs pivot at the hips (children of the root so they stay grounded as the body bobs).
     this.body = new THREE.Group();
     this.group.add(this.body);
+    this.armL = new THREE.Group(); this.armL.position.set(0.56, 1.82, 0); this.body.add(this.armL);
+    this.armR = new THREE.Group(); this.armR.position.set(-0.56, 1.82, 0); this.body.add(this.armR);
+    this.legL = new THREE.Group(); this.legL.position.set(0.24, 0.92, 0); this.group.add(this.legL);
+    this.legR = new THREE.Group(); this.legR.position.set(-0.24, 0.92, 0); this.group.add(this.legR);
 
-    // Big chunky torso + a blocky head with simple eyes. (No belts/stripes/visor — kept
-    // deliberately simple.)
-    const torso = box(0.86, 0.95, 0.5, p.torso);
-    torso.position.y = 1.42;
-    const head = box(0.66, 0.64, 0.62, p.head);
-    head.position.y = 2.06;
-    const eyeL = box(0.1, 0.12, 0.04, 0x2a2a30);
-    eyeL.position.set(0.15, 2.08, 0.32);
-    const eyeR = eyeL.clone();
-    eyeR.position.x = -0.15;
-    this.body.add(torso, head, eyeL, eyeR);
-
-    // Chunky arms (shoulders near the top of the torso).
-    this.armL = limb(0.56, 1.82, 0.26, 0.84, 0.32, p.limb);
-    this.armR = limb(-0.56, 1.82, 0.26, 0.84, 0.32, p.limb);
-    this.body.add(this.armL, this.armR);
-
-    // Chunky legs (children of the root so they stay grounded while the body bobs).
-    this.legL = limb(0.22, 0.92, 0.32, 0.86, 0.36, p.limb);
-    this.legR = limb(-0.22, 0.92, 0.32, 0.86, 0.36, p.limb);
-    this.group.add(this.legL, this.legR);
-
-    this.orb = null;
     if (classId === 'warrior') this.buildWarrior();
     else if (classId === 'hunter') this.buildHunter();
     else this.buildPriest();
   }
 
+  /** Skin+hair+eyes shared by every class (hair styling is added by the caller). */
+  private buildFace(eyeColor: number): void {
+    const b = this.body;
+    put(b, 0.62, 0.58, 0.58, SKIN, 0, 2.04, 0);            // head
+    put(b, 0.16, 0.05, 0.04, BROW, 0.15, 2.15, 0.30);    // brows
+    put(b, 0.16, 0.05, 0.04, BROW, -0.15, 2.15, 0.30);
+    put(b, 0.09, 0.11, 0.04, 0xffffff, 0.15, 2.04, 0.30, 0.4); // eye whites
+    put(b, 0.09, 0.11, 0.04, 0xffffff, -0.15, 2.04, 0.30, 0.4);
+    put(b, 0.07, 0.09, 0.05, eyeColor, 0.15, 2.03, 0.31, 0.35); // irises
+    put(b, 0.07, 0.09, 0.05, eyeColor, -0.15, 2.03, 0.31, 0.35);
+    put(b, 0.16, 0.05, 0.04, 0x9c6b45, 0, 1.86, 0.30);   // mouth line
+  }
+
+  // ── Warrior: steel plate over a navy gambeson, red scarf/tabard, sword + kite shield ──
   private buildWarrior(): void {
-    // Chunky sword in the right hand: grip + crossguard + a thick blade pointing up.
+    const b = this.body;
+    const STEEL = 0x969ca6, STEEL_DK = 0x6c727c, STEEL_LT = 0xb6bcc4;
+    const NAVY = 0x2c3346, NAVY_DK = 0x232838;
+    const RED = 0x8f3a34, LEATHER = 0x5a3a1e, LEATHER_DK = 0x3f2814;
+    const GOLD = 0xc9a94e, BLADE = 0xd6dbe2, SHIELD = 0x2f3e63;
+
+    this.buildFace(0x2f5fa0);
+    // Tufty brown hair.
+    put(b, 0.7, 0.24, 0.66, HAIR, 0, 2.36, 0);
+    put(b, 0.62, 0.16, 0.12, HAIR, 0, 2.28, 0.28);
+    put(b, 0.12, 0.42, 0.5, HAIR, 0.33, 2.12, -0.02);
+    put(b, 0.12, 0.42, 0.5, HAIR, -0.33, 2.12, -0.02);
+    put(b, 0.66, 0.3, 0.14, HAIR, 0, 2.22, -0.3);
+    for (const [hx, hz] of [[-0.2, 0.1], [0.05, 0.16], [0.24, 0.02], [-0.28, -0.05]] as const)
+      put(b, 0.18, 0.14, 0.18, HAIR, hx, 2.5, hz);
+
+    // Red scarf bunched at the collar (sits below the chin).
+    put(b, 0.56, 0.2, 0.18, RED, 0, 1.68, 0.2);
+    put(b, 0.2, 0.26, 0.46, RED, 0.24, 1.7, 0);
+    put(b, 0.2, 0.26, 0.46, RED, -0.24, 1.7, 0);
+    put(b, 0.5, 0.28, 0.16, RED, 0, 1.64, -0.22);
+
+    // Torso: navy gambeson core + steel chest plate + baldric + belt.
+    put(b, 0.8, 0.92, 0.46, NAVY, 0, 1.42, 0);
+    put(b, 0.74, 0.54, 0.5, STEEL, 0, 1.58, 0.02);
+    put(b, 0.16, 0.5, 0.52, STEEL_LT, 0, 1.58, 0.03);
+    put(b, 0.74, 0.06, 0.5, GOLD, 0, 1.32, 0.02);       // waist trim of the plate
+    put(b, 0.12, 1.12, 0.05, LEATHER, 0, 1.46, 0.26).rotation.z = -0.6; // baldric across chest
+    put(b, 0.86, 0.16, 0.5, LEATHER, 0, 1.0, 0);         // belt
+    put(b, 0.2, 0.18, 0.06, GOLD, 0, 1.0, 0.25);         // buckle
+
+    // Steel pauldrons with gold trim (on the body so they sit still as the arms swing).
+    for (const s of [1, -1]) {
+      put(b, 0.42, 0.3, 0.46, STEEL, 0.56 * s, 1.86, 0);
+      put(b, 0.44, 0.14, 0.48, STEEL_DK, 0.56 * s, 1.98, 0);
+      put(b, 0.44, 0.05, 0.49, GOLD, 0.56 * s, 1.77, 0);
+    }
+
+    // Arms: navy upper, leather bracer with gold trim, steel gauntlet.
+    for (const arm of [this.armL, this.armR]) {
+      put(arm, 0.28, 0.42, 0.32, NAVY_DK, 0, -0.22, 0);
+      put(arm, 0.3, 0.34, 0.34, LEATHER, 0, -0.58, 0);
+      put(arm, 0.31, 0.05, 0.35, GOLD, 0, -0.42, 0);
+      put(arm, 0.26, 0.2, 0.3, STEEL, 0, -0.84, 0);
+    }
+
+    // Legs: navy trousers, steel knee guard + gold trim, brown boots.
+    for (const leg of [this.legL, this.legR]) {
+      put(leg, 0.34, 0.46, 0.38, NAVY, 0, -0.24, 0);
+      put(leg, 0.36, 0.16, 0.4, STEEL, 0, -0.5, 0.02);
+      put(leg, 0.36, 0.05, 0.41, GOLD, 0, -0.42, 0.03);
+      put(leg, 0.32, 0.24, 0.36, NAVY_DK, 0, -0.68, 0);
+      put(leg, 0.36, 0.2, 0.4, LEATHER, 0, -0.84, 0.04);
+      put(leg, 0.36, 0.14, 0.18, LEATHER_DK, 0, -0.88, 0.24);
+    }
+
+    // Red tabard hanging over the groin (root-parented so it stays put over the legs).
+    put(this.group, 0.42, 0.82, 0.08, RED, 0, 0.56, 0.25);
+    put(this.group, 0.3, 0.2, 0.08, RED, 0, 0.18, 0.25);
+    put(this.group, 0.44, 0.06, 0.09, GOLD, 0, 0.94, 0.25);
+
+    // Sword slung diagonally across the back (hilt over the left shoulder).
+    const back = new THREE.Group();
+    back.position.set(0.05, 1.45, -0.32);
+    back.rotation.set(0.12, 0, -0.7);
+    put(back, 0.15, 1.3, 0.11, LEATHER_DK, 0, 0, 0);
+    put(back, 0.36, 0.09, 0.13, GOLD, 0, 0.62, 0);
+    put(back, 0.08, 0.24, 0.09, LEATHER, 0, 0.75, 0);
+    put(back, 0.13, 0.13, 0.13, GOLD, 0, 0.9, 0);
+    b.add(back);
+
+    // Sword in the right hand, pointing down at rest (swings up on attack).
     const sword = new THREE.Group();
-    const grip = box(0.08, 0.26, 0.08, 0x5a3a1e);
-    const guard = box(0.36, 0.09, 0.12, 0xc2c6cd, 0.4);
-    guard.position.y = 0.16;
-    const blade = box(0.13, 0.98, 0.06, 0xd6dbe2, 0.3);
-    blade.position.y = 0.7;
-    sword.add(grip, guard, blade);
-    sword.position.set(0, -0.84, 0.12);
-    sword.rotation.set(Math.PI / 4, 0, 0.22); // rest angled forward (~45°), clear of the body
+    sword.position.set(0, -0.9, 0.14);
+    put(sword, 0.11, 0.11, 0.11, GOLD, 0, 0.14, 0);       // pommel
+    put(sword, 0.08, 0.24, 0.08, LEATHER, 0, 0, 0);        // grip
+    put(sword, 0.36, 0.1, 0.11, GOLD, 0, -0.15, 0);        // crossguard
+    put(sword, 0.14, 0.88, 0.05, BLADE, 0, -0.62, 0, 0.3); // blade
+    put(sword, 0.1, 0.18, 0.05, BLADE, 0, -1.12, 0, 0.3);  // tip
     this.armR.add(sword);
 
-    // Blocky round-ish shield on the left forearm.
-    const shield = box(0.56, 0.66, 0.12, 0x8a3b3b, 0.6);
-    shield.position.set(0, -0.5, 0.2);
-    const boss = box(0.16, 0.16, 0.06, 0xc2c6cd, 0.3);
-    boss.position.set(0, -0.5, 0.27);
-    this.armL.add(shield, boss);
+    // Navy kite shield with a gold border + gold diamond emblem, on the left forearm.
+    const shield = new THREE.Group();
+    shield.position.set(0, -0.5, 0.24);
+    put(shield, 0.66, 1.02, 0.06, GOLD, 0, 0.02, -0.02);   // gold border (shows around the plates)
+    put(shield, 0.58, 0.5, 0.08, SHIELD, 0, 0.22, 0.02);
+    put(shield, 0.5, 0.4, 0.08, SHIELD, 0, -0.18, 0.02);
+    put(shield, 0.3, 0.32, 0.08, SHIELD, 0, -0.52, 0.02);
+    put(shield, 0.16, 0.44, 0.05, GOLD, 0, 0.02, 0.08);    // emblem: vertical bar
+    put(shield, 0.24, 0.24, 0.05, GOLD, 0, 0.02, 0.08).rotation.z = Math.PI / 4; // emblem: diamond
+    put(shield, 0.12, 0.12, 0.06, SHIELD, 0, 0.02, 0.1).rotation.z = Math.PI / 4; // diamond centre
+    this.armL.add(shield);
   }
 
+  // ── Ranger: green cloak + hood, leather armour with a gold stag, bow + back quiver ──
   private buildHunter(): void {
-    // A tall vertical wooden bow held in the left hand + a bowstring chord.
-    const bow = new THREE.Group();
-    const wood = new THREE.MeshStandardMaterial({ color: 0x7a5126, roughness: 0.7 });
-    const arc = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.045, 6, 20, Math.PI * 1.4), wood);
-    arc.rotation.z = -Math.PI * 0.7;
-    const string = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.012, 0.012, 1.0, 4),
-      new THREE.MeshStandardMaterial({ color: 0xeae6d8, roughness: 0.5 }),
-    );
-    string.position.x = -0.36;
-    bow.add(arc, string);
-    bow.rotation.y = -Math.PI / 2;
-    bow.position.set(0.06, -0.84, 0.06);
-    this.armL.add(bow);
+    const b = this.body;
+    const GREEN = 0x415f30, GREEN_DK = 0x2f4826;
+    const LEATHER = 0x5a3a1e, LEATHER_DK = 0x3f2814, LEATHER_LT = 0x6e4a2a;
+    const GOLD = 0xc9a94e, WOOD = 0x7a5126, STRING = 0xd8d2c0, FLETCH = 0xeae6d8;
 
-    // A nocked arrow in the draw (right) hand, pointing forward.
-    const arrow = box(0.03, 0.03, 0.7, 0x8a7a55);
-    arrow.position.set(0, -0.84, 0.22);
-    const tip = box(0.06, 0.06, 0.08, 0xc2c6cd, 0.4);
-    tip.position.set(0, -0.84, 0.58);
-    this.armR.add(arrow, tip);
+    this.buildFace(0x3f6b3a);
+    // Brown hair under a pushed-back green hood.
+    put(b, 0.68, 0.22, 0.62, HAIR, 0, 2.34, 0);
+    put(b, 0.6, 0.14, 0.12, HAIR, 0, 2.28, 0.28);
+    put(b, 0.12, 0.36, 0.48, HAIR, 0.32, 2.14, -0.02);
+    put(b, 0.12, 0.36, 0.48, HAIR, -0.32, 2.14, -0.02);
+    for (const [hx, hz] of [[-0.18, 0.08], [0.14, 0.12], [0.24, -0.04]] as const)
+      put(b, 0.16, 0.12, 0.16, HAIR, hx, 2.48, hz);
+    put(b, 0.56, 0.34, 0.24, GREEN, 0, 1.82, -0.26);      // hood bunched behind the neck
+    put(b, 0.7, 0.22, 0.34, GREEN_DK, 0, 1.68, -0.2);
+
+    // Torso: green tunic + leather harness + gold stag emblem + belt.
+    put(b, 0.8, 0.92, 0.46, GREEN, 0, 1.42, 0);
+    put(b, 0.72, 0.52, 0.5, LEATHER, 0, 1.6, 0.02);
+    put(b, 0.72, 0.06, 0.5, LEATHER_LT, 0, 1.36, 0.02);
+    put(b, 0.12, 1.1, 0.05, LEATHER, 0, 1.46, 0.26).rotation.z = 0.6; // quiver strap
+    put(b, 0.86, 0.16, 0.5, LEATHER, 0, 1.0, 0);          // belt
+    put(b, 0.2, 0.18, 0.06, GOLD, 0, 1.0, 0.25);          // buckle
+    put(b, 0.22, 0.2, 0.06, LEATHER_DK, 0.36, 1.0, 0.22); // belt pouch
+    // Gold stag emblem on the chest (face + antlers).
+    put(b, 0.16, 0.18, 0.04, GOLD, 0, 1.52, 0.27);
+    for (const s of [1, -1]) {
+      put(b, 0.06, 0.16, 0.04, GOLD, 0.1 * s, 1.66, 0.27).rotation.z = 0.4 * s;
+      put(b, 0.06, 0.12, 0.04, GOLD, 0.18 * s, 1.74, 0.27).rotation.z = 0.6 * s;
+      put(b, 0.05, 0.09, 0.04, GOLD, 0.05 * s, 1.72, 0.27);
+    }
+
+    // Layered leather pauldrons with a gold stud.
+    for (const s of [1, -1]) {
+      put(b, 0.42, 0.28, 0.46, LEATHER, 0.56 * s, 1.86, 0);
+      put(b, 0.44, 0.14, 0.48, LEATHER_LT, 0.56 * s, 1.96, 0);
+      put(b, 0.1, 0.1, 0.1, GOLD, 0.56 * s, 1.86, 0.24);
+    }
+
+    // Arms: green sleeve, leather bracer, dark glove.
+    for (const arm of [this.armL, this.armR]) {
+      put(arm, 0.28, 0.42, 0.32, GREEN_DK, 0, -0.22, 0);
+      put(arm, 0.3, 0.32, 0.34, LEATHER, 0, -0.58, 0);
+      put(arm, 0.31, 0.05, 0.35, GOLD, 0, -0.44, 0);
+      put(arm, 0.26, 0.2, 0.3, LEATHER_DK, 0, -0.84, 0);
+    }
+
+    // Legs: dark-green trousers, leather boots with gold trim.
+    for (const leg of [this.legL, this.legR]) {
+      put(leg, 0.34, 0.5, 0.38, GREEN_DK, 0, -0.26, 0);
+      put(leg, 0.32, 0.26, 0.36, LEATHER, 0, -0.62, 0);
+      put(leg, 0.36, 0.22, 0.4, LEATHER, 0, -0.84, 0.04);
+      put(leg, 0.36, 0.05, 0.41, GOLD, 0, -0.74, 0.05);
+      put(leg, 0.36, 0.14, 0.18, LEATHER_DK, 0, -0.88, 0.24);
+    }
+
+    // Flowing green cloak behind (root-parented, swept to one side).
+    put(this.group, 0.9, 1.7, 0.08, GREEN, 0, 1.05, -0.32);
+    put(this.group, 1.02, 0.5, 0.08, GREEN_DK, 0.04, 0.32, -0.34);
+    put(this.group, 0.5, 0.95, 0.08, GREEN, 0.5, 0.7, -0.3).rotation.z = 0.28;
+    put(this.group, 0.42, 0.06, 0.09, GOLD, 0, 0.24, -0.34);
+
+    // Quiver of arrows over the right shoulder (on the body).
+    const quiver = new THREE.Group();
+    quiver.position.set(-0.34, 1.5, -0.28);
+    quiver.rotation.z = 0.22;
+    put(quiver, 0.22, 0.66, 0.22, LEATHER, 0, 0, 0);
+    put(quiver, 0.24, 0.08, 0.24, LEATHER_LT, 0, 0.28, 0);
+    for (const [ax, az] of [[-0.06, 0.02], [0.06, -0.04], [0, 0.08]] as const) {
+      put(quiver, 0.04, 0.5, 0.04, WOOD, ax, 0.5, az);
+      put(quiver, 0.07, 0.16, 0.07, FLETCH, ax, 0.82, az);
+    }
+    b.add(quiver);
+
+    // Recurve wooden bow carried in the left hand — gripped mid-riser, D-profile facing
+    // forward so it reads as a bow from the front (and in profile from behind in-game).
+    const bow = new THREE.Group();
+    bow.position.set(0.18, -0.86, 0.2);
+    put(bow, 0.1, 0.5, 0.1, WOOD, 0, 0, 0);               // riser (grip, at the hand)
+    put(bow, 0.07, 0.5, 0.08, WOOD, 0, 0.44, 0.07).rotation.x = -0.4;  // upper limb (bows forward)
+    put(bow, 0.06, 0.32, 0.07, WOOD, 0, 0.74, 0.03).rotation.x = 0.5;  // upper tip (recurves back)
+    put(bow, 0.07, 0.5, 0.08, WOOD, 0, -0.44, 0.07).rotation.x = 0.4;  // lower limb
+    put(bow, 0.06, 0.32, 0.07, WOOD, 0, -0.74, 0.03).rotation.x = -0.5; // lower tip
+    put(bow, 0.025, 1.72, 0.025, STRING, 0, 0, -0.03, 0.5); // string (straight, near side)
+    this.armL.add(bow);
   }
 
+  // ── Priest: hooded cream robe with gold trim, blue front + cross, gem staff ──
   private buildPriest(): void {
-    // A chunky staff in the right hand with a glowing orb on top.
+    const b = this.body;
+    const ROBE = 0xe8e0cc, ROBE_LT = 0xf2ecda, ROBE_SH = 0xd6ccb4;
+    const BLUE = 0x39568a, GOLD = 0xc9a94e, GOLD_DK = 0xa8842e;
+    const GEM = 0x4aa8e8, BELT = 0x5a3a1e, STAFF = 0x4a3a2a;
+
+    this.buildFace(0x2f5fa0);
+    // Brown fringe peeking out under a raised cream hood with gold trim.
+    put(b, 0.5, 0.14, 0.1, HAIR, 0, 2.24, 0.27);
+    put(b, 0.12, 0.24, 0.2, HAIR, 0.28, 2.1, 0.2);
+    put(b, 0.12, 0.24, 0.2, HAIR, -0.28, 2.1, 0.2);
+    put(b, 0.8, 0.3, 0.78, ROBE, 0, 2.44, -0.02);          // hood crown
+    put(b, 0.76, 0.64, 0.22, ROBE, 0, 2.12, -0.34);        // hood back
+    put(b, 0.18, 0.72, 0.66, ROBE, 0.36, 2.06, 0.02);      // hood side
+    put(b, 0.18, 0.72, 0.66, ROBE, -0.36, 2.06, 0.02);
+    put(b, 0.72, 0.16, 0.22, ROBE, 0, 2.36, 0.28);         // hood brow
+    put(b, 0.74, 0.06, 0.24, GOLD, 0, 2.28, 0.3);          // gold trim on the hood brow
+    put(b, 0.06, 0.6, 0.66, GOLD, 0.37, 2.06, 0.06);       // gold trim down the hood sides
+    put(b, 0.06, 0.6, 0.66, GOLD, -0.37, 2.06, 0.06);
+
+    // Robe torso: cream core, blue front panel + gold trims + a gold cross.
+    put(b, 0.84, 0.96, 0.5, ROBE, 0, 1.42, 0);
+    put(b, 0.34, 0.94, 0.52, BLUE, 0, 1.4, 0.01);
+    put(b, 0.05, 0.94, 0.53, GOLD, 0.19, 1.4, 0.02);
+    put(b, 0.05, 0.94, 0.53, GOLD, -0.19, 1.4, 0.02);
+    put(b, 0.08, 0.32, 0.04, GOLD, 0, 1.36, 0.28);         // cross: vertical
+    put(b, 0.24, 0.08, 0.04, GOLD, 0, 1.44, 0.28);         // cross: horizontal
+
+    // Ornate gold-and-cream mantle over the shoulders, with blue gems.
+    put(b, 0.9, 0.3, 0.58, ROBE_LT, 0, 1.84, 0);
+    put(b, 0.91, 0.08, 0.59, GOLD, 0, 1.72, 0);
+    put(b, 0.48, 0.16, 0.3, GOLD, 0, 1.88, 0.18);          // gold collar (front)
+    put(b, 0.09, 0.09, 0.06, GEM, 0, 1.9, 0.32, 0.3);
+    for (const s of [1, -1]) {
+      put(b, 0.32, 0.18, 0.42, GOLD, 0.5 * s, 1.9, 0);     // gold shoulder cap
+      put(b, 0.32, 0.06, 0.44, ROBE_LT, 0.5 * s, 2.0, 0);
+      put(b, 0.09, 0.09, 0.09, GEM, 0.5 * s, 1.9, 0.23, 0.3);
+    }
+    // Brown belt + round gold buckle.
+    put(b, 0.86, 0.16, 0.52, BELT, 0, 1.02, 0);
+    put(b, 0.22, 0.2, 0.06, GOLD, 0, 1.02, 0.26);
+
+    // Wide robed sleeves: cream, gold cuff, brown glove.
+    for (const arm of [this.armL, this.armR]) {
+      put(arm, 0.36, 0.5, 0.42, ROBE, 0, -0.26, 0);
+      put(arm, 0.34, 0.1, 0.44, GOLD, 0, -0.54, 0);
+      put(arm, 0.3, 0.22, 0.36, ROBE_SH, 0, -0.7, 0);
+      put(arm, 0.24, 0.2, 0.28, BELT, 0, -0.86, 0);
+    }
+
+    // Short lower legs + shoes (the robe skirt hides the thighs).
+    for (const leg of [this.legL, this.legR]) {
+      put(leg, 0.3, 0.42, 0.34, ROBE_SH, 0, -0.6, 0);
+      put(leg, 0.34, 0.2, 0.44, BELT, 0, -0.84, 0.06);
+    }
+
+    // Long cream robe skirt (root-parented) with a blue front panel + gold hem.
+    put(this.group, 0.92, 0.98, 0.58, ROBE, 0, 0.56, 0);
+    put(this.group, 1.04, 0.32, 0.64, ROBE_LT, 0, 0.2, 0);
+    put(this.group, 0.32, 0.94, 0.6, BLUE, 0, 0.55, 0.02);
+    put(this.group, 0.05, 0.94, 0.61, GOLD, 0.17, 0.55, 0.03);
+    put(this.group, 0.05, 0.94, 0.61, GOLD, -0.17, 0.55, 0.03);
+    put(this.group, 1.06, 0.08, 0.65, GOLD, 0, 0.09, 0);
+
+    // Ornate staff in the right hand: dark shaft, gold rings, a diamond frame + glowing gem.
     const staff = new THREE.Group();
-    const shaft = box(0.08, 2.0, 0.08, 0x6b5a3a);
-    shaft.position.y = 0.5;
-    const orb = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(0.18, 0),
-      new THREE.MeshStandardMaterial({
-        color: 0xbfe6ff,
-        emissive: 0x7fd0ff,
-        emissiveIntensity: this.orbBase,
-        roughness: 0.3,
-      }),
+    staff.position.set(0, -0.82, 0.12);
+    staff.rotation.set(0.12, 0, 0.1);
+    put(staff, 0.08, 2.0, 0.08, STAFF, 0, 0.5, 0);
+    put(staff, 0.1, 0.07, 0.1, GOLD, 0, 0.0, 0);
+    put(staff, 0.1, 0.07, 0.1, GOLD, 0, 0.7, 0);
+    put(staff, 0.1, 0.07, 0.1, GOLD_DK, 0, -0.42, 0);
+    // Gold diamond frame around the gem (four bars).
+    for (const [dx, dy] of [[0, 0.22], [0, -0.22], [0.22, 0], [-0.22, 0]] as const)
+      put(staff, 0.12, 0.12, 0.07, GOLD, dx, 1.5 + dy, 0).rotation.z = Math.PI / 4;
+    const gem = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.17, 0),
+      new THREE.MeshStandardMaterial({ color: 0x9fd8ff, emissive: GEM, emissiveIntensity: this.orbBase, roughness: 0.25 }),
     );
-    orb.position.y = 1.55;
-    staff.add(shaft, orb);
-    staff.position.set(0, -0.8, 0.08);
-    staff.rotation.set(Math.PI / 4, 0, 0.18); // rest angled forward (~45°), not dead vertical
+    gem.position.set(0, 1.5, 0);
+    staff.add(gem);
     this.armR.add(staff);
-    this.orb = orb;
+    this.orb = gem;
   }
 
   /** Start a swing/draw/cast motion for an ability (kind chosen by class + targeting). */
@@ -326,8 +530,8 @@ export class PlayerView {
 
     this.group.position.set(x, y - FEET, z);
     this.group.rotation.y = yaw;
-    // Float the name+level plate above the head (sprites self-billboard to the camera).
-    if (this.nameplate) this.nameplate.position.set(x, y - FEET + 3.0, z);
+    // Float the name+level plate above the (scaled) head (sprites self-billboard to the camera).
+    if (this.nameplate) this.nameplate.position.set(x, y - FEET + (HEAD_TOP + 0.55) * MODEL_SCALE, z);
 
     // Walk blend + phase from movement speed.
     const target = Math.min(1, speed / 3.5);

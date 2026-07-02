@@ -5,6 +5,19 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## New class player models (owner-requested — voxelised from reference art)
+**Goal:** replace the plain blocky avatars with detailed, Cube-World-style class models matching owner-supplied reference art, and scale the avatar up a touch so the extra detail doesn't look squished.
+- **Rebuilt `src/render/player-view.ts`** — each class is now a richly voxel-skinned figure on the **same animation rig** (walk / idle / one-shot swing-draw-cast untouched, still driven by `AbilityUsed`; still purely cosmetic — equipped gear deliberately doesn't show):
+  - **Warrior** — steel plate over a navy gambeson, red collar scarf + hanging tabard, a leather baldric, gold-trimmed pauldrons/bracers/knees, a sword held point-down, a **back-slung sword**, and a **navy kite shield with a gold diamond emblem**.
+  - **Ranger** — a flowing **green hooded cloak**, leather harness with a **gold stag**, a **back quiver** (white fletching), gold-trimmed boots, and a **recurve bow** carried at the side.
+  - **Priest** — a **hooded cream robe** with gold trim, a blue front panel + **gold cross**, an ornate gem-studded gold mantle, wide sleeves, a long robe skirt, and a **gold-framed glowing-gem staff** (the staff gem keeps the cast-flash emissive).
+- **Bigger avatar:** a new `MODEL_SCALE = 1.22` uniformly enlarges the figure (feet stay grounded on the terrain); the overhead nameplate floats up to match.
+- **Editor mirror:** the Map Builder's Player-Spawn **size reference** (`src/oathbound/player-model.ts`) now renders the new warrior at the same scale, and the spawn marker reads `~3.0m (1:1)`.
+
+**Verified:** `typecheck` ✓ (both repos) · `npm test` → 344/344 ✓ · `build` ✓ (both repos) · headless renders of the **shipped** `player-view.ts` (all three classes from front / ¾ / back) and of the editor's `buildPlayerModel()` — models match the reference art with clean silhouettes, no clipping, and zero console errors.
+
+---
+
 ## Cube World is now the game's only style (toggle removed)
 **Goal:** the owner picked the Cube World look, so the game drops the smooth/voxel switch — it always renders as fine cubes. The **Map Builder keeps** its `Terrain: Smooth ⇄ Cubic` toggle (handy for visual editing).
 - Removed the `voxelTerrain` setting + the Settings → Graphics toggle and the `?voxel=` override; bootstrap always builds the cube bubble, switches on the voxel collision grid, and pulls the fog in. The unused smooth-terrain build paths are no longer called in-game (the builders stay exported for the editor/tests).
