@@ -5,6 +5,13 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Voxel paving fix — paved ground steps with the cubes
+**Goal:** City/Cobblestone ground was drawing as one smooth coarse sheet draped over the fine voxel terrain (it was built at the map's authoring resolution, ~15 m quads, so on a slope it looked like a flat plane amid the cubes). Now the voxel bubble emits **one flat, stone-textured quad per paved cube top** (world-scaled UVs so stones tile seamlessly across cubes), so paved ground reads as textured cubes — flat where the ground is flat, stepped (paved tops + grey risers) on slopes — matching the terrain. The old smooth overlay is hidden in voxel mode. `render/voxel-terrain.ts` + bootstrap wiring; no format change.
+
+**Verified:** `typecheck` ✓ · `npm test` → 344/344 ✓ · `build` ✓ · headless on Talar: flat plaza shows fine cobblestone on the cubes, and a paved slope steps down in cobblestone cubes (paving submesh spans a 16 m / 8-step height range) — zero console errors.
+
+---
+
 ## Voxel terrain v2 — fine cubes, textured tops, real cube collision
 **Goal:** the follow-ups on the Cube World toggle — much finer cubes (the coarse ~23 m blocks made the player look ant-sized), ground textures that read correctly on the cubes, and collision that stands on the cubes instead of clipping through their edges.
 - **Fine cubes via a player-centred bubble** (`render/voxel-terrain.ts`): the map is far too large to voxelize whole at a fine size, but the scene fog only shows a few hundred metres, so the game builds just a bubble of ~3 m cubes around the player and rebuilds it as they roam (the fog hides the edge; the voxel-mode fog is pulled in to match). ~3 m cubes ≈ 1.5× the player instead of ~11×.

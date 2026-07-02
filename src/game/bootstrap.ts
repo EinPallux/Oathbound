@@ -14,7 +14,6 @@ import { generateHeightfield, generateColliders, type Heightfield, type Cylinder
 import { WORLD_SIZE, WORLD_RES } from '../world/layout';
 import { generateScenery, type Clearing, type Scenery } from '../world/scenery';
 import { getActiveMap } from '../world/active-map';
-import { pavedSurfaceGeometry, unpackHeights } from '../world/map-format';
 import {
   buildCustomHeightfield,
   customColliders,
@@ -318,7 +317,7 @@ export function boot(options: BootOptions = {}): Game {
       }
     : terrainColorRGB;
   const smoothTerrain = cm ? buildCustomTerrainMesh(field, cm) : buildTerrainMesh(field);
-  const voxelTerrain = new VoxelTerrain(field, voxelColorAt, VOXEL_CUBE, VOXEL_VIEW);
+  const voxelTerrain = new VoxelTerrain(field, voxelColorAt, VOXEL_CUBE, VOXEL_VIEW, cm ? (x, z) => biomeIndexAt(cm, x, z) : null);
   let terrain: THREE.Object3D = smoothTerrain;
   renderer.scene.add(terrain);
 
@@ -444,21 +443,12 @@ export function boot(options: BootOptions = {}): Game {
     const pt = world.get<Transform>(player, C.Transform)!;
     renderer.scene.remove(terrain);
     if (on) voxelTerrain.rebuildAt(pt.x, pt.z);
-    terrain = on ? voxelTerrain.mesh : smoothTerrain;
+    terrain = on ? voxelTerrain.group : smoothTerrain;
     renderer.scene.add(terrain);
-    cameraObstacles[0] = terrain; // keep the camera's occlusion ray pointing at the live mesh
-    // Re-lay the paved-stone (City/Cobblestone) overlay: on the cube tops in voxel mode (so the
-    // stone texture shows), or the smooth heights otherwise.
-    if (pavingMesh && cm) {
-      const hAt = on ? (x: number, z: number): number => field.voxelHeightAt(x, z) : undefined;
-      const pv = pavedSurfaceGeometry(cm.biomes, unpackHeights(cm), cm.res, cm.size, hAt);
-      const g = pavingMesh.geometry;
-      g.setAttribute('position', new THREE.BufferAttribute(pv.positions, 3));
-      g.setAttribute('uv', new THREE.BufferAttribute(pv.uvs, 2));
-      g.setAttribute('color', new THREE.BufferAttribute(pv.colors, 3));
-      g.setIndex(pv.indices);
-      g.computeVertexNormals();
-    }
+    cameraObstacles[0] = on ? voxelTerrain.mesh : smoothTerrain; // raycast the cube mesh, not the group
+    // The smooth paving overlay is for smooth mode only; in voxel mode the bubble draws its own
+    // per-cube paved-stone tops (matching the cubes), so hide the smooth one.
+    if (pavingMesh) pavingMesh.visible = !on;
   };
   let voxelApplied = settings.voxelTerrain;
   applyVoxelTerrain(); // set the initial state from the saved setting / ?voxel=
