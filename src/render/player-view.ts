@@ -112,6 +112,9 @@ export class PlayerView {
   private classId: ClassId | '' = '';
   private mount: THREE.Group | null = null; // persistent wolf mount (shown only while riding)
   private mountLegs: THREE.Group[] = []; // [FL, FR, BL, BR] leg pivots for the trot cycle
+  private mountBody: THREE.Group | null = null; // wolf torso — breathes when idle
+  private mountHead: THREE.Group | null = null; // wolf head — nods
+  private mountTail: THREE.Group | null = null; // wolf tail — sways
   private mountBlend = 0; // 0 on foot → 1 fully mounted (smooths the seat/pose transition)
   private wolfPhase = 0;
 
@@ -191,6 +194,9 @@ export class PlayerView {
       const wolf = buildWolf();
       this.mount = wolf.group;
       this.mountLegs = wolf.legs;
+      this.mountBody = wolf.body;
+      this.mountHead = wolf.head;
+      this.mountTail = wolf.tail;
       this.mount.visible = false;
       this.group.add(this.mount);
     }
@@ -602,9 +608,18 @@ export class PlayerView {
     this.armR.rotation.x = armRx;
     this.armL.rotation.x = armLx;
 
-    // Trot the wolf's legs (diagonal pairs) by speed while ridden.
+    // Wolf idle + trot while ridden: a breathing body bob (the rider rides along with it), a
+    // swaying tail and gentle head nod when standing, and a diagonal-pair leg trot that ramps
+    // with speed — so it never looks frozen when AFK.
     if (this.mount && mb > 0.02) {
       const trot = Math.min(1, speed / 6);
+      const still = 1 - Math.min(1, speed / 2);
+      const breathe = Math.sin(this.t * 1.6) * 0.04 * still * mb;
+      this.mountBody!.position.y = breathe;
+      this.figure.position.y = SEAT_Y * mb + breathe; // the rider breathes with the mount
+      this.mountTail!.rotation.y = Math.sin(this.t * 2.3) * (0.14 + 0.16 * still) * mb;
+      this.mountHead!.rotation.x = Math.sin(this.t * 1.6 + 0.7) * 0.06 * still * mb;
+      this.mountHead!.rotation.y = Math.sin(this.t * 0.9) * 0.04 * still * mb;
       if (speed > 0.05) this.wolfPhase += dt * (2.5 + speed * 0.8);
       const ws = Math.sin(this.wolfPhase) * 0.5 * trot * mb;
       const signs = [1, -1, -1, 1]; // FL, FR, BL, BR
@@ -623,43 +638,57 @@ function easeOut(p: number): number {
 // reference. Feet at y=0, facing +Z (same as the rider). Returns the group plus the four
 // leg pivots [FL, FR, BL, BR] for the trot cycle. Scaled with the player (a child of the
 // scaled root). The saddle seat sits at ~y1.82 so the lifted rider (SEAT_Y) straddles it.
-function buildWolf(): { group: THREE.Group; legs: THREE.Group[] } {
+interface Wolf {
+  group: THREE.Group;
+  legs: THREE.Group[];
+  body: THREE.Group; // torso/neck/saddle/harness — breathes (subtle Y bob) when idle
+  head: THREE.Group; // nods gently
+  tail: THREE.Group; // sways
+}
+function buildWolf(): Wolf {
   const g = new THREE.Group();
   g.name = 'wolf-mount';
   const FUR_DK = 0x4a4952, FUR = 0x6d6a70, FUR_LT = 0xcdbb98, FUR_TAN = 0xa8906e;
   const NOSE = 0x1b1a1e, EYE = 0xd8a12a;
   const SADDLE = 0x6e4a2e, SADDLE_DK = 0x4f3622, SEATR = 0x7d3a2a, GOLD = 0xc9a94e, STRAP = 0x5a3a1e;
 
-  // Body: torso + dark back, cream belly, rear haunch, front chest.
-  put(g, 0.82, 0.8, 1.5, FUR, 0, 1.2, -0.15);
-  put(g, 0.72, 0.26, 1.5, FUR_DK, 0, 1.5, -0.15);
-  put(g, 0.7, 0.32, 1.4, FUR_LT, 0, 0.9, -0.15);
-  put(g, 0.86, 0.86, 0.62, FUR, 0, 1.16, -0.95);
-  put(g, 0.72, 0.3, 0.62, FUR_DK, 0, 1.52, -0.95);
-  put(g, 0.78, 0.78, 0.5, FUR, 0, 1.14, 0.62);
-  put(g, 0.62, 0.42, 0.5, FUR_LT, 0, 0.9, 0.64);
+  // The body carries everything except the (planted) legs, so it can breathe as one unit.
+  // The head + tail are pivoted sub-groups of the body so they can nod / sway on top of it.
+  const body = new THREE.Group();
+  g.add(body);
+  const head = new THREE.Group(); head.position.set(0, 1.62, 1.15); body.add(head);
+  const tail = new THREE.Group(); tail.position.set(0, 1.5, -1.15); body.add(tail);
 
-  // Neck + head.
-  put(g, 0.52, 0.66, 0.5, FUR, 0, 1.54, 0.95);
-  put(g, 0.44, 0.32, 0.5, FUR_DK, 0, 1.82, 0.92);
-  put(g, 0.56, 0.52, 0.56, FUR, 0, 1.72, 1.42);
-  put(g, 0.5, 0.28, 0.32, FUR_LT, 0, 1.55, 1.56);
-  put(g, 0.34, 0.34, 0.42, FUR_LT, 0, 1.6, 1.8);
-  put(g, 0.18, 0.14, 0.12, NOSE, 0, 1.66, 2.0);
-  // Ears (pointed) + amber eyes + brow.
+  // Torso + dark back, cream belly, rear haunch, front chest, neck + mane.
+  put(body, 0.82, 0.8, 1.5, FUR, 0, 1.2, -0.15);
+  put(body, 0.72, 0.26, 1.5, FUR_DK, 0, 1.5, -0.15);
+  put(body, 0.7, 0.32, 1.4, FUR_LT, 0, 0.9, -0.15);
+  put(body, 0.86, 0.86, 0.62, FUR, 0, 1.16, -0.95);
+  put(body, 0.72, 0.3, 0.62, FUR_DK, 0, 1.52, -0.95);
+  put(body, 0.78, 0.78, 0.5, FUR, 0, 1.14, 0.62);
+  put(body, 0.62, 0.42, 0.5, FUR_LT, 0, 0.9, 0.64);
+  put(body, 0.52, 0.66, 0.5, FUR, 0, 1.54, 0.95);   // neck
+  put(body, 0.44, 0.32, 0.5, FUR_DK, 0, 1.82, 0.92); // mane
+
+  // Head (relative to the head pivot at 0,1.62,1.15): snout, nose, ears, amber eyes, brow.
+  put(head, 0.56, 0.52, 0.56, FUR, 0, 0.1, 0.27);
+  put(head, 0.5, 0.28, 0.32, FUR_LT, 0, -0.07, 0.41);
+  put(head, 0.34, 0.34, 0.42, FUR_LT, 0, -0.02, 0.65);
+  put(head, 0.18, 0.14, 0.12, NOSE, 0, 0.04, 0.85);
   for (const s of [1, -1]) {
-    put(g, 0.16, 0.26, 0.14, FUR_DK, 0.18 * s, 2.02, 1.34);
-    put(g, 0.09, 0.14, 0.09, FUR_TAN, 0.18 * s, 2.0, 1.4);
-    put(g, 0.1, 0.12, 0.08, EYE, 0.17 * s, 1.78, 1.69);
-    put(g, 0.15, 0.05, 0.07, FUR_DK, 0.17 * s, 1.87, 1.68);
+    put(head, 0.16, 0.26, 0.14, FUR_DK, 0.18 * s, 0.4, 0.19);
+    put(head, 0.09, 0.14, 0.09, FUR_TAN, 0.18 * s, 0.38, 0.25);
+    put(head, 0.1, 0.12, 0.08, EYE, 0.17 * s, 0.16, 0.54);
+    put(head, 0.15, 0.05, 0.07, FUR_DK, 0.17 * s, 0.25, 0.53);
   }
 
-  // Bushy tail sweeping up and back.
-  put(g, 0.32, 0.32, 0.5, FUR, 0, 1.5, -1.34).rotation.x = -0.6;
-  put(g, 0.36, 0.36, 0.5, FUR_DK, 0, 1.78, -1.58).rotation.x = -0.5;
-  put(g, 0.26, 0.26, 0.3, FUR_LT, 0, 2.0, -1.78).rotation.x = -0.5;
+  // Bushy tail (relative to the tail pivot at 0,1.5,-1.15), sweeping up and back.
+  put(tail, 0.32, 0.32, 0.5, FUR, 0, 0, -0.19).rotation.x = -0.6;
+  put(tail, 0.36, 0.36, 0.5, FUR_DK, 0, 0.28, -0.43).rotation.x = -0.5;
+  put(tail, 0.26, 0.26, 0.3, FUR_LT, 0, 0.5, -0.63).rotation.x = -0.5;
 
-  // Four legs (pivot groups for the trot): upper fur, cream shin, dark paw.
+  // Four legs (pivot groups for the trot) — planted on the root so they don't lift as the
+  // body breathes: upper fur, cream shin, dark paw.
   const legs: THREE.Group[] = [];
   const makeLeg = (x: number, z: number, topY: number): THREE.Group => {
     const L = new THREE.Group();
@@ -677,30 +706,30 @@ function buildWolf(): { group: THREE.Group; legs: THREE.Group[] } {
   makeLeg(-0.32, -0.78, 1.2); // BR
 
   // Saddle: blanket, seat + gold rim, pommel/cantle, side skirts.
-  put(g, 0.88, 0.14, 1.02, SADDLE_DK, 0, 1.62, -0.1);
-  put(g, 0.68, 0.16, 0.82, SADDLE, 0, 1.74, -0.1);
-  put(g, 0.52, 0.14, 0.58, SEATR, 0, 1.82, -0.1);
-  put(g, 0.56, 0.05, 0.64, GOLD, 0, 1.9, -0.1);
-  put(g, 0.36, 0.22, 0.16, SADDLE_DK, 0, 1.92, 0.26);   // pommel
-  put(g, 0.4, 0.05, 0.18, GOLD, 0, 2.03, 0.26);
-  put(g, 0.42, 0.26, 0.16, SADDLE_DK, 0, 1.96, -0.46);  // cantle
-  put(g, 0.46, 0.05, 0.18, GOLD, 0, 2.09, -0.46);
-  put(g, 0.1, 0.42, 0.72, SADDLE, 0.45, 1.48, -0.1);    // side skirts
-  put(g, 0.1, 0.42, 0.72, SADDLE, -0.45, 1.48, -0.1);
+  put(body, 0.88, 0.14, 1.02, SADDLE_DK, 0, 1.62, -0.1);
+  put(body, 0.68, 0.16, 0.82, SADDLE, 0, 1.74, -0.1);
+  put(body, 0.52, 0.14, 0.58, SEATR, 0, 1.82, -0.1);
+  put(body, 0.56, 0.05, 0.64, GOLD, 0, 1.9, -0.1);
+  put(body, 0.36, 0.22, 0.16, SADDLE_DK, 0, 1.92, 0.26);   // pommel
+  put(body, 0.4, 0.05, 0.18, GOLD, 0, 2.03, 0.26);
+  put(body, 0.42, 0.26, 0.16, SADDLE_DK, 0, 1.96, -0.46);  // cantle
+  put(body, 0.46, 0.05, 0.18, GOLD, 0, 2.09, -0.46);
+  put(body, 0.1, 0.42, 0.72, SADDLE, 0.45, 1.48, -0.1);    // side skirts
+  put(body, 0.1, 0.42, 0.72, SADDLE, -0.45, 1.48, -0.1);
   // Rear saddlebags with gold buckles.
   for (const s of [1, -1]) {
-    put(g, 0.16, 0.42, 0.36, SADDLE, 0.48 * s, 1.32, -0.6);
-    put(g, 0.18, 0.14, 0.38, SADDLE_DK, 0.48 * s, 1.5, -0.6);
-    put(g, 0.08, 0.1, 0.1, GOLD, 0.55 * s, 1.34, -0.44);
+    put(body, 0.16, 0.42, 0.36, SADDLE, 0.48 * s, 1.32, -0.6);
+    put(body, 0.18, 0.14, 0.38, SADDLE_DK, 0.48 * s, 1.5, -0.6);
+    put(body, 0.08, 0.1, 0.1, GOLD, 0.55 * s, 1.34, -0.44);
   }
 
   // Harness: chest strap + a gold medallion, and a girth band round the barrel.
-  put(g, 0.82, 0.14, 0.14, STRAP, 0, 1.16, 0.86);
-  put(g, 0.14, 0.6, 0.12, STRAP, 0.34, 1.35, 0.7).rotation.x = -0.3;
-  put(g, 0.14, 0.6, 0.12, STRAP, -0.34, 1.35, 0.7).rotation.x = -0.3;
-  put(g, 0.22, 0.22, 0.1, GOLD, 0, 1.02, 0.9);
-  put(g, 0.11, 0.11, 0.12, SADDLE_DK, 0, 1.02, 0.93);
-  put(g, 0.86, 0.14, 0.34, STRAP, 0, 1.18, 0.18);
+  put(body, 0.82, 0.14, 0.14, STRAP, 0, 1.16, 0.86);
+  put(body, 0.14, 0.6, 0.12, STRAP, 0.34, 1.35, 0.7).rotation.x = -0.3;
+  put(body, 0.14, 0.6, 0.12, STRAP, -0.34, 1.35, 0.7).rotation.x = -0.3;
+  put(body, 0.22, 0.22, 0.1, GOLD, 0, 1.02, 0.9);
+  put(body, 0.11, 0.11, 0.12, SADDLE_DK, 0, 1.02, 0.93);
+  put(body, 0.86, 0.14, 0.34, STRAP, 0, 1.18, 0.18);
 
-  return { group: g, legs };
+  return { group: g, legs, body, head, tail };
 }
