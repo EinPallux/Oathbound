@@ -51,6 +51,13 @@ const STORM_BLUE = 0x3f63a0;
 const GOLD = 0xc9a94e;
 const BANNER_RED = 0x9a2f2f;
 const BANNER_BLUE = 0x2f4f9a;
+// Blue-Roof Tavern palette (warm lit windows, slate-blue ridge cap, timber, props).
+const ROOF_BLUE_DK = 0x39445e;
+const WIN_LIT = 0xffcf87, WIN_FRAME = 0x2e2216;
+const IRON = 0x24242a;
+const MUG_AMBER = 0xd9a441, MUG_FOAM = 0xf2ead2, MUG_HANDLE = 0xb07a2a;
+const BARREL = 0x7a5230, BARREL_HOOP = 0x4a3420, CRATE = 0x8a5a32, CRATE_DK = 0x5a3a1e;
+const LEAF = 0x4f7a34;
 
 function merlons(y: number, half: number, color: number): AssetPart[] {
   const xs = [-half + 0.4, -half * 0.34, half * 0.34, half - 0.4];
@@ -68,6 +75,36 @@ function gableRoof(color: number, width: number, length: number, rise: number, b
   return [
     part('box', color, [planeLen, 0.18, length], [cx - halfW / 2, y, z], [0, 0, slope]),
     part('box', color, [planeLen, 0.18, length], [cx + halfW / 2, y, z], [0, 0, -slope]),
+  ];
+}
+
+// ── Blue-Roof Tavern helpers (warm lattice windows + a barrel) ────────────────
+// A tall lit lattice window on a +Z-facing wall (dark frame + warm glass + mullion cross).
+function litWindow(w: number, h: number, x: number, y: number, z: number, depth = 0.12): AssetPart[] {
+  return [
+    box(WIN_FRAME, w + 0.16, h + 0.16, depth - 0.02, x, y, z - 0.01),
+    box(WIN_LIT, w, h, depth, x, y, z),
+    box(WIN_FRAME, w + 0.02, 0.06, depth + 0.02, x, y, z + 0.005),
+    box(WIN_FRAME, 0.06, h + 0.02, depth + 0.02, x, y, z + 0.005),
+  ];
+}
+// A lit window on an X-facing side wall (thin in X; glass sits slightly proud).
+function sideWindow(w: number, h: number, x: number, y: number, z: number, depth = 0.12): AssetPart[] {
+  const s = x >= 0 ? 1 : -1;
+  return [
+    box(WIN_FRAME, depth - 0.02, h + 0.16, w + 0.16, x, y, z),
+    box(WIN_LIT, depth, h, w, x + s * 0.03, y, z),
+    box(WIN_FRAME, depth + 0.02, 0.06, w + 0.02, x + s * 0.04, y, z),
+    box(WIN_FRAME, depth + 0.02, h + 0.02, 0.06, x + s * 0.04, y, z),
+  ];
+}
+// A barrel (body + two hoops + lid).
+function barrel(x: number, y0: number, z: number, s = 1): AssetPart[] {
+  return [
+    cyl(BARREL, 0.4 * s, 0.48 * s, 1.0 * s, x, y0 + 0.5 * s, z),
+    cyl(BARREL_HOOP, 0.5 * s, 0.5 * s, 0.12 * s, x, y0 + 0.3 * s, z),
+    cyl(BARREL_HOOP, 0.5 * s, 0.5 * s, 0.12 * s, x, y0 + 0.72 * s, z),
+    cyl(0x5a3f26, 0.4 * s, 0.4 * s, 0.06 * s, x, y0 + 1.0 * s, z),
   ];
 }
 
@@ -154,6 +191,116 @@ export const PRESET_ASSETS: AssetDef[] = [
     box(WOOD_DK, 0.1, 0.1, 0.9, 2.0, 2.6, 1.7),
     box(WOOD_LT, 0.08, 0.7, 0.7, 2.0, 2.2, 2.1),
   ], null, { hw: 2.0, hd: 1.6 }),
+  // A grand two-storey timber-framed tavern with a steep blue-slate roof, glowing lattice
+  // windows, a stone chimney, a covered porch (barrels + crate) and a hanging beer-mug sign.
+  // (front = +Z; big roof planes face ±X; front gable + attic window face +Z.)
+  def('tavern-blueroof', 'Blue-Roof Tavern', 'structure', [
+    // Stone ground floor + darker plinth + corner quoins
+    box(STONE_DK, 4.8, 0.36, 3.98, 0, 0.18, 0),
+    box(STONE, 4.6, 2.1, 3.8, 0, 1.25, 0),
+    box(STONE_LT, 0.42, 2.1, 0.42, -2.2, 1.25, 1.8),
+    box(STONE_LT, 0.42, 2.1, 0.42, 2.2, 1.25, 1.8),
+    // Iron-strapped door + stone surround (jambs, lintel, keystone) + steps
+    box(DOOR, 1.0, 1.5, 0.16, 0, 0.85, 1.94),
+    box(0x2a211a, 1.04, 0.1, 0.2, 0, 1.2, 2.0),
+    box(0x2a211a, 0.1, 1.4, 0.2, 0, 0.85, 2.0),
+    sph(0x1c1c22, 0.07, 0.3, 0.9, 2.02),
+    box(STONE_DK, 0.24, 1.7, 0.32, -0.62, 0.85, 1.98),
+    box(STONE_DK, 0.24, 1.7, 0.32, 0.62, 0.85, 1.98),
+    box(STONE_DK, 1.5, 0.34, 0.34, 0, 1.7, 1.98),
+    box(STONE_LT, 0.24, 0.36, 0.36, 0, 1.78, 2.0),
+    box(STONE, 1.6, 0.34, 0.42, 0, 0.17, 2.12),
+    box(STONE, 2.0, 0.2, 0.55, 0, 0.1, 2.42),
+    // Ground-floor lit windows (flank the door) + one on the left side, and door lanterns
+    ...litWindow(0.55, 0.72, -1.55, 1.3, 1.96),
+    ...litWindow(0.55, 0.72, 1.55, 1.3, 1.96),
+    ...sideWindow(0.5, 0.66, -2.32, 1.3, -0.4),
+    box(IRON, 0.16, 0.34, 0.16, -0.98, 1.55, 2.05),
+    box(0xffd27a, 0.1, 0.18, 0.1, -0.98, 1.55, 2.09),
+    box(IRON, 0.16, 0.34, 0.16, 0.98, 1.55, 2.05),
+    box(0xffd27a, 0.1, 0.18, 0.1, 0.98, 1.55, 2.09),
+    // Jettied (overhanging) upper timber floor: joist band + corbels + plaster block
+    box(WOOD_DK, 4.96, 0.28, 4.12, 0, 2.28, 0),
+    box(WOOD, 0.28, 0.28, 0.6, -1.9, 2.15, 2.05),
+    box(WOOD, 0.28, 0.28, 0.6, 0, 2.15, 2.05),
+    box(WOOD, 0.28, 0.28, 0.6, 1.9, 2.15, 2.05),
+    box(PLASTER_W, 4.8, 2.4, 4.0, 0, 3.6, 0),
+    // Timber frame: corner posts, front rails/studs, chevron braces, side rails
+    box(WOOD_DK, 0.22, 2.4, 0.22, -2.3, 3.6, 1.9),
+    box(WOOD_DK, 0.22, 2.4, 0.22, 2.3, 3.6, 1.9),
+    box(WOOD_DK, 0.22, 2.4, 0.22, -2.3, 3.6, -1.9),
+    box(WOOD_DK, 0.22, 2.4, 0.22, 2.3, 3.6, -1.9),
+    box(WOOD_DK, 4.7, 0.2, 0.12, 0, 4.7, 2.02),
+    box(WOOD_DK, 4.7, 0.18, 0.12, 0, 3.55, 2.02),
+    box(WOOD_DK, 4.7, 0.2, 0.12, 0, 2.45, 2.02),
+    box(WOOD_DK, 0.14, 2.4, 0.1, -0.75, 3.6, 2.03),
+    box(WOOD_DK, 0.14, 2.4, 0.1, 0.75, 3.6, 2.03),
+    box(WOOD_DK, 1.1, 0.13, 0.1, -1.5, 4.2, 2.03),
+    box(WOOD_DK, 1.1, 0.13, 0.1, 1.5, 4.2, 2.03),
+    part('box', WOOD_DK, [0.12, 0.18, 3.9], [2.42, 4.55, 0], [0, 0, 0]),
+    part('box', WOOD_DK, [0.12, 0.18, 3.9], [2.42, 2.5, 0], [0, 0, 0]),
+    // Upper lit windows: two tall on the front, one on each side
+    ...litWindow(0.72, 1.15, -1.5, 3.55, 2.04),
+    ...litWindow(0.72, 1.15, 1.5, 3.55, 2.04),
+    ...sideWindow(0.66, 1.05, 2.44, 3.55, 0.6),
+    ...sideWindow(0.66, 1.05, -2.44, 3.55, -0.5),
+    // Steep blue-slate roof (ridge along Z) + ridge cap + timber fascia
+    ...gableRoof(ROOF_BLUE, 5.4, 4.4, 2.8, 4.6, 0),
+    box(ROOF_BLUE_DK, 0.34, 0.2, 4.5, 0, 7.35, 0),
+    box(WOOD_DK, 0.14, 0.22, 4.5, -2.72, 4.55, 0),
+    box(WOOD_DK, 0.14, 0.22, 4.5, 2.72, 4.55, 0),
+    // Front gable (attic): stepped plaster (kept under the roof slope) + bargeboards +
+    // king post + tie beam + a glowing diamond window
+    box(PLASTER_W, 3.2, 1.0, 0.3, 0, 5.1, 2.0),
+    box(PLASTER_W, 2.0, 0.6, 0.3, 0, 5.9, 2.0),
+    box(PLASTER_W, 0.9, 0.55, 0.3, 0, 6.475, 2.0),
+    part('box', WOOD_DK, [Math.hypot(2.7, 2.8), 0.2, 0.34], [-1.35, 6.0, 2.16], [0, 0, Math.atan2(2.8, 2.7)]),
+    part('box', WOOD_DK, [Math.hypot(2.7, 2.8), 0.2, 0.34], [1.35, 6.0, 2.16], [0, 0, -Math.atan2(2.8, 2.7)]),
+    box(WOOD_DK, 0.18, 2.5, 0.3, 0, 5.85, 2.04),
+    box(WOOD_DK, 3.3, 0.18, 0.3, 0, 4.72, 2.04),
+    part('box', WIN_FRAME, [0.66, 0.66, 0.12], [0, 5.5, 2.16], [0, 0, Math.PI / 4]),
+    part('box', WIN_LIT, [0.5, 0.5, 0.14], [0, 5.5, 2.2], [0, 0, Math.PI / 4]),
+    part('box', WIN_FRAME, [0.9, 0.05, 0.16], [0, 5.5, 2.22], [0, 0, 0]),
+    part('box', WIN_FRAME, [0.05, 0.9, 0.16], [0, 5.5, 2.22], [0, 0, 0]),
+    // Back gable — matching stepped plaster fill so it isn't hollow from behind
+    box(PLASTER_W, 3.2, 1.0, 0.3, 0, 5.1, -2.0),
+    box(PLASTER_W, 2.0, 0.6, 0.3, 0, 5.9, -2.0),
+    box(PLASTER_W, 0.9, 0.55, 0.3, 0, 6.475, -2.0),
+    // Stone chimney (right, toward the back) with cap + flue pots
+    box(STONE, 0.95, 6.0, 0.95, 2.0, 5.3, -0.9),
+    box(STONE_LT, 0.5, 0.5, 0.5, 2.0, 6.2, -0.68),
+    box(STONE_LT, 0.45, 0.45, 0.45, 1.8, 7.2, -0.9),
+    box(STONE_DK, 1.06, 0.3, 1.06, 2.0, 6.5, -0.9),
+    box(STONE_DK, 1.2, 0.42, 1.2, 2.0, 8.4, -0.9),
+    box(0x322e28, 0.28, 0.42, 0.28, 1.82, 8.75, -0.9),
+    box(0x322e28, 0.28, 0.42, 0.28, 2.18, 8.75, -0.9),
+    // Covered porch (right): deck, posts, beam, blue lean-to roof, barrels + a crate
+    box(WOOD_LT, 1.7, 0.16, 3.4, 3.35, 0.1, 0.2),
+    box(WOOD, 0.18, 2.3, 0.18, 4.1, 1.25, 1.6),
+    box(WOOD, 0.18, 2.3, 0.18, 4.1, 1.25, 0.0),
+    box(WOOD, 0.18, 2.3, 0.18, 4.1, 1.25, -1.5),
+    box(WOOD, 0.16, 0.22, 3.5, 4.1, 2.3, 0.05),
+    part('box', ROOF_BLUE, [2.4, 0.16, 3.6], [3.28, 3.0, 0.15], [0, 0, -Math.atan2(1.2, 1.9)]),
+    part('box', WOOD_DK, [0.14, 0.2, 3.6], [4.32, 2.35, 0.15], [0, 0, 0]),
+    ...barrel(3.85, 0.18, 1.35, 1.0),
+    ...barrel(3.95, 0.18, -1.1, 0.9),
+    box(CRATE, 0.8, 0.8, 0.8, 3.35, 0.6, -0.3),
+    box(CRATE_DK, 0.86, 0.12, 0.86, 3.35, 1.02, -0.3),
+    // Front dressing: a leafy planter + a barrel by the steps
+    box(WOOD, 0.72, 0.42, 0.72, -1.85, 0.31, 2.25),
+    box(LEAF, 0.62, 0.22, 0.62, -1.85, 0.6, 2.25),
+    ...barrel(1.75, 0.0, 2.25, 0.85),
+    // Hanging tavern sign (front-left): bracket + chains + board with a foaming-mug emblem
+    box(WOOD_DK, 0.12, 0.12, 1.25, -2.5, 3.95, 2.45),
+    box(WOOD_DK, 0.12, 0.55, 0.12, -2.5, 3.65, 1.95),
+    part('cylinder', IRON, [0.028, 0.028, 0.5], [-2.72, 3.4, 2.95], [0, 0, 0]),
+    part('cylinder', IRON, [0.028, 0.028, 0.5], [-2.28, 3.4, 2.95], [0, 0, 0]),
+    box(0x2e2016, 1.02, 0.9, 0.06, -2.5, 2.95, 2.95),
+    box(0x4a3626, 0.86, 0.74, 0.08, -2.5, 2.95, 2.96),
+    box(MUG_AMBER, 0.34, 0.42, 0.06, -2.55, 2.86, 3.0),
+    box(MUG_FOAM, 0.34, 0.14, 0.06, -2.55, 3.14, 3.0),
+    box(MUG_HANDLE, 0.1, 0.24, 0.06, -2.3, 2.88, 3.0),
+  ], null, { hw: 2.5, hd: 2.1 }),
   def('barn', 'Barn', 'structure', [
     box(BARN_RED, 4.4, 3.0, 5.2, 0, 1.5, 0),
     cone(ROOF_DARK, 3.6, 1.8, 0, 3.6, 0),
