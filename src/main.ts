@@ -1,18 +1,25 @@
 // Entry point. The app shell (src/game/app.ts) runs the onboarding flow — Login →
 // Character Select → enter world — and boots the play session when a character is chosen.
 //
-// Optional: ?map=<name> loads a custom map authored in the Admin Tools Map Builder from
-// public/maps/<name>.oathbound-map.json (or ?map=<path|url>) and builds the world from it
-// instead of the procedural generators. With no ?map= the default world boots unchanged.
+// The game boots the authored "talar" map by default (see DEFAULT_MAP), loaded from
+// public/maps/talar.oathbound-map.json. ?map=<name> loads a different custom map authored in
+// the Admin Tools Map Builder from public/maps/<name>.oathbound-map.json (or ?map=<path|url>);
+// ?map=none (also `off` or empty) boots the old procedural world instead.
 import './styles.css';
 import { runApp } from './game/app';
 import { setActiveMap } from './world/active-map';
 import { normalizeMap } from './world/map-format';
 import { resolveMapUrl, mapNameHint } from './world/map-url';
 
+/** The map loaded when the URL has no ?map= override. */
+const DEFAULT_MAP = 'talar';
+
 async function loadRequestedMap(): Promise<void> {
-  const name = new URLSearchParams(location.search).get('map');
-  if (!name) return;
+  const requested = new URLSearchParams(location.search).get('map');
+  const lower = requested?.toLowerCase();
+  // Explicit opt-out (?map=none / off / empty) → boot the procedural world.
+  if (lower === '' || lower === 'none' || lower === 'off') return;
+  const name = requested ?? DEFAULT_MAP;
   const url = resolveMapUrl(name, import.meta.env.BASE_URL);
   const hint = mapNameHint(name);
   const place = `Put the exported file at public/maps/${hint}.oathbound-map.json and load it with ?map=${hint}.`;
