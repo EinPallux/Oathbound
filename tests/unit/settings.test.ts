@@ -61,7 +61,6 @@ describe('settings — merge/validate', () => {
       mouseSensitivity: 1.5,
       invertY: true,
       maxPixelRatio: 1,
-      voxelTerrain: true,
     };
     expect(mergeSettings(JSON.parse(JSON.stringify(custom)))).toEqual(custom);
     // confirmDestructive defaults to on, and validates like the other booleans.

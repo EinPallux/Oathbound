@@ -14,7 +14,6 @@ import { generateHeightfield, generateColliders, type Heightfield, type Cylinder
 import { WORLD_SIZE, WORLD_RES } from '../world/layout';
 import { generateScenery, type Clearing, type Scenery } from '../world/scenery';
 import { getActiveMap } from '../world/active-map';
-import { pavedSurfaceGeometry, unpackHeights } from '../world/map-format';
 import {
   buildCustomHeightfield,
   customColliders,
@@ -95,10 +94,10 @@ import {
 } from '../sim/combat/events';
 import type { TelemetrySnapshot } from '../sim/telemetry';
 import { Rng } from '../core/rng';
-import { buildTerrainMesh, buildProps, terrainColorRGB, VOXEL_CUBE, VOXEL_STEP, VOXEL_VIEW } from '../render/terrain-mesh';
+import { buildProps, terrainColorRGB, VOXEL_CUBE, VOXEL_STEP, VOXEL_VIEW } from '../render/terrain-mesh';
 import { VoxelTerrain } from '../render/voxel-terrain';
 import { buildScenery } from '../render/scenery-view';
-import { buildCustomTerrainMesh, buildCustomScenery, colorForBiome } from '../render/custom-map-view';
+import { buildCustomScenery, colorForBiome } from '../render/custom-map-view';
 import { CustomNpcs } from '../render/custom-npcs';
 import { CustomCritters } from '../render/custom-critters';
 import { QuestLog } from './quests';
@@ -256,7 +255,6 @@ export function boot(options: BootOptions = {}): Game {
   let movementBoxes = villageBoxes();
   let villageEnabled = true;
   let mapSize = WORLD_SIZE;
-  let pavingMesh: THREE.Mesh | null = null; // City/Cobblestone overlay — re-laid on cube tops in voxel mode
   const playerStart = customMap ? customMap.playerSpawn : { x: 0, z: 0 };
 
   if (customMap) {
@@ -265,7 +263,10 @@ export function boot(options: BootOptions = {}): Game {
     const boxCols = customBoxColliders(customMap); // building/wall footprints
     const customSceneryGroup = buildCustomScenery(customMap, field);
     renderer.scene.add(customSceneryGroup);
-    pavingMesh = (customSceneryGroup.getObjectByName('paving') as THREE.Mesh) ?? null;
+    // Always Cube World: the voxel bubble draws per-cube paved-stone tops, so hide the smooth
+    // authoring-res paving overlay that buildCustomScenery adds.
+    const smoothPaving = customSceneryGroup.getObjectByName('paving');
+    if (smoothPaving) smoothPaving.visible = false;
     scenery = customSceneryForMinimap(customMap);
     props = new THREE.Group(); // custom maps add no separate collidable-rock mesh
     mapSize = customMap.size;
@@ -302,13 +303,16 @@ export function boot(options: BootOptions = {}): Game {
     scenery = generateScenery(WORLD_SIZE, { clearings, roadTargets, seed: 7777 });
     renderer.scene.add(buildScenery(scenery, field));
   }
-  // Terrain — the smooth mesh, or a "Cube World" voxel bubble that follows the player. The
-  // voxel toggle also switches the heightfield's collision grid (field.voxelCube/Step) and pulls
-  // the fog in; render + collision share field.voxelHeightAt, so the cubes you see are the cubes
-  // you stand on. Wired for a live swap by applyVoxelTerrain() below. ?voxel=1 / ?voxel=0
-  // overrides the saved setting at boot.
-  const voxelOverride = new URLSearchParams(location.search).get('voxel');
-  if (voxelOverride != null) settings.voxelTerrain = !(voxelOverride === '0' || voxelOverride === 'off' || voxelOverride === 'false');
+  // Terrain — the game renders in "Cube World" style: a bubble of fine cubes that follows the
+  // player (the map is too big to voxelize whole, but the fog only shows a few hundred metres, so
+  // we build just the visible square and rebuild as the player roams). The heightfield's collision
+  // grid is switched on to match (field.voxelCube/Step) and the fog pulled in to hide the bubble
+  // edge; render + collision share field.voxelHeightAt, so the cubes you see are the cubes you
+  // stand on. The smooth ground overlays (paving from buildCustomScenery) are hidden — the bubble
+  // draws its own per-cube paved-stone tops.
+  field.voxelCube = VOXEL_CUBE;
+  field.voxelStep = VOXEL_STEP;
+  renderer.setFogRange(60, VOXEL_VIEW);
   const _terrCol = new THREE.Color();
   const cm = customMap; // non-null capture for the colour closure
   const voxelColorAt: (x: number, z: number, h: number, out: [number, number, number]) => void = cm
@@ -317,10 +321,9 @@ export function boot(options: BootOptions = {}): Game {
         out[0] = _terrCol.r; out[1] = _terrCol.g; out[2] = _terrCol.b;
       }
     : terrainColorRGB;
-  const smoothTerrain = cm ? buildCustomTerrainMesh(field, cm) : buildTerrainMesh(field);
-  const voxelTerrain = new VoxelTerrain(field, voxelColorAt, VOXEL_CUBE, VOXEL_VIEW);
-  let terrain: THREE.Object3D = smoothTerrain;
-  renderer.scene.add(terrain);
+  const voxelTerrain = new VoxelTerrain(field, voxelColorAt, VOXEL_CUBE, VOXEL_VIEW, cm ? (x, z) => biomeIndexAt(cm, x, z) : null);
+  voxelTerrain.rebuildAt(playerStart.x, playerStart.z);
+  renderer.scene.add(voxelTerrain.group);
 
   // Entities.
   const world = new World();
@@ -430,38 +433,9 @@ export function boot(options: BootOptions = {}): Game {
   const playerView = new PlayerView(renderer.scene);
   const ambientLife = new AmbientLife(renderer.scene);
   // Buildings join the camera's occlusion obstacles so the chase camera springs off walls.
-  // The array is mutable so a live terrain swap (voxel toggle) can replace the terrain entry.
-  const cameraObstacles: THREE.Object3D[] = [terrain, props, ...(village ? [village.buildings] : [])];
+  // (The voxel cube mesh is the terrain obstacle — raycast the mesh, not its wrapper group.)
+  const cameraObstacles: THREE.Object3D[] = [voxelTerrain.mesh, props, ...(village ? [village.buildings] : [])];
   const cameraRig = new CameraRig(renderer.camera, input, cameraObstacles);
-  // Apply the voxel-terrain setting: switch the collision grid + fog, and swap the smooth mesh
-  // for the player-centred cube bubble (rebuilt at the player's current spot). Called at boot
-  // and whenever the setting toggles.
-  const applyVoxelTerrain = (): void => {
-    const on = settings.voxelTerrain;
-    field.voxelCube = on ? VOXEL_CUBE : 0;
-    field.voxelStep = on ? VOXEL_STEP : 0;
-    renderer.setFogRange(on ? 60 : 150, on ? VOXEL_VIEW : 640);
-    const pt = world.get<Transform>(player, C.Transform)!;
-    renderer.scene.remove(terrain);
-    if (on) voxelTerrain.rebuildAt(pt.x, pt.z);
-    terrain = on ? voxelTerrain.mesh : smoothTerrain;
-    renderer.scene.add(terrain);
-    cameraObstacles[0] = terrain; // keep the camera's occlusion ray pointing at the live mesh
-    // Re-lay the paved-stone (City/Cobblestone) overlay: on the cube tops in voxel mode (so the
-    // stone texture shows), or the smooth heights otherwise.
-    if (pavingMesh && cm) {
-      const hAt = on ? (x: number, z: number): number => field.voxelHeightAt(x, z) : undefined;
-      const pv = pavedSurfaceGeometry(cm.biomes, unpackHeights(cm), cm.res, cm.size, hAt);
-      const g = pavingMesh.geometry;
-      g.setAttribute('position', new THREE.BufferAttribute(pv.positions, 3));
-      g.setAttribute('uv', new THREE.BufferAttribute(pv.uvs, 2));
-      g.setAttribute('color', new THREE.BufferAttribute(pv.colors, 3));
-      g.setIndex(pv.indices);
-      g.computeVertexNormals();
-    }
-  };
-  let voxelApplied = settings.voxelTerrain;
-  applyVoxelTerrain(); // set the initial state from the saved setting / ?voxel=
   const enemyView = new EnemyView(renderer.scene);
   const lootView = new LootView(renderer.scene);
   const projectileView = new ProjectileView(renderer.scene, projectiles);
@@ -489,10 +463,6 @@ export function boot(options: BootOptions = {}): Game {
     renderer.setMaxPixelRatio(settings.maxPixelRatio);
     applyVolume();
     input.setLook(settings.mouseSensitivity, settings.invertY);
-    if (settings.voxelTerrain !== voxelApplied) {
-      voxelApplied = settings.voxelTerrain;
-      applyVoxelTerrain();
-    }
   };
   settingsPanel.onKeybindsChange = () => {
     saveKeybinds(keybinds);
@@ -718,9 +688,9 @@ export function boot(options: BootOptions = {}): Game {
       const rdt = Math.min(0.1, (now - lastRender) / 1000);
       lastRender = now;
 
-      // Voxel mode: keep the cube bubble centred on the player (rebuilds only when they've
-      // drifted far enough, so most frames this is a cheap distance check).
-      if (field.voxelCube > 0) voxelTerrain.update(playerTransform.x, playerTransform.z);
+      // Keep the cube bubble centred on the player (rebuilds only when they've drifted far
+      // enough, so most frames this is a cheap distance check).
+      voxelTerrain.update(playerTransform.x, playerTransform.z);
 
       // Centre panels are mutually exclusive (inventory / character / vendor / travel).
       if (input.consumeToggleInventory()) {
