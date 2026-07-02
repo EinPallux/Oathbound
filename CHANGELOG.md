@@ -5,6 +5,15 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Blue-Roof Tavern preset (owner-requested — built from a reference image)
+**Goal:** turn an owner-supplied reference image (a timber-framed medieval tavern with a blue slate roof) into a placeable Three.js asset for the Map Builder + game.
+- **New `structure` preset `tavern-blueroof` ("Blue-Roof Tavern")** (`presets.ts`, mirrored editor ↔ game): a grand two-storey **timber-framed inn** built from the shared primitive + `gableRoof` vocabulary — a grey **stone ground floor** (plinth + corner quoins), a **jettied** cream **upper floor** with dark timber framing (corner posts, rails, studs, chevron braces) and a stepped plaster front gable, a steep **blue-slate gable roof** (ridge cap + bargeboards + fascia), a tall **stone chimney** with cap + flue pots, **warm glowing lattice windows** (front, sides, and a diamond attic light), an iron-strapped arched **door** with a stone surround + steps, a **covered porch** (posts, blue lean-to roof, two barrels + a crate), a leafy planter, and a **hanging beer-mug sign**. Box-footprint collider `{ hw: 2.5, hd: 2.1 }`; it lists in the **Structures** library right after Inn/Tavern.
+- Added three small tavern helpers to `presets.ts` (`litWindow`, `sideWindow`, `barrel`) + a tavern palette block; the editor and game copies stay byte-identical after the header.
+
+**Verified:** `typecheck` ✓ (both repos) · `npm test` → 335/335 ✓ · `build` ✓ (both repos) · headless render of the **shipped** `presets.ts` (both repos) resolves `tavern-blueroof` (122 parts) and renders the tavern from four angles, matching the reference; a headless **editor** run confirms the "Blue-Roof Tavern" chip appears in the Assets palette (with a generated thumbnail) and places on the terrain ("Placed 1 asset"), with zero console errors.
+
+---
+
 ## Paving polish + Mountains ground + 12 medieval city buildings
 **Goal:** three follow-ups to the Ground work — shrink the oversized paving stones, add a rocky **Mountains** ground, and add grand **city** buildings (Stormwind-style, not villagey).
 - **Smaller paving (City + Cobblestone):** the paved look moved off the terrain vertex colours (which were mesh-resolution-limited, so slabs looked huge) onto a **repeat-tiled texture overlay** — a procedural cobblestone canvas (`src/render/paving.ts`, mirrored in the Map Builder) laid on a thin mesh over paved cells with world-scaled UVs (`pavedSurfaceGeometry`, ~2.2 m repeat → ~0.44 m stones). Stone size is now independent of terrain resolution; City & Cobblestone share the texture (City cool grey, Cobblestone a touch warmer). The terrain vertex colour under paving is now a flat base tone.
