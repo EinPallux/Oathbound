@@ -31,6 +31,8 @@ const HOLD_ANGLE = ((90 - 65) * Math.PI) / 180;
 const SHIELD_ANGLE = (50 * Math.PI) / 180;
 /** How far the rider lifts (local m) to sit on the wolf's saddle when mounted. */
 const SEAT_Y = 0.78;
+/** Local Y the player's head pivots about (neck base) so it can nod/turn on the torso. */
+const HEAD_PIVOT = 1.72;
 
 const SKIN = 0xd9a878;
 const HAIR = 0x6b4526;
@@ -102,7 +104,8 @@ export class PlayerView {
   private npTexture: THREE.CanvasTexture | null = null;
   private npKey = '';
   private figure = new THREE.Group(); // the whole rider (body + legs + drapery) — lifts when mounted
-  private body = new THREE.Group(); // upper body (torso/head/arms) — bobs/leans/spins
+  private body = new THREE.Group(); // upper body (torso/arms) — bobs/leans/twists
+  private head = new THREE.Group(); // head + hair (child of body) — nods/turns
   private legL = new THREE.Group();
   private legR = new THREE.Group();
   private armL = new THREE.Group(); // off-hand (shield / bow-hold)
@@ -180,6 +183,7 @@ export class PlayerView {
     this.group.add(this.figure);
     this.body = new THREE.Group();
     this.figure.add(this.body);
+    this.head = new THREE.Group(); this.head.position.set(0, HEAD_PIVOT, 0); this.body.add(this.head);
     this.armL = new THREE.Group(); this.armL.position.set(0.56, 1.82, 0); this.body.add(this.armL);
     this.armR = new THREE.Group(); this.armR.position.set(-0.56, 1.82, 0); this.body.add(this.armR);
     this.legL = new THREE.Group(); this.legL.position.set(0.24, 0.92, 0); this.figure.add(this.legL);
@@ -202,17 +206,25 @@ export class PlayerView {
     }
   }
 
+  /** Add a box to the head sub-group using absolute (torso-space) coords — the head pivots
+   *  about HEAD_PIVOT, so it can nod/turn while everything reads at the same rest position. */
+  private putHead(w: number, h: number, d: number, color: number, x: number, y: number, z: number, rough = 0.75): THREE.Mesh {
+    const m = box(w, h, d, color, rough);
+    m.position.set(x, y - HEAD_PIVOT, z);
+    this.head.add(m);
+    return m;
+  }
+
   /** Skin+hair+eyes shared by every class (hair styling is added by the caller). */
   private buildFace(eyeColor: number): void {
-    const b = this.body;
-    put(b, 0.62, 0.58, 0.58, SKIN, 0, 2.04, 0);            // head
-    put(b, 0.16, 0.05, 0.04, BROW, 0.15, 2.15, 0.30);    // brows
-    put(b, 0.16, 0.05, 0.04, BROW, -0.15, 2.15, 0.30);
-    put(b, 0.09, 0.11, 0.04, 0xffffff, 0.15, 2.04, 0.30, 0.4); // eye whites
-    put(b, 0.09, 0.11, 0.04, 0xffffff, -0.15, 2.04, 0.30, 0.4);
-    put(b, 0.07, 0.09, 0.05, eyeColor, 0.15, 2.03, 0.31, 0.35); // irises
-    put(b, 0.07, 0.09, 0.05, eyeColor, -0.15, 2.03, 0.31, 0.35);
-    put(b, 0.16, 0.05, 0.04, 0x9c6b45, 0, 1.86, 0.30);   // mouth line
+    this.putHead(0.62, 0.58, 0.58, SKIN, 0, 2.04, 0);            // head
+    this.putHead(0.16, 0.05, 0.04, BROW, 0.15, 2.15, 0.30);     // brows
+    this.putHead(0.16, 0.05, 0.04, BROW, -0.15, 2.15, 0.30);
+    this.putHead(0.09, 0.11, 0.04, 0xffffff, 0.15, 2.04, 0.30, 0.4); // eye whites
+    this.putHead(0.09, 0.11, 0.04, 0xffffff, -0.15, 2.04, 0.30, 0.4);
+    this.putHead(0.07, 0.09, 0.05, eyeColor, 0.15, 2.03, 0.31, 0.35); // irises
+    this.putHead(0.07, 0.09, 0.05, eyeColor, -0.15, 2.03, 0.31, 0.35);
+    this.putHead(0.16, 0.05, 0.04, 0x9c6b45, 0, 1.86, 0.30);   // mouth line
   }
 
   // ── Warrior: steel plate over a navy gambeson, red scarf/tabard, sword + kite shield ──
@@ -224,14 +236,14 @@ export class PlayerView {
     const GOLD = 0xc9a94e, BLADE = 0xd6dbe2, SHIELD = 0x2f3e63;
 
     this.buildFace(0x2f5fa0);
-    // Tufty brown hair.
-    put(b, 0.7, 0.24, 0.66, HAIR, 0, 2.36, 0);
-    put(b, 0.62, 0.16, 0.12, HAIR, 0, 2.28, 0.28);
-    put(b, 0.12, 0.42, 0.5, HAIR, 0.33, 2.12, -0.02);
-    put(b, 0.12, 0.42, 0.5, HAIR, -0.33, 2.12, -0.02);
-    put(b, 0.66, 0.3, 0.14, HAIR, 0, 2.22, -0.3);
+    // Tufty brown hair (on the head pivot).
+    this.putHead(0.7, 0.24, 0.66, HAIR, 0, 2.36, 0);
+    this.putHead(0.62, 0.16, 0.12, HAIR, 0, 2.28, 0.28);
+    this.putHead(0.12, 0.42, 0.5, HAIR, 0.33, 2.12, -0.02);
+    this.putHead(0.12, 0.42, 0.5, HAIR, -0.33, 2.12, -0.02);
+    this.putHead(0.66, 0.3, 0.14, HAIR, 0, 2.22, -0.3);
     for (const [hx, hz] of [[-0.2, 0.1], [0.05, 0.16], [0.24, 0.02], [-0.28, -0.05]] as const)
-      put(b, 0.18, 0.14, 0.18, HAIR, hx, 2.5, hz);
+      this.putHead(0.18, 0.14, 0.18, HAIR, hx, 2.5, hz);
 
     // Red scarf bunched at the collar (sits below the chin).
     put(b, 0.56, 0.2, 0.18, RED, 0, 1.68, 0.2);
@@ -322,13 +334,13 @@ export class PlayerView {
     const GOLD = 0xc9a94e, WOOD = 0x7a5126, STRING = 0xd8d2c0, FLETCH = 0xeae6d8;
 
     this.buildFace(0x3f6b3a);
-    // Brown hair under a pushed-back green hood.
-    put(b, 0.68, 0.22, 0.62, HAIR, 0, 2.34, 0);
-    put(b, 0.6, 0.14, 0.12, HAIR, 0, 2.28, 0.28);
-    put(b, 0.12, 0.36, 0.48, HAIR, 0.32, 2.14, -0.02);
-    put(b, 0.12, 0.36, 0.48, HAIR, -0.32, 2.14, -0.02);
+    // Brown hair under a pushed-back green hood (hair on the head pivot; hood stays on the body).
+    this.putHead(0.68, 0.22, 0.62, HAIR, 0, 2.34, 0);
+    this.putHead(0.6, 0.14, 0.12, HAIR, 0, 2.28, 0.28);
+    this.putHead(0.12, 0.36, 0.48, HAIR, 0.32, 2.14, -0.02);
+    this.putHead(0.12, 0.36, 0.48, HAIR, -0.32, 2.14, -0.02);
     for (const [hx, hz] of [[-0.18, 0.08], [0.14, 0.12], [0.24, -0.04]] as const)
-      put(b, 0.16, 0.12, 0.16, HAIR, hx, 2.48, hz);
+      this.putHead(0.16, 0.12, 0.16, HAIR, hx, 2.48, hz);
     put(b, 0.56, 0.34, 0.24, GREEN, 0, 1.82, -0.26);      // hood bunched behind the neck
     put(b, 0.7, 0.22, 0.34, GREEN_DK, 0, 1.68, -0.2);
 
@@ -407,10 +419,10 @@ export class PlayerView {
     const GEM = 0x4aa8e8, BELT = 0x5a3a1e, STAFF = 0x4a3a2a;
 
     this.buildFace(0x2f5fa0);
-    // Brown fringe peeking out under a raised cream hood with gold trim.
-    put(b, 0.5, 0.14, 0.1, HAIR, 0, 2.24, 0.27);
-    put(b, 0.12, 0.24, 0.2, HAIR, 0.28, 2.1, 0.2);
-    put(b, 0.12, 0.24, 0.2, HAIR, -0.28, 2.1, 0.2);
+    // Brown fringe peeking out under a raised cream hood with gold trim (fringe on the head pivot).
+    this.putHead(0.5, 0.14, 0.1, HAIR, 0, 2.24, 0.27);
+    this.putHead(0.12, 0.24, 0.2, HAIR, 0.28, 2.1, 0.2);
+    this.putHead(0.12, 0.24, 0.2, HAIR, -0.28, 2.1, 0.2);
     put(b, 0.8, 0.3, 0.78, ROBE, 0, 2.44, -0.02);          // hood crown
     put(b, 0.76, 0.64, 0.22, ROBE, 0, 2.12, -0.34);        // hood back
     put(b, 0.18, 0.72, 0.66, ROBE, 0.36, 2.06, 0.02);      // hood side
@@ -576,23 +588,35 @@ export class PlayerView {
     const target = Math.min(1, speed / 3.5);
     this.walkBlend += (target - this.walkBlend) * Math.min(1, dt * 10);
     if (speed > 0.05) this.walkPhase += dt * (4.5 + speed * 0.9);
-    const wb = this.walkBlend * (1 - mb);
-    const sw = Math.sin(this.walkPhase);
+    const wb = this.walkBlend * (1 - mb);           // on-foot walk weight
+    const idle = (1 - this.walkBlend) * (1 - mb);   // on-foot standing weight
+    const sw = Math.sin(this.walkPhase);            // stride (1 per step-pair)
+    const sw2 = Math.sin(this.walkPhase * 2);       // footfall (2 per step-pair)
 
-    // Legs: walk cycle on foot; astride (dropped down the wolf's sides, splayed) while
-    // mounted — mostly hanging with a slight forward angle so they clear the barrel.
-    this.legR.rotation.x = sw * 0.6 * wb + 0.36 * mb;
-    this.legL.rotation.x = -sw * 0.6 * wb + 0.36 * mb;
+    // Legs: a bigger walk swing on foot; astride (dropped down the wolf's sides, splayed)
+    // while mounted — hanging with a slight forward angle so they clear the barrel.
+    this.legR.rotation.x = sw * 0.72 * wb + 0.36 * mb;
+    this.legL.rotation.x = -sw * 0.72 * wb + 0.36 * mb;
     this.legR.rotation.z = -0.44 * mb;
     this.legL.rotation.z = 0.44 * mb;
-    let armRx = -sw * 0.45 * wb + 0.3 * mb;
-    let armLx = sw * 0.45 * wb + 0.3 * mb;
 
-    // Body bob/breathing (suppressed while mounted) + a slight forward lean.
-    const breathe = Math.sin(this.t * 1.6) * 0.025 * (1 - this.walkBlend);
-    this.body.position.y = (Math.abs(Math.sin(this.walkPhase * 2)) * 0.07 * wb + breathe) * (1 - mb);
-    this.body.rotation.x = 0.06 * wb + 0.1 * mb;
-    this.body.rotation.y = 0;
+    // Arms counter-swing to the legs; a breath-driven drift keeps them alive when idle.
+    const breath = Math.sin(this.t * 1.5);
+    let armRx = -sw * 0.58 * wb + 0.3 * mb + breath * 0.03 * idle;
+    let armLx = sw * 0.58 * wb + 0.3 * mb + breath * 0.03 * idle;
+
+    // Torso: a footfall bob + breathing lift; a slight forward lean when walking; a shoulder
+    // twist that counter-rotates the hips (walk) and a slow weight-shift sway (idle).
+    this.body.position.y = (Math.abs(sw2) * 0.08 * wb + breath * 0.03 * idle) * (1 - mb);
+    this.body.rotation.x = 0.08 * wb + 0.1 * mb;
+    this.body.rotation.y = -sw * 0.13 * wb + Math.sin(this.t * 0.5) * 0.05 * idle;
+    this.body.rotation.z = sw * 0.05 * wb + Math.sin(this.t * 0.4) * 0.03 * idle;
+
+    // Head: bobs with each footfall and partly counter-turns so the gaze stays forward when
+    // walking; drifts in a slow look-around when idle.
+    this.head.rotation.x = -sw2 * 0.05 * wb + Math.sin(this.t * 0.65) * 0.04 * idle;
+    this.head.rotation.y = sw * 0.08 * wb + Math.sin(this.t * 0.4 + 1.3) * 0.14 * idle;
+    this.head.rotation.z = Math.sin(this.t * 0.5) * 0.03 * idle;
 
     // Ability action overrides the arms (and body) — suppressed while mounted to avoid odd
     // seated swings, but its timer/orb still resolve.
@@ -608,22 +632,54 @@ export class PlayerView {
     this.armR.rotation.x = armRx;
     this.armL.rotation.x = armLx;
 
-    // Wolf idle + trot while ridden: a breathing body bob (the rider rides along with it), a
-    // swaying tail and gentle head nod when standing, and a diagonal-pair leg trot that ramps
-    // with speed — so it never looks frozen when AFK.
+    // Wolf while ridden: idle breathing/tail/head sway when standing, and a lively bounding
+    // gallop when moving — the body rocks and bobs, the rider posts and leans into it, the
+    // tail streams and the legs bound in front/back pairs. All gated by `mb` so it fades in/out
+    // cleanly on mount/dismount, and by speed so an AFK mount never looks frozen.
     if (this.mount && mb > 0.02) {
-      const trot = Math.min(1, speed / 6);
-      const still = 1 - Math.min(1, speed / 2);
-      const breathe = Math.sin(this.t * 1.6) * 0.04 * still * mb;
-      this.mountBody!.position.y = breathe;
-      this.figure.position.y = SEAT_Y * mb + breathe; // the rider breathes with the mount
+      const gait = Math.min(1, speed / 6);           // 0 standing → 1 full gallop
+      const still = 1 - Math.min(1, speed / 2);      // 1 standing → 0 moving
+      if (speed > 0.05) this.wolfPhase += dt * (2.2 + speed * 0.85);
+      const gp = this.wolfPhase;
+      const gs = Math.sin(gp);
+
+      // Wolf body: gentle breathing when idle; vertical suspension + fore/aft rock when bounding.
+      const idleBob = Math.sin(this.t * 1.6) * 0.04 * still;
+      const bound = Math.abs(gs) * 0.13 * gait;
+      const mountBob = (idleBob + bound) * mb;
+      this.mountBody!.position.y = mountBob;
+      this.mountBody!.rotation.x = Math.sin(gp + 0.7) * 0.11 * gait * mb;
+
+      // Rider: rides the bob glued to the saddle, posts a little extra, and leans into the
+      // gallop while rocking subtly with each bound.
+      const posting = Math.abs(Math.sin(gp + 0.4)) * 0.06 * gait * mb;
+      this.figure.position.y = SEAT_Y * mb + mountBob + posting;
+      this.body.rotation.x += (0.2 * gait + gs * 0.05 * gait) * mb;  // lean forward + rock
+      this.body.rotation.z += gs * 0.04 * gait * mb;                 // sway with the gallop
+      this.head.rotation.x =
+        (-0.06 + Math.sin(gp + 0.5) * 0.05) * gait * mb + Math.sin(this.t * 1.4) * 0.03 * still * mb;
+      this.head.rotation.y = 0;
+      const reinBob = gs * 0.06 * gait * mb;
+      this.armR.rotation.x += reinBob;                               // hands ride the reins
+      this.armL.rotation.x += reinBob;
+      this.legR.rotation.x += gs * 0.05 * gait * mb;                 // legs flex with the gait
+      this.legL.rotation.x -= gs * 0.05 * gait * mb;
+
+      // Tail: sways side-to-side when idle; pumps up/down streaming behind at the gallop.
       this.mountTail!.rotation.y = Math.sin(this.t * 2.3) * (0.14 + 0.16 * still) * mb;
-      this.mountHead!.rotation.x = Math.sin(this.t * 1.6 + 0.7) * 0.06 * still * mb;
+      this.mountTail!.rotation.x = -gs * 0.2 * gait * mb;
+
+      // Head: gentle nod/look when idle; reaches with the bounding rhythm when galloping.
+      this.mountHead!.rotation.x =
+        Math.sin(this.t * 1.6 + 0.7) * 0.06 * still * mb + Math.sin(gp + 3.0) * 0.12 * gait * mb;
       this.mountHead!.rotation.y = Math.sin(this.t * 0.9) * 0.04 * still * mb;
-      if (speed > 0.05) this.wolfPhase += dt * (2.5 + speed * 0.8);
-      const ws = Math.sin(this.wolfPhase) * 0.5 * trot * mb;
-      const signs = [1, -1, -1, 1]; // FL, FR, BL, BR
-      for (let i = 0; i < this.mountLegs.length; i++) this.mountLegs[i].rotation.x = ws * signs[i];
+
+      // Legs: a bounding gallop — the front pair reaches as the back pair pushes (offset ~π),
+      // with a slight lead within each pair so it reads as a real 4-beat gait; amplitude ramps.
+      const legAmp = 0.62 * gait * mb;
+      const legPhase = [Math.PI + 0.5, Math.PI, 0.5, 0]; // FL, FR, BL, BR
+      for (let i = 0; i < this.mountLegs.length; i++)
+        this.mountLegs[i].rotation.x = Math.sin(gp + legPhase[i]) * legAmp;
     }
   }
 }
