@@ -54,43 +54,67 @@ const PALETTE = {
   mountainHigh: new THREE.Color(0x877f73),
 };
 
-function rockNoise(wx: number, wz: number): number {
-  const qx = Math.floor(wx / 1.5);
-  const qz = Math.floor(wz / 1.5);
-  let h = (qx * 374761393 + qz * 668265263) | 0;
-  h = ((h ^ (h >>> 13)) * 1274126177) | 0;
-  return ((h >>> 0) % 1000) / 1000;
+// ── Ground grain ──────────────────────────────────────────────────────────────
+// A little deterministic per-spot colour variation so each ground type reads with *texture* —
+// grassy speckle + meadow patches, craggy stone mottle, fine sandy/snowy grit — instead of one
+// flat colour per cube. Pure function of world position, so it stays stable as the cube bubble
+// rebuilds. Kept byte-identical with the editor copy (AdminTools src/oathbound/palette.ts).
+type GrainStyle = 'grass' | 'rock' | 'grit' | 'flat';
+function hash01(ix: number, iz: number, seed: number): number {
+  let h = (Math.imul(ix, 374761393) + Math.imul(iz, 668265263) + Math.imul(seed, 1442695041)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+}
+/** Value noise in [0,1) sampled per `cell`-metre block at world (wx, wz). */
+function vnoise(wx: number, wz: number, cell: number, seed: number): number {
+  return hash01(Math.floor(wx / cell), Math.floor(wz / cell), seed);
+}
+/** Nudge `out` with per-spot grain matching the ground's material feel. */
+function applyGrain(out: THREE.Color, style: GrainStyle, wx: number, wz: number): void {
+  if (style === 'grass') {
+    const fine = vnoise(wx, wz, 1.7, 11) - 0.5;   // per-blade speckle
+    const patch = vnoise(wx, wz, 6.5, 12) - 0.5;  // meadow patches
+    out.addScalar(fine * 0.09 + patch * 0.05);
+    out.g += patch * 0.035; out.r += patch * 0.02; // patches drift warmer/cooler green
+  } else if (style === 'rock') {
+    const fine = vnoise(wx, wz, 1.5, 21) - 0.5;
+    const crag = vnoise(wx, wz, 3.4, 22) - 0.5;   // blocky craggy mottle
+    out.addScalar(fine * 0.12 + crag * 0.09);
+  } else if (style === 'grit') {
+    const fine = vnoise(wx, wz, 1.4, 31) - 0.5;
+    const patch = vnoise(wx, wz, 5, 32) - 0.5;
+    out.addScalar(fine * 0.06 + patch * 0.035);   // subtle sand/snow grain
+  }
 }
 
 export function colorForBiome(biome: number, h: number, wx: number, wz: number, out: THREE.Color): THREE.Color {
   const t = THREE.MathUtils.clamp((h + 2) / 5, 0, 1);
+  let style: GrainStyle = 'grass';
   switch (biome) {
-    case 1: return out.copy(PALETTE.thorn).lerp(PALETTE.greenHigh, t * 0.25);
-    case 2: return out.copy(PALETTE.fen);
-    case 3: return out.copy(PALETTE.ember).lerp(PALETTE.emberHot, t);
-    case 4: { const sn = THREE.MathUtils.clamp((h - 24) / 22, 0, 1); return out.copy(PALETTE.rivenRock).lerp(PALETTE.snow, sn); }
-    case 5: return out.copy(PALETTE.grave);
-    case 6: return out.copy(PALETTE.hub);
-    case 7: return out.copy(PALETTE.city);   // City — paved stone (fine paving is a texture overlay)
-    case 8: return out.copy(PALETTE.desert);                                       // Desert sand
-    case 9: { const band = Math.sin(h * 0.8) * 0.5 + 0.5; return out.copy(PALETTE.mesaLow).lerp(PALETTE.mesaHigh, band); } // Mesa
-    case 10: return out.copy(PALETTE.savanna);                                     // Savanna
-    case 11: { const sn = THREE.MathUtils.clamp((h - 6) / 20, 0, 1); return out.copy(PALETTE.tundra).lerp(PALETTE.snow, sn); } // Tundra
-    case 12: return out.copy(PALETTE.dirt);                                        // Dirt
-    case 13: return out.copy(PALETTE.sand);                                        // Beach sand
-    case 14: return out.copy(PALETTE.mud);                                         // Mud
-    case 15: return out.copy(PALETTE.cobble);                                      // Cobblestone (paving overlay on top)
-    case 16: return out.copy(PALETTE.ash);                                         // Ash / wasteland
-    case 17: return out.copy(PALETTE.jungleLow).lerp(PALETTE.jungleHigh, t * 0.5); // Jungle
-    case 18: return out.copy(PALETTE.ice);                                         // Ice
-    case 19: return out.copy(PALETTE.basalt);                                      // Basalt
-    case 20: { // Mountains — craggy grey-brown rock with a snow cap on the peaks
-      const sn = THREE.MathUtils.clamp((h - 26) / 20, 0, 1);
-      const n = rockNoise(wx, wz) * 0.14 - 0.07;
-      return out.copy(PALETTE.mountainLow).lerp(PALETTE.mountainHigh, THREE.MathUtils.clamp(h / 40, 0, 1)).addScalar(n).lerp(PALETTE.snow, sn);
-    }
-    default: return out.copy(PALETTE.greenLow).lerp(PALETTE.greenHigh, t);         // 0 — grass
+    case 1: out.copy(PALETTE.thorn).lerp(PALETTE.greenHigh, t * 0.25); break;
+    case 2: out.copy(PALETTE.fen); break;
+    case 3: out.copy(PALETTE.ember).lerp(PALETTE.emberHot, t); style = 'rock'; break;
+    case 4: { const sn = THREE.MathUtils.clamp((h - 24) / 22, 0, 1); out.copy(PALETTE.rivenRock).lerp(PALETTE.snow, sn); style = 'rock'; break; }
+    case 5: out.copy(PALETTE.grave); style = 'rock'; break;
+    case 6: out.copy(PALETTE.hub); break;
+    case 7: out.copy(PALETTE.city); style = 'flat'; break;   // City — paved (paving texture overlays the top)
+    case 8: out.copy(PALETTE.desert); style = 'grit'; break;                                  // Desert sand
+    case 9: { const band = Math.sin(h * 0.8) * 0.5 + 0.5; out.copy(PALETTE.mesaLow).lerp(PALETTE.mesaHigh, band); style = 'rock'; break; } // Mesa
+    case 10: out.copy(PALETTE.savanna); break;                                                // Savanna (dry grass)
+    case 11: { const sn = THREE.MathUtils.clamp((h - 6) / 20, 0, 1); out.copy(PALETTE.tundra).lerp(PALETTE.snow, sn); style = 'grit'; break; } // Tundra
+    case 12: out.copy(PALETTE.dirt); style = 'grit'; break;                                   // Dirt
+    case 13: out.copy(PALETTE.sand); style = 'grit'; break;                                   // Beach sand
+    case 14: out.copy(PALETTE.mud); style = 'grit'; break;                                    // Mud
+    case 15: out.copy(PALETTE.cobble); style = 'flat'; break;                                 // Cobblestone (paving overlay)
+    case 16: out.copy(PALETTE.ash); style = 'grit'; break;                                    // Ash / wasteland
+    case 17: out.copy(PALETTE.jungleLow).lerp(PALETTE.jungleHigh, t * 0.5); break;            // Jungle
+    case 18: out.copy(PALETTE.ice); style = 'grit'; break;                                    // Ice
+    case 19: out.copy(PALETTE.basalt); style = 'rock'; break;                                 // Basalt
+    case 20: { const sn = THREE.MathUtils.clamp((h - 26) / 20, 0, 1); out.copy(PALETTE.mountainLow).lerp(PALETTE.mountainHigh, THREE.MathUtils.clamp(h / 40, 0, 1)).lerp(PALETTE.snow, sn); style = 'rock'; break; } // Mountains
+    default: out.copy(PALETTE.greenLow).lerp(PALETTE.greenHigh, t); break;                    // 0 — grass
   }
+  applyGrain(out, style, wx, wz);
+  return out;
 }
 
 /** Terrain mesh for a custom map, coloured per painted biome. Named 'terrain'. */

@@ -5,6 +5,16 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Textured ground — per-material grain instead of flat colours (owner-requested)
+**Goal:** stop the terrain reading as one flat colour per cube — give each ground type a bit of *feeling* (grassy speckle, craggy stone, fine sandy/snowy grit) so it looks richer in the world.
+- **`colorForBiome` + `terrainColor` grain:** after picking a ground's base colour, a small **deterministic per-spot variation** is layered on, keyed to a **material style** — `grass` (per-blade speckle + warmer/cooler meadow patches), `rock` (blocky craggy grey mottle), `grit` (subtle sand/snow grain), or `flat` (paved tops, which already carry the stone texture). It's a pure function of world position, so it stays **stable as the cube bubble rebuilds** and never shimmers.
+- Applied to **every** painted ground index (custom maps, `custom-map-view.ts`) and to the **procedural world** (`terrain-mesh.ts`, craggier on the Riven/Gravereach rock frontiers). The Mountains' old one-off `rockNoise` is folded into the shared `rock` grain.
+- Render-only and cheap — no new meshes/textures/draw calls; it just enriches the per-cube vertex colour the voxel bubble already uses. Kept **byte-identical** with the Map Builder's copy (`AdminTools src/oathbound/palette.ts`) so the editor preview matches 1:1.
+
+**Verified:** `typecheck` ✓ · `npm test` → 344/344 ✓ · `build` ✓ · headless renders of the shipped colour code over the real Talar map (via the Map Builder bundle): grass reads as a varied meadow, mountains as craggy rock, the city keeps its stone paving — and an in-game `?autostart` boot renders the terrain with the paving intact and **zero console errors**.
+
+---
+
 ## Big, dynamic combat animations (owner-requested)
 **Goal:** make ability animations read as powerful, full-body actions instead of a lone arm swing — a wind-up, a whole-body commit, weapon arcs, spell flares — and add signature moves so different ability types look different.
 - **Whole-rig actions:** an ability no longer just moves the arms. `applyAction` now also drives the torso (twist/lean/lunge/crouch — pivoting from the feet), the head (tracks the target / looks up), the legs (steps + stances), a forward body lunge, and the priest's gem flare. Combat-only channels (arm cross/twist, torso lunge) rest at zero each frame so they revert the instant the move ends. Still suppressed while mounted.
