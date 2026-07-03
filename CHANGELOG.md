@@ -5,6 +5,17 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Livelier idle/walk + an active-riding gallop (owner-requested)
+**Goal:** make all three class models feel more dynamic while standing and walking, and give the wolf mount a proper *active-riding* animation instead of a static seat.
+- **Head sub-group:** each class's skin/eyes/mouth/hair now sit on a `head` pivot at the neck base (parented to the torso), so the head can nod/turn/tilt on its own while everything still reads at the same rest position — hoods, scarves and collars stay on the body.
+- **Livelier idle (on foot):** standing now layers a breathing lift, a slow **weight-shift sway** (subtle torso yaw + roll), a **slow head look-around**, and a breath-driven **arm drift** — small enough to read as alive without fidgeting.
+- **Livelier walk (on foot):** a **bigger arm/leg swing**, a **shoulder twist that counter-rotates the hips**, a lean into each step, and a **head bob that partly counter-turns** so the gaze stays forward — a much more dynamic gait than the old straight-swing.
+- **Active-riding gallop:** moving on the wolf is now a lively **bound** — the wolf's body **bobs (vertical suspension) and rocks fore/aft**, its legs **bound in front/back pairs** (offset so it reads as a real 4-beat gait, amplitude ramping with speed) and its **tail streams** out behind. The **rider posts** with the gait, **leans forward** into the gallop and **rocks** with each bound, hands riding the reins. All gated by the mount blend so it fades in/out cleanly on mount/dismount, and by speed so an **AFK mount still just breathes** (the standing wolf idle is preserved).
+
+**Verified:** `typecheck` ✓ · `npm test` → 344/344 ✓ · `build` ✓ · headless renders of the shipped `player-view.ts` — two frame samples each of **idle** (head/body drift is alive), **walk** (stride reverses, torso twists) and **gallop** (legs bound, body suspends, rider posts + leans), plus **side + front** riding-integrity views and an **AFK-on-mount** frame, across all three classes — the rider sits clean on the wolf at speed (no clipping/detachment) and there are zero page errors.
+
+---
+
 ## Wolf mount + faster travel (owner-requested)
 **Goal:** replace hold-Shift *sprint* with a summonable **wolf mount**, nudge base walk speed up, and refine the priest/ranger weapon holds.
 - **Faster on foot:** base `runSpeed` 6 → **6.6**.
