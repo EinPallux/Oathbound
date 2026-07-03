@@ -5,6 +5,18 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Big, dynamic combat animations (owner-requested)
+**Goal:** make ability animations read as powerful, full-body actions instead of a lone arm swing — a wind-up, a whole-body commit, weapon arcs, spell flares — and add signature moves so different ability types look different.
+- **Whole-rig actions:** an ability no longer just moves the arms. `applyAction` now also drives the torso (twist/lean/lunge/crouch — pivoting from the feet), the head (tracks the target / looks up), the legs (steps + stances), a forward body lunge, and the priest's gem flare. Combat-only channels (arm cross/twist, torso lunge) rest at zero each frame so they revert the instant the move ends. Still suppressed while mounted.
+- **Warrior** — the basic strike is now a **coil → diagonal downswing with a lunging step and follow-through** (torso whips into it, head tracks, shield braces); whirlwind is a **rising spin >1 full turn** with sword + shield flung out. New signature moves: an overhead **ground slam** (raise high → slam → land in a crouch, for `groundAoE`), a charging **lunge-stab** (`charge`/`dash`), and a **battle shout** (sword thrust skyward, chest out, for `self` buffs).
+- **Ranger** — the shot is a **bladed archer's stance**: bow up and aiming, body turned side-on while the head sights forward, draw to full → hold → **loose with a recoil kick**. New: a **sweeping multishot** (`cone`) that fans three rapid draws across an arc; the trap set is now a clean **bend-and-place** crouch.
+- **Priest** — the offensive cast is **gather → hurl** (raise the staff as the gem builds, then thrust it forward with a body push and a flare); the blessing **raises the staff aloft and holds it high**, head up, floating a touch while the gem pulses. New: a **smite** (`groundAoE`) that charges overhead then swings down as the gem blazes.
+- **More ability types map to distinct motions:** warrior `selfAoE/groundAoE/charge/dash/self` and priest `groundAoE` now pick dedicated animations instead of all collapsing into one swing/cast.
+
+**Verified:** `typecheck` ✓ · `npm test` → 344/344 ✓ · `build` ✓ · headless renders of the shipped `player-view.ts` firing every move via `triggerAction`, sampled at wind-up + strike/peak progress for all three classes (18 frames) — each move reads as a big, clean action with no broken/collapsed poses (the trap crouch was retuned after a first pass folded the body over), and zero page errors.
+
+---
+
 ## Livelier idle/walk + an active-riding gallop (owner-requested)
 **Goal:** make all three class models feel more dynamic while standing and walking, and give the wolf mount a proper *active-riding* animation instead of a static seat.
 - **Head sub-group:** each class's skin/eyes/mouth/hair now sit on a `head` pivot at the neck base (parented to the torso), so the head can nod/turn/tilt on its own while everything still reads at the same rest position — hoods, scarves and collars stay on the body.
