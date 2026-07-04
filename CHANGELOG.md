@@ -5,6 +5,17 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Realistic road textures — City / Grassland / Sandland (owner-requested)
+**Goal:** fix the Road tool so roads read as real environmental roads instead of one flat tan colour — a paved **City** road, an earthen **Grassland** road and a sandy **Sandland** road, each looking right in its surroundings.
+- **Three procedural road textures** (`render/paving.ts`, `makeRoadTexture` + `roadMaterial`, mirrored in the Map Builder's `engine/paving.ts`): **City** — warm-grey cobbled setts in running bond over dark mortar; **Grassland** — packed-earth dirt with soft worn wheel lanes, pebbles and fine grain; **Sandland** — drifting tan sand with wind-ripple streaks, faint compacted tracks and fine grit. Full-colour, tileable canvas textures (seamless across the 9 wrap offsets).
+- **Textured road ribbons:** the draped ribbon builder now emits **world-scaled UVs** (a 4 m texture repeat — U across the road width, V along its length) so stones/grain keep a constant real-world size on roads of any width or length — added in the game's `render/scenery-view.ts` and `render/custom-map-view.ts` and the editor's `engine/ribbon.ts`.
+- **Road surface picker:** the editor **Road** tool gains a *Surface* dropdown (City / Grassland / Sandland); the choice rides along in the map as a new optional `style` on a road path (`MapPath.style`, mirrored `format/map.ts` ↔ `world/map-format.ts`) and selects the texture both in the editor preview and in-game. Roads with no style default to **City**; procedural-world roads use the **Grassland** dirt texture.
+- Render-only content: no engine/sim changes; rivers are unaffected (they ignore `style`).
+
+**Verified:** `typecheck` ✓ (both repos) · `npm test` → 344/344 ✓ · `build` ✓ (both repos) · headless renders of all three textures as close-up swatches and as roads draped over rolling terrain — each reads clearly as its environment (cobbled stone / dirt / sand) and tiles seamlessly, with **zero console errors**.
+
+---
+
 ## 12 new City buildings for the Map Builder (owner-requested — voxelised from reference art)
 **Goal:** turn the owner's `public/new_assets` reference renders into placeable low-poly assets for the City, in the same primitive-parts style as the rest of the preset library.
 - **New presets** (`world/presets.ts`, mirrored in the Map Builder's `format/presets.ts`), all category `structure` so they appear automatically in the editor's **Structures** palette: **Timbered House, Tall Townhouse, Tudor Cottage, Corner House** (half-timbered Tudor houses), **Worker's Hut, Stable** (barn + hay + lean-to), **Bathhouse** (chimney steam + an outdoor steaming tub), **Inn** (mug sign + covered porch), **Church** (nave + bell tower + spire + cross + rose window), **Tower Manor** & **Grand Manor** (grand multi-gabled houses), and a **Stone Fountain** (basin + column + water jets).

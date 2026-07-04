@@ -8,7 +8,7 @@ import { TERRAIN_RENDER_RES } from '../world/layout';
 import { biomeIndexAt } from '../world/custom-map';
 import { unpackHeights, unpackWater, waterSurfaceGeometry, pavedSurfaceGeometry, type OathboundMap, type PlacedAsset } from '../world/map-format';
 import { placedAssetGeometry, assetYLift, isSmoothAsset } from './asset-geometry';
-import { makePavingTexture } from './paving';
+import { makePavingTexture, roadMaterial } from './paving';
 
 let _pavingMat: THREE.Material | null = null;
 function pavingMaterial(): THREE.Material {
@@ -169,9 +169,14 @@ function buildRibbon(path: { points: { x: number; z: number }[]; width: number }
   if (path.points.length < 2) return null;
   const pts = resamplePath(path.points, 2.5);
   const hw = path.width / 2;
+  const TILE = 4; // texture repeat in metres, so road stones/grain keep a constant world size
   const left: number[] = [];
   const right: number[] = [];
+  const vRun: number[] = []; // texture V per point (metres along the path / TILE)
+  let run = 0;
   for (let i = 0; i < pts.length; i++) {
+    if (i > 0) run += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
+    vRun.push(run / TILE);
     const prev = pts[Math.max(0, i - 1)];
     const next = pts[Math.min(pts.length - 1, i + 1)];
     let tx = next.x - prev.x;
@@ -186,15 +191,21 @@ function buildRibbon(path: { points: { x: number; z: number }[]; width: number }
     left.push(lx, field.sample(lx, lz) + yOffset, lz);
     right.push(rx, field.sample(rx, rz) + yOffset, rz);
   }
+  const uR = path.width / TILE; // U spans the road width → constant world-scale texel density
   const positions: number[] = [];
+  const uvs: number[] = [];
   for (let i = 0; i < pts.length - 1; i++) {
     const a = i * 3;
     const b = (i + 1) * 3;
+    const va = vRun[i];
+    const vb = vRun[i + 1];
     positions.push(left[a], left[a + 1], left[a + 2], right[b], right[b + 1], right[b + 2], right[a], right[a + 1], right[a + 2]);
     positions.push(left[a], left[a + 1], left[a + 2], left[b], left[b + 1], left[b + 2], right[b], right[b + 1], right[b + 2]);
+    uvs.push(0, va, uR, vb, uR, va, 0, va, 0, vb, uR, vb);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = name;
@@ -258,9 +269,9 @@ export function buildCustomScenery(map: OathboundMap, field: Heightfield): THREE
     const m = buildRibbon(map.rivers[i], field, 0.18, riverMat, `river-${i}`);
     if (m) group.add(m);
   }
-  const roadMat = new THREE.MeshLambertMaterial({ color: 0x9c8a5e, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+  // Roads — each laid with its chosen environmental texture (city cobbles / grass dirt / sand).
   for (let i = 0; i < map.roads.length; i++) {
-    const m = buildRibbon(map.roads[i], field, 0.25, roadMat, `road-${i}`);
+    const m = buildRibbon(map.roads[i], field, 0.25, roadMaterial(map.roads[i].style ?? 'city'), `road-${i}`);
     if (m) group.add(m);
   }
   return group;
