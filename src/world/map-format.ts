@@ -60,10 +60,16 @@ export type EnemyTier = (typeof ENEMY_TIERS)[number];
 export const BOSS_IDS = ['emberhorn', 'rimewyrm', 'maelgrith'] as const;
 export type BossId = (typeof BOSS_IDS)[number];
 
+/** Environmental road surface — picks which texture the road ribbon is laid with. */
+export type RoadStyle = 'city' | 'grass' | 'sand';
+
 /** A polyline path (rivers, roads) — a list of XZ points + a width in metres. */
 export interface MapPath {
   points: { x: number; z: number }[];
   width: number;
+  /** Roads only: which environmental road texture to lay — 'city' cobbles, 'grass'
+   *  grassland dirt, or 'sand' desert. Undefined = 'city'. Rivers ignore this. */
+  style?: RoadStyle;
 }
 
 /** A circular water body. `y` is the water-surface height (the editor sets it; the
