@@ -31,6 +31,17 @@ const PALETTE = {
 const tmpA = new THREE.Color();
 const tmpB = new THREE.Color();
 
+// Ground grain — a little deterministic per-spot colour variation so the terrain reads with
+// texture (grassy speckle, craggier on the bare-rock frontiers) instead of one flat colour.
+function hash01(ix: number, iz: number, seed: number): number {
+  let h = (Math.imul(ix, 374761393) + Math.imul(iz, 668265263) + Math.imul(seed, 1442695041)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+}
+function vnoise(wx: number, wz: number, cell: number, seed: number): number {
+  return hash01(Math.floor(wx / cell), Math.floor(wz / cell), seed);
+}
+
 /** Blended terrain colour at a world position + height. Smooth across biome borders. */
 function terrainColor(x: number, z: number, h: number, out: THREE.Color): THREE.Color {
   const f = biomeFactors(x, z);
@@ -49,6 +60,15 @@ function terrainColor(x: number, z: number, h: number, out: THREE.Color): THREE.
     out.lerp(tmpB, f.east * (1 - f.ne));
   }
   if (f.ne > 0) out.lerp(PALETTE.thorn, f.ne);
+
+  // Grain: grassy speckle + meadow patches everywhere, craggier on the bare-rock frontiers.
+  const rocky = Math.max(f.east * (1 - f.ne), f.north * (1 - f.ne));
+  const fine = vnoise(x, z, 1.7, 11) - 0.5;
+  const patch = vnoise(x, z, 6.5, 12) - 0.5;
+  const crag = vnoise(x, z, 3.4, 22) - 0.5;
+  out.addScalar(fine * (0.09 + rocky * 0.05) + patch * 0.05 + crag * rocky * 0.09);
+  out.g += patch * 0.035 * (1 - rocky);
+  out.r += patch * 0.02 * (1 - rocky);
   return out;
 }
 

@@ -5,6 +5,28 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Textured ground — per-material grain instead of flat colours (owner-requested)
+**Goal:** stop the terrain reading as one flat colour per cube — give each ground type a bit of *feeling* (grassy speckle, craggy stone, fine sandy/snowy grit) so it looks richer in the world.
+- **`colorForBiome` + `terrainColor` grain:** after picking a ground's base colour, a small **deterministic per-spot variation** is layered on, keyed to a **material style** — `grass` (per-blade speckle + warmer/cooler meadow patches), `rock` (blocky craggy grey mottle), `grit` (subtle sand/snow grain), or `flat` (paved tops, which already carry the stone texture). It's a pure function of world position, so it stays **stable as the cube bubble rebuilds** and never shimmers.
+- Applied to **every** painted ground index (custom maps, `custom-map-view.ts`) and to the **procedural world** (`terrain-mesh.ts`, craggier on the Riven/Gravereach rock frontiers). The Mountains' old one-off `rockNoise` is folded into the shared `rock` grain.
+- Render-only and cheap — no new meshes/textures/draw calls; it just enriches the per-cube vertex colour the voxel bubble already uses. Kept **byte-identical** with the Map Builder's copy (`AdminTools src/oathbound/palette.ts`) so the editor preview matches 1:1.
+
+**Verified:** `typecheck` ✓ · `npm test` → 344/344 ✓ · `build` ✓ · headless renders of the shipped colour code over the real Talar map (via the Map Builder bundle): grass reads as a varied meadow, mountains as craggy rock, the city keeps its stone paving — and an in-game `?autostart` boot renders the terrain with the paving intact and **zero console errors**.
+
+---
+
+## Big, dynamic combat animations (owner-requested)
+**Goal:** make ability animations read as powerful, full-body actions instead of a lone arm swing — a wind-up, a whole-body commit, weapon arcs, spell flares — and add signature moves so different ability types look different.
+- **Whole-rig actions:** an ability no longer just moves the arms. `applyAction` now also drives the torso (twist/lean/lunge/crouch — pivoting from the feet), the head (tracks the target / looks up), the legs (steps + stances), a forward body lunge, and the priest's gem flare. Combat-only channels (arm cross/twist, torso lunge) rest at zero each frame so they revert the instant the move ends. Still suppressed while mounted.
+- **Warrior** — the basic strike is now a **coil → diagonal downswing with a lunging step and follow-through** (torso whips into it, head tracks, shield braces); whirlwind is a **rising spin >1 full turn** with sword + shield flung out. New signature moves: an overhead **ground slam** (raise high → slam → land in a crouch, for `groundAoE`), a charging **lunge-stab** (`charge`/`dash`), and a **battle shout** (sword thrust skyward, chest out, for `self` buffs).
+- **Ranger** — the shot is a **bladed archer's stance**: bow up and aiming, body turned side-on while the head sights forward, draw to full → hold → **loose with a recoil kick**. New: a **sweeping multishot** (`cone`) that fans three rapid draws across an arc; the trap set is now a clean **bend-and-place** crouch.
+- **Priest** — the offensive cast is **gather → hurl** (raise the staff as the gem builds, then thrust it forward with a body push and a flare); the blessing **raises the staff aloft and holds it high**, head up, floating a touch while the gem pulses. New: a **smite** (`groundAoE`) that charges overhead then swings down as the gem blazes.
+- **More ability types map to distinct motions:** warrior `selfAoE/groundAoE/charge/dash/self` and priest `groundAoE` now pick dedicated animations instead of all collapsing into one swing/cast.
+
+**Verified:** `typecheck` ✓ · `npm test` → 344/344 ✓ · `build` ✓ · headless renders of the shipped `player-view.ts` firing every move via `triggerAction`, sampled at wind-up + strike/peak progress for all three classes (18 frames) — each move reads as a big, clean action with no broken/collapsed poses (the trap crouch was retuned after a first pass folded the body over), and zero page errors.
+
+---
+
 ## Livelier idle/walk + an active-riding gallop (owner-requested)
 **Goal:** make all three class models feel more dynamic while standing and walking, and give the wolf mount a proper *active-riding* animation instead of a static seat.
 - **Head sub-group:** each class's skin/eyes/mouth/hair now sit on a `head` pivot at the neck base (parented to the torso), so the head can nod/turn/tilt on its own while everything still reads at the same rest position — hoods, scarves and collars stay on the body.

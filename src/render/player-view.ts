@@ -497,59 +497,190 @@ export class PlayerView {
     this.orb = gem;
   }
 
-  /** Start a swing/draw/cast motion for an ability (kind chosen by class + targeting). */
+  /** Start a swing/draw/cast motion for an ability (kind + duration chosen by class + targeting). */
   triggerAction(targeting: string, castTime: number): void {
     const cls = this.classId;
     if (cls === 'warrior') {
-      this.actionKind = targeting === 'selfAoE' ? 'w-spin' : 'w-swing';
-      this.actionDur = this.actionKind === 'w-spin' ? 0.55 : 0.42;
+      if (targeting === 'selfAoE') { this.actionKind = 'w-spin'; this.actionDur = 0.62; }
+      else if (targeting === 'groundAoE') { this.actionKind = 'w-slam'; this.actionDur = 0.58; }
+      else if (targeting === 'charge' || targeting === 'dash') { this.actionKind = 'w-thrust'; this.actionDur = 0.44; }
+      else if (targeting === 'self') { this.actionKind = 'w-shout'; this.actionDur = 0.6; }
+      else { this.actionKind = 'w-swing'; this.actionDur = 0.5; }
     } else if (cls === 'hunter') {
-      this.actionKind = targeting === 'trap' ? 'h-place' : 'h-shoot';
-      this.actionDur = this.actionKind === 'h-place' ? 0.5 : 0.45;
+      if (targeting === 'trap') { this.actionKind = 'h-place'; this.actionDur = 0.55; }
+      else if (targeting === 'cone') { this.actionKind = 'h-multi'; this.actionDur = 0.6; }
+      else { this.actionKind = 'h-shoot'; this.actionDur = 0.55; }
     } else {
       const channel = castTime > 0;
-      this.actionKind =
-        targeting === 'heal' || targeting === 'shield' || targeting === 'toggle' ? 'p-bless' : 'p-cast';
-      this.actionDur = channel ? Math.max(0.4, castTime) : 0.5;
+      if (targeting === 'heal' || targeting === 'shield' || targeting === 'toggle' || targeting === 'self')
+        this.actionKind = 'p-bless';
+      else if (targeting === 'groundAoE') this.actionKind = 'p-smite';
+      else this.actionKind = 'p-cast';
+      this.actionDur = channel ? Math.max(0.4, castTime) : 0.55;
     }
     this.actionT = this.actionDur;
   }
 
-  /** Apply the active action to the arms (and body/orb); returns overridden arm angles. */
+  /** Apply the active action to the whole rig (arms/body/head/legs/figure/orb); returns arm-x
+   *  angles for the caller to commit. Each move drives more than the arms — a wind-up, a torso
+   *  whip/lunge, a step, head tracking and (for the priest) a gem flare — so combat reads big. */
   private applyAction(p: number, armRx: number, armLx: number): [number, number] {
-    const arc = Math.sin(Math.min(1, p) * Math.PI); // 0→1→0 over the action
+    const q = Math.min(1, p);
+    const arc = Math.sin(q * Math.PI); // 0→1→0 over the action
     switch (this.actionKind) {
-      case 'w-swing':
-        armRx = -2.2 + 2.9 * easeOut(p);
-        armLx = -0.3 * arc;
-        this.body.rotation.y = Math.sin(p * Math.PI) * 0.25;
-        break;
-      case 'w-spin':
-        this.body.rotation.y = p * Math.PI * 2;
-        armRx = -1.5;
-        armLx = -1.2;
-        break;
-      case 'h-shoot': {
-        armLx = -1.55;
-        const draw = p < 0.7 ? p / 0.7 : 1 - (p - 0.7) / 0.3;
-        armRx = -1.4 - draw * 0.7;
+      case 'w-swing': {
+        // Coil the sword up and back, then a diagonal downswing with a lunging step + follow-through.
+        let sx: number, sz: number;
+        if (p < 0.3) { const s = p / 0.3; sx = -2.6 * easeOut(s); sz = 0.5 * s; }
+        else if (p < 0.55) { const s = (p - 0.3) / 0.25; sx = -2.6 + 3.7 * s * s; sz = 0.5 - 1.05 * s; }
+        else { const s = (p - 0.55) / 0.45; sx = 1.1 * (1 - easeOut(s)); sz = -0.55 * (1 - easeOut(s)); }
+        armRx = sx; this.armR.rotation.z = sz;
+        let twist: number;
+        if (p < 0.3) twist = -0.35 * (p / 0.3);
+        else if (p < 0.55) { const s = (p - 0.3) / 0.25; twist = -0.35 + 0.78 * s; }
+        else { const s = (p - 0.55) / 0.45; twist = 0.43 * (1 - easeOut(s)); }
+        this.body.rotation.y = twist;
+        const lunge = p > 0.3 ? Math.sin(Math.min(1, (p - 0.3) / 0.7) * Math.PI) : 0;
+        this.body.position.z = lunge * 0.28;
+        this.body.rotation.x += lunge * 0.34;
+        this.head.rotation.x = lunge * 0.3;
+        this.head.rotation.y = twist * 0.5;                            // head tracks the target
+        armLx = -0.45 * lunge; this.armL.rotation.z = 0.4 * lunge;     // shield braces across
+        this.legR.rotation.x = 0.5 * lunge; this.legL.rotation.x = -0.28 * lunge; // step into it
         break;
       }
-      case 'h-place':
-        armRx = 0.9 * arc;
-        armLx = 0.6 * arc;
-        this.body.rotation.x += 0.4 * arc;
+      case 'w-spin': {
+        // A rising whirlwind: >1 full turn (ease in/out) with sword + shield flung out, a lean
+        // into the rotation and a wide braced stance.
+        this.body.rotation.y = easeInOut(q) * Math.PI * 2.2;
+        armRx = -1.5; armLx = -1.45;
+        this.armR.rotation.z = -0.6 * arc; this.armL.rotation.z = 0.6 * arc;
+        this.body.rotation.z = 0.15 * arc;
+        this.body.position.y += 0.06 * arc;
+        this.head.rotation.x = 0.12 * arc;
+        this.legR.rotation.x = 0.22 * arc; this.legL.rotation.x = -0.22 * arc;
         break;
-      case 'p-cast':
-        armRx = -1.7 + 0.7 * arc;
-        armLx = -0.4 * arc;
-        this.flashOrb(this.orbBase + 2.2 * arc);
+      }
+      case 'w-thrust': {
+        // A charging lunge-stab: sword drives forward to horizontal over a deep lead step.
+        const punch = arc;
+        armRx = -1.4 * punch; this.armR.rotation.z = 0.15 * punch;
+        armLx = -0.5 * punch;
+        this.body.position.z = 0.5 * punch;
+        this.body.rotation.x += 0.22 * punch;
+        this.head.rotation.x = 0.18 * punch;
+        this.legR.rotation.x = 0.75 * punch;                           // deep lead step
+        this.legL.rotation.x = -0.5 * punch; this.legL.rotation.z = 0.12 * punch; // trailing drive
         break;
-      case 'p-bless':
-        armRx = -2.2;
-        armLx = -1.6 * arc;
-        this.flashOrb(this.orbBase + 1.6 * arc);
+      }
+      case 'w-slam': {
+        // Raise the blade high overhead, then slam it down and land in a crouch — a ground pound.
+        let sx: number;
+        if (p < 0.4) { const s = p / 0.4; sx = -2.7 * easeOut(s); }
+        else if (p < 0.6) { const s = (p - 0.4) / 0.2; sx = -2.7 + 3.9 * s * s; }
+        else { const s = (p - 0.6) / 0.4; sx = 1.2 * (1 - easeOut(s)); }
+        armRx = sx; armLx = sx * 0.7;                                  // two-handed grip
+        const raise = p < 0.4 ? p / 0.4 : 1;
+        const impact = p > 0.4 ? Math.sin(Math.min(1, (p - 0.4) / 0.6) * Math.PI) : 0;
+        this.body.rotation.x += -0.2 * raise + 0.5 * impact;           // arch back, then crunch down
+        this.body.position.y += 0.08 * raise - 0.3 * impact;           // rise, then drop into a crouch
+        this.legR.rotation.x = 0.5 * impact; this.legL.rotation.x = 0.5 * impact;
+        this.head.rotation.x = -0.2 * raise + 0.35 * impact;
         break;
+      }
+      case 'w-shout': {
+        // A defiant battle cry: thrust the sword skyward, chest out, head up, held then settled.
+        const hold = easeOut(Math.min(1, p / 0.3)) * (p > 0.75 ? 1 - (p - 0.75) / 0.25 : 1);
+        armRx = -2.5 * hold; armLx = -1.0 * hold; this.armL.rotation.z = 0.3 * hold;
+        this.body.rotation.x += -0.18 * hold;
+        this.head.rotation.x = -0.35 * hold;
+        this.body.position.y += 0.05 * hold;
+        break;
+      }
+      case 'h-shoot': {
+        // A bladed archer's stance: bow up and aiming, body turned side-on while the head sights
+        // forward; draw to full, hold, then loose with a recoil kick.
+        armLx = -1.55;
+        this.body.rotation.y = -0.4;
+        this.head.rotation.y = 0.42;
+        if (p < 0.5) { const s = p / 0.5; armRx = -1.4 - 0.85 * easeOut(s); }
+        else if (p < 0.64) armRx = -2.25;
+        else { const s = (p - 0.64) / 0.36; armRx = -2.25 + 2.75 * easeOut(s); }
+        const rel = p > 0.64 ? Math.sin(((p - 0.64) / 0.36) * Math.PI) : 0;
+        this.body.rotation.x += -0.14 * rel;                           // rock back from the loose
+        this.armL.rotation.x += 0.18 * rel;                            // the bow kicks
+        this.head.rotation.x = -0.06 * rel;
+        break;
+      }
+      case 'h-multi': {
+        // A sweeping fan of arrows: bow held up, the stance sweeps across a cone while the draw
+        // hand fires three rapid shots.
+        armLx = -1.55;
+        const sweep = (q - 0.5) * 1.0;
+        this.body.rotation.y = sweep;
+        this.head.rotation.y = 0.2 - sweep * 0.6;
+        armRx = -1.5 - 0.7 * Math.abs(Math.sin(q * Math.PI * 3));       // three rapid draws
+        break;
+      }
+      case 'h-place': {
+        // Bend over to set a trap: a modest forward lean + dip while both hands reach down to
+        // the ground and the head looks at it, then rise. Kept gentle because the torso pivots
+        // at the feet, so a big pitch would swing the whole body over.
+        const dip = arc;
+        this.body.position.y += -0.14 * dip;
+        this.body.rotation.x += 0.28 * dip;
+        armRx = 1.05 * dip; armLx = 0.9 * dip;
+        this.head.rotation.x = 0.32 * dip;
+        break;
+      }
+      case 'p-cast': {
+        // Gather power (raise the staff, the gem builds), then hurl it forward with a body push.
+        if (p < 0.5) {
+          const s = p / 0.5;
+          armRx = -1.75 * easeOut(s); armLx = -0.9 * easeOut(s);
+          this.body.rotation.x += -0.14 * s;
+          this.head.rotation.x = -0.12 * s;
+          this.flashOrb(this.orbBase + 2.6 * s);
+        } else {
+          const s = (p - 0.5) / 0.5;
+          armRx = -1.75 + 2.05 * easeOut(s); armLx = -0.9 + 0.95 * easeOut(s);
+          this.body.rotation.x += -0.14 + 0.6 * easeOut(s);
+          this.body.position.z = 0.2 * Math.sin(s * Math.PI);
+          this.head.rotation.x = 0.22 * Math.sin(s * Math.PI);
+          this.flashOrb(this.orbBase + 3.6 * (1 - s));
+        }
+        break;
+      }
+      case 'p-smite': {
+        // Raise the staff overhead as the gem charges, then swing it down and flare — a smite bolt.
+        let sx: number;
+        if (p < 0.5) { const s = p / 0.5; sx = -2.6 * easeOut(s); }
+        else if (p < 0.68) { const s = (p - 0.5) / 0.18; sx = -2.6 + 3.4 * s * s; }
+        else { const s = (p - 0.68) / 0.32; sx = 0.8 * (1 - easeOut(s)); }
+        armRx = sx;
+        const charge = p < 0.5 ? p / 0.5 : 1;
+        const impact = p > 0.5 ? Math.sin(Math.min(1, (p - 0.5) / 0.5) * Math.PI) : 0;
+        armLx = -1.2 * charge; this.armL.rotation.z = -0.2 * charge;
+        this.body.rotation.x += -0.15 * charge + 0.4 * impact;
+        this.body.position.y += 0.05 * charge - 0.12 * impact;
+        this.head.rotation.x = -0.25 * charge + 0.3 * impact;
+        this.flashOrb(this.orbBase + 2.4 * charge + 3.6 * impact);
+        break;
+      }
+      case 'p-bless': {
+        // Raise the staff aloft and hold it high, head tilted up, floating a touch while the gem
+        // pulses a steady radiance; lower at the very end.
+        const raise = Math.min(1, p / 0.25);
+        const lower = p > 0.8 ? (p - 0.8) / 0.2 : 0;
+        const hold = easeOut(raise) * (1 - lower);
+        armRx = -2.4 * hold; armLx = -2.0 * hold;
+        this.body.rotation.x += -0.12 * hold;
+        this.head.rotation.x = -0.32 * hold;
+        this.figure.position.y += 0.12 * hold;
+        this.body.position.y += 0.04 * hold;
+        this.flashOrb(this.orbBase + (1.8 + Math.sin(this.t * 12) * 0.5) * hold);
+        break;
+      }
     }
     return [armRx, armLx];
   }
@@ -617,6 +748,12 @@ export class PlayerView {
     this.head.rotation.x = -sw2 * 0.05 * wb + Math.sin(this.t * 0.65) * 0.04 * idle;
     this.head.rotation.y = sw * 0.08 * wb + Math.sin(this.t * 0.4 + 1.3) * 0.14 * idle;
     this.head.rotation.z = Math.sin(this.t * 0.5) * 0.03 * idle;
+
+    // Combat-only channels (arm twist/cross, torso lunge) rest at zero each frame so an action
+    // can drive them and they revert the instant it ends.
+    this.armR.rotation.z = 0; this.armL.rotation.z = 0;
+    this.armR.rotation.y = 0; this.armL.rotation.y = 0;
+    this.body.position.z = 0;
 
     // Ability action overrides the arms (and body) — suppressed while mounted to avoid odd
     // seated swings, but its timer/orb still resolve.
@@ -686,6 +823,10 @@ export class PlayerView {
 
 function easeOut(p: number): number {
   return 1 - (1 - p) * (1 - p);
+}
+
+function easeInOut(p: number): number {
+  return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
 }
 
 // ── The wolf mount ────────────────────────────────────────────────────────────
