@@ -2,6 +2,8 @@
 
 Systems **explicitly out of scope for 1.0-BETA**. This list is a scope-creep firewall: if a request appears here, the answer during the beta is **"not now — recorded for the post-beta horizon."** Sequencing for some of these (if ever pursued) lives in [POST_BETA_MMO_HORIZON](./POST_BETA_MMO_HORIZON.md).
 
+> **⚠️ Partial supersession ([ADR-013](../decisions/DECISION_RECORDS.md#adr-013-going-online--authoritative-node-server--sqlite)):** the owner has since committed to the online track. **Multiplayer servers, real-time networking, accounts, authentication, and global chat** are now *in scope* via the [MMO_ROADMAP](./MMO_ROADMAP.md) (phases M0–M8). Everything else below (dungeons, raids, PvP, trading, guilds, auction house, mail, housing, mounts, monetization, …) **remains deferred**.
+
 ## Hard-deferred (do not schedule into early development)
 Dungeons · Raids · Accounts · Authentication · Multiplayer servers · Real-time networking · Guilds · Clans · PvP · Factions · Trading · Auction house · Global chat · Mail · Player housing · Mounts & mount breeding · Large crafting professions · Multiple character races with unique skeletons · More than three classes · Extensive story campaigns · Cinematics · Monetization · Battle passes · Cash shops · Mobile-first controls · Procedurally infinite worlds.
 

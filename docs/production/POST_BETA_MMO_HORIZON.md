@@ -1,5 +1,7 @@
 # Post-Beta MMO Horizon (Non-Committed Appendix)
 
+> **⚠️ Activated ([ADR-013](../decisions/DECISION_RECORDS.md#adr-013-going-online--authoritative-node-server--sqlite)):** the owner has committed to real multiplayer. The scheduled, concrete plan now lives in [MMO_ROADMAP](./MMO_ROADMAP.md) + [MMO_ARCHITECTURE](../technical/MMO_ARCHITECTURE.md); this appendix stays as the original long-horizon sketch (items 7–15 remain non-committed).
+
 A **clearly non-committed** outline of what *could* come after 1.0-BETA if Oathbound pursues real multiplayer. **Nothing here is scheduled or implemented.** The honest framing: **converting a local Three.js RPG into an MMO is a major project, not a feature.** The beta's job is to make the **solo loop excellent first**; this appendix only ensures we left the door open ([FUTURE_MULTIPLAYER_BOUNDARIES](../technical/FUTURE_MULTIPLAYER_BOUNDARIES.md)).
 
 ## Guiding principle

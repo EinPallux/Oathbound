@@ -5,6 +5,17 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## MMO plan — Oathbound Online + SQLite (owner-requested, planning phase — no code)
+**Goal:** plan the full transition from local single-player to a **self-hostable MMORPG**: an authoritative game server on a **Linux VPS**, friends playing together in one world, and all persisted game data (accounts, characters, world flags) moved to **SQLite** server-side.
+- **[docs/production/MMO_ROADMAP.md](./docs/production/MMO_ROADMAP.md)** — the phased track **M0→M8** (server scaffold → first online connection → shared-world per-player sim refactor → accounts + SQLite → prediction/reconciliation netcode → group XP/loot/threat/boss rules → chat & presence → VPS ops/backups/hardening → friends beta + **Online Gate**), sized as a *friends server* (≤ ~20 players), one phase at a time like the 0.x roadmap. Solo/offline mode keeps working throughout.
+- **[docs/technical/MMO_ARCHITECTURE.md](./docs/technical/MMO_ARCHITECTURE.md)** — one Node 22 process runs the **existing headless sim** at 30 Hz (the sim/render seam pays off: `ControlState` becomes the input packet, sim events become the broadcast stream, terrain stays deterministic and never replicates); WebSocket + zod protocol; **SQLite (`better-sqlite3`, WAL)** schema v1 (`accounts`, `sessions`, `characters` = hot columns + versioned `SaveData` JSON via the existing `serialize()`/`applySave()` boundary, `world_state`, migrations); write-behind autosave; one-time local-save import; friends-scale security model.
+- **[docs/technical/VPS_HOSTING_GUIDE.md](./docs/technical/VPS_HOSTING_GUIDE.md)** — the exact VPS to buy (**2 vCPU / 4 GB / 40 GB NVMe, Ubuntu 24.04, e.g. Hetzner CX22 ~€4–5/mo + a domain**) and the full setup: Caddy (auto-TLS, serves the client, proxies `/ws`), systemd, UFW, nightly SQLite backups + restore drill, deploy script.
+- **[ADR-013](./docs/decisions/DECISION_RECORDS.md#adr-013-going-online--authoritative-node-server--sqlite)** records the decision (Node-reusing-the-sim over rewrite/hosted platforms; WebSocket over WebRTC; SQLite over Postgres/browser-sync). DEFERRED_FEATURES gained a partial-supersession note (multiplayer/accounts/networking/chat now in scope; dungeons/raids/PvP/trading/guilds still deferred); POST_BETA_MMO_HORIZON marked activated; AGENTS.md status updated. **AdminTools needs no changes** — it couples only via the map JSON format, which the server parses with the game's own `map-format.ts`.
+
+**Verified:** docs-only change — `typecheck` ✓ · unit ✓ · `build` ✓ (no code touched). **Next phase → M0 "Server Scaffold"** (after owner review of the plan).
+
+---
+
 ## Realistic road textures — City / Grassland / Sandland (owner-requested)
 **Goal:** fix the Road tool so roads read as real environmental roads instead of one flat tan colour — a paved **City** road, an earthen **Grassland** road and a sandy **Sandland** road, each looking right in its surroundings.
 - **Three procedural road textures** (`render/paving.ts`, `makeRoadTexture` + `roadMaterial`, mirrored in the Map Builder's `engine/paving.ts`): **City** — warm-grey cobbled setts in running bond over dark mortar; **Grassland** — packed-earth dirt with soft worn wheel lanes, pebbles and fine grain; **Sandland** — drifting tan sand with wind-ripple streaks, faint compacted tracks and fine grit. Full-colour, tileable canvas textures (seamless across the 9 wrap offsets).
