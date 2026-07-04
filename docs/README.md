@@ -47,10 +47,12 @@ If you are a future implementation session, read in this order:
 ### Technical (`/docs/technical`)
 - [TECH_STACK_EVALUATION.md](./technical/TECH_STACK_EVALUATION.md) · [ARCHITECTURE_PLAN.md](./technical/ARCHITECTURE_PLAN.md) · [RENDERING_AND_PERFORMANCE.md](./technical/RENDERING_AND_PERFORMANCE.md)
 - [SAVE_SYSTEM_PLAN.md](./technical/SAVE_SYSTEM_PLAN.md) · [CONTENT_DATA_STRATEGY.md](./technical/CONTENT_DATA_STRATEGY.md) · [VERCEL_DEPLOYMENT_PLAN.md](./technical/VERCEL_DEPLOYMENT_PLAN.md) · [FUTURE_MULTIPLAYER_BOUNDARIES.md](./technical/FUTURE_MULTIPLAYER_BOUNDARIES.md)
+- **Online (owner-committed, [ADR-013](./decisions/DECISION_RECORDS.md#adr-013-going-online--authoritative-node-server--sqlite)):** [MMO_ARCHITECTURE.md](./technical/MMO_ARCHITECTURE.md) (server, protocol, SQLite) · [VPS_HOSTING_GUIDE.md](./technical/VPS_HOSTING_GUIDE.md) (what VPS to buy + Linux setup)
 
 ### Production (`/docs/production`)
 - [VERSION_ROADMAP.md](./production/VERSION_ROADMAP.md) · [PHASE_DEPENDENCIES.md](./production/PHASE_DEPENDENCIES.md) · [RELEASE_GATES.md](./production/RELEASE_GATES.md)
 - [RISK_REGISTER.md](./production/RISK_REGISTER.md) · [ASSUMPTIONS.md](./production/ASSUMPTIONS.md) · [DEFERRED_FEATURES.md](./production/DEFERRED_FEATURES.md) · [POST_BETA_MMO_HORIZON.md](./production/POST_BETA_MMO_HORIZON.md)
+- **[MMO_ROADMAP.md](./production/MMO_ROADMAP.md)** — the owner-committed online track (phases M0→M8: server, multiplayer, accounts, SQLite, VPS ops)
 
 ### QA (`/docs/qa`)
 - [TEST_STRATEGY.md](./qa/TEST_STRATEGY.md) · [PLAYTEST_PLAN.md](./qa/PLAYTEST_PLAN.md) · [PERFORMANCE_BUDGETS.md](./qa/PERFORMANCE_BUDGETS.md) · [BETA_ACCEPTANCE_CRITERIA.md](./qa/BETA_ACCEPTANCE_CRITERIA.md)
