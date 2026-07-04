@@ -5,6 +5,16 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## 12 new City buildings for the Map Builder (owner-requested — voxelised from reference art)
+**Goal:** turn the owner's `public/new_assets` reference renders into placeable low-poly assets for the City, in the same primitive-parts style as the rest of the preset library.
+- **New presets** (`world/presets.ts`, mirrored in the Map Builder's `format/presets.ts`), all category `structure` so they appear automatically in the editor's **Structures** palette: **Timbered House, Tall Townhouse, Tudor Cottage, Corner House** (half-timbered Tudor houses), **Worker's Hut, Stable** (barn + hay + lean-to), **Bathhouse** (chimney steam + an outdoor steaming tub), **Inn** (mug sign + covered porch), **Church** (nave + bell tower + spire + cross + rose window), **Tower Manor** & **Grand Manor** (grand multi-gabled houses), and a **Stone Fountain** (basin + column + water jets).
+- Built from the shared `box`/`cyl`/`cone` primitives with a few new helpers — `chimney`, `leadWin` (leaded glass), `flowerBox`, `studs` (half-timber framing), `gableEnd`/`gableEndX` (stepped gable-end fills) and `gableRoofX` (ridge along the wide axis) — plus a small warm-terracotta / plaster / leaded-glass palette. Each carries a box footprint collider.
+- Render-only content: no engine changes; they load through the existing `preset:<id>` custom-asset path in both the editor and the game.
+
+**Verified:** `typecheck` ✓ (both repos) · `npm test` → 344/344 ✓ (incl. the preset-validity/unique-id test) · `build` ✓ (both repos) · headless renders of all 12 via the Map Builder's real `customAssetGeometry` (each reads clearly as its reference building), and an in-editor check: all 12 appear in the Structures palette as rendered thumbnails with **zero console errors**.
+
+---
+
 ## Textured ground — real material textures on the cube tops (owner-requested)
 **Goal:** make each terrain cube read as its *surface* — grassy blades, craggy stone, sandy grit — the same way City ground already reads as cobbled stone, instead of a flat colour. (Supersedes a first pass that only varied the per-cube colour, which read as a noisy mosaic rather than a texture.)
 - **Procedural material textures** (`render/paving.ts`, `makeGroundTexture`): tileable canvas textures for **grass** (blades + soft meadow blotches), **rock** (irregular chunks + dark cracks) and **grit** (fine sandy/snowy speckle), alongside the existing cobble paving. Light-keyed detail so a per-cube biome tint shows through.

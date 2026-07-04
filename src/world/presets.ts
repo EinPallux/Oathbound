@@ -58,6 +58,18 @@ const IRON = 0x24242a;
 const MUG_AMBER = 0xd9a441, MUG_FOAM = 0xf2ead2, MUG_HANDLE = 0xb07a2a;
 const BARREL = 0x7a5230, BARREL_HOOP = 0x4a3420, CRATE = 0x8a5a32, CRATE_DK = 0x5a3a1e;
 const LEAF = 0x4f7a34;
+// City buildings voxelised from public/new_assets reference art (Tudor: stone base, half-timber
+// upper, warm terracotta tiled roofs, leaded glass, stone chimneys).
+const TILE = 0xa5513a, TILE_DK = 0x7f3b2b;      // terracotta roof tiles + ridge/shadow
+const TIMBER = 0x6a4630, TIMBER_DK = 0x47301f;  // half-timber frame
+const WATTLE = 0xe7dfca;                          // plaster / wattle infill
+const CHIM_POT = 0xb0563a;                        // terracotta chimney pot
+const LEAD = 0x39423f, LEAD_LIT = 0xf0c079;       // leaded glass / warm-lit window
+const PETAL = 0xf1ecdd;                            // white window-box flowers
+const FOUNT_WATER = 0x4f9fc9, JET = 0xbfeaf7;     // fountain water + jets
+const STEAM = 0xeef2f5;                            // steam / smoke
+const HAY = 0xc9a24a;                              // straw / hay
+const SIGNBOARD = 0x37271a;                        // hanging sign board
 
 function merlons(y: number, half: number, color: number): AssetPart[] {
   const xs = [-half + 0.4, -half * 0.34, half * 0.34, half - 0.4];
@@ -106,6 +118,78 @@ function barrel(x: number, y0: number, z: number, s = 1): AssetPart[] {
     cyl(BARREL_HOOP, 0.5 * s, 0.5 * s, 0.12 * s, x, y0 + 0.72 * s, z),
     cyl(0x5a3f26, 0.4 * s, 0.4 * s, 0.06 * s, x, y0 + 1.0 * s, z),
   ];
+}
+
+// ── City-building helpers (chimney, leaded window, flower box, timber studs) ───
+// A stone chimney stack from `baseY` up to `top`, capped with a terracotta pot.
+function chimney(x: number, z: number, baseY: number, top: number, pot = CHIM_POT): AssetPart[] {
+  const h = top - baseY;
+  return [
+    box(STONE, 0.92, h, 0.92, x, baseY + h / 2, z),
+    box(STONE_DK, 1.02, 0.2, 1.02, x, top - 0.08, z),
+    box(pot, 0.34, 0.5, 0.34, x, top + 0.26, z),
+  ];
+}
+// A leaded (latticed) window on the +Z front: dark frame + glass (warm-lit optional) + mullions.
+function leadWin(w: number, h: number, x: number, y: number, z: number, lit = false): AssetPart[] {
+  return [
+    box(TIMBER_DK, w + 0.18, h + 0.18, 0.1, x, y, z - 0.03),
+    box(lit ? LEAD_LIT : LEAD, w, h, 0.12, x, y, z),
+    box(TIMBER_DK, w + 0.04, 0.06, 0.14, x, y, z + 0.01),
+    box(TIMBER_DK, 0.06, h + 0.04, 0.14, x, y, z + 0.01),
+  ];
+}
+// A window flower box on the +Z wall (wood trough + green + white blooms).
+function flowerBox(x: number, y: number, z: number): AssetPart[] {
+  return [
+    box(TIMBER, 0.88, 0.24, 0.28, x, y, z),
+    box(LEAF, 0.76, 0.18, 0.22, x, y + 0.2, z),
+    box(PETAL, 0.58, 0.1, 0.16, x, y + 0.3, z + 0.02),
+  ];
+}
+// Evenly-spaced vertical half-timber studs across a +Z wall face (the Tudor look), centred on `cx`.
+function studs(halfW: number, y: number, h: number, z: number, n = 4, cx = 0): AssetPart[] {
+  const out: AssetPart[] = [];
+  for (let i = 0; i < n; i++) {
+    const x = cx + (n === 1 ? 0 : -halfW + 0.2 + (i / (n - 1)) * (halfW * 2 - 0.4));
+    out.push(box(TIMBER, 0.16, h, 0.08, x, y, z));
+  }
+  return out;
+}
+// Fill a triangular gable end (front/back face of a gable roof) with stepped plaster so the
+// roof reads as a solid house, not an open shell. `halfW` = eave half-width, `rise` = ridge height.
+function gableEnd(halfW: number, baseY: number, rise: number, z: number, cx = 0, color = WATTLE): AssetPart[] {
+  const steps = 5, out: AssetPart[] = [];
+  for (let i = 0; i < steps; i++) {
+    const f = i / steps;
+    out.push(box(color, halfW * 2 * (1 - f) + 0.1, rise / steps + 0.03, 0.3, cx, baseY + (rise / steps) * (i + 0.5), z));
+  }
+  return out;
+}
+// Like gableRoof but with the ridge running along X (for wide buildings whose long side faces
+// front). `depth` = the Z span the planes cover, `length` = the X extent (ridge length).
+function gableRoofX(color: number, depth: number, length: number, rise: number, baseY: number, cx = 0, z = 0): AssetPart[] {
+  const halfD = depth / 2;
+  const slope = Math.atan2(rise, halfD);
+  const planeLen = Math.hypot(halfD, rise);
+  const y = baseY + rise / 2;
+  return [
+    part('box', color, [length, 0.18, planeLen], [cx, y, z - halfD / 2], [-slope, 0, 0]),
+    part('box', color, [length, 0.18, planeLen], [cx, y, z + halfD / 2], [slope, 0, 0]),
+  ];
+}
+// Triangular gable-end fill for an X-ridge roof (faces ±X). `halfD` = eave half-depth.
+function gableEndX(halfD: number, baseY: number, rise: number, x: number, cz = 0, color = WATTLE): AssetPart[] {
+  const steps = 5, out: AssetPart[] = [];
+  for (let i = 0; i < steps; i++) {
+    const f = i / steps;
+    out.push(box(color, 0.3, rise / steps + 0.03, halfD * 2 * (1 - f) + 0.1, x, baseY + (rise / steps) * (i + 0.5), cz));
+  }
+  return out;
+}
+// A small hanging lantern (iron case + warm glow).
+function lantern(x: number, y: number, z: number): AssetPart[] {
+  return [box(IRON, 0.16, 0.3, 0.16, x, y, z), box(LEAD_LIT, 0.1, 0.18, 0.1, x, y, z + 0.03)];
 }
 
 export const PRESET_ASSETS: AssetDef[] = [
@@ -577,6 +661,359 @@ export const PRESET_ASSETS: AssetDef[] = [
     box(DOOR, 1.2, 2.2, 0.24, 0, 1.1, 3.55),
     ...[4.0, 6.0, 8.0].map((y) => box(0x1a1712, 0.24, 1.2, 0.14, 0, y, 2.9)),
   ], 3.4),
+
+  // ── City buildings (voxelised from public/new_assets reference art) ──────────
+  // Half-timbered Tudor houses, an inn, a church, a stable, a bathhouse, grand manors and a
+  // stone fountain — stone ground floors, jettied timber upper storeys, warm terracotta roofs.
+  def('city-house-1', 'Timbered House', 'structure', [
+    box(STONE, 3.6, 2.1, 3.0, 0, 1.05, 0),                     // stone ground floor
+    box(WOOD_DK, 3.75, 0.24, 3.15, 0, 2.16, 0),                // jetty band
+    box(WATTLE, 3.7, 2.0, 3.25, 0, 3.25, 0),                   // half-timber upper
+    ...[-1.78, 1.78].map((x) => box(TIMBER, 0.2, 2.0, 3.25, x, 3.25, 0)),
+    box(TIMBER, 3.7, 0.18, 3.28, 0, 4.25, 0),                  // top plate
+    box(TIMBER, 3.7, 0.16, 0.1, 0, 3.25, 1.64),                // mid rail
+    ...studs(1.85, 3.25, 2.0, 1.64, 4),
+    ...gableEnd(2.0, 4.25, 1.75, 1.66),
+    ...gableRoof(TILE, 4.3, 3.5, 1.75, 4.25, 0),
+    box(TILE_DK, 0.36, 0.24, 3.5, 0, 6.0, 0),                  // ridge
+    box(TIMBER_DK, 4.4, 0.18, 0.18, 0, 4.28, 1.75),            // front eave
+    ...chimney(1.2, -0.75, 3.0, 6.7),
+    box(TIMBER_DK, 1.15, 1.75, 0.14, -0.7, 0.88, 1.46),        // door frame
+    box(DOOR, 0.82, 1.5, 0.16, -0.7, 0.75, 1.53),
+    box(TILE, 1.35, 0.18, 0.55, -0.7, 1.98, 1.74),             // door awning
+    box(STONE_LT, 1.2, 0.2, 0.5, -0.7, 0.1, 1.86),             // step
+    ...lantern(-1.5, 1.45, 1.55),
+    ...leadWin(0.7, 0.85, 0.9, 1.25, 1.52, true),
+    ...leadWin(0.72, 0.95, -0.75, 3.3, 1.66),
+    ...leadWin(0.72, 0.95, 0.85, 3.3, 1.66, true),
+    ...flowerBox(0.85, 2.82, 1.72),
+  ], null, { hw: 1.9, hd: 1.6 }),
+  def('city-house-2', 'Tall Townhouse', 'structure', [
+    box(STONE, 3.2, 2.2, 2.9, 0, 1.1, 0),
+    box(WOOD_DK, 3.35, 0.22, 3.0, 0, 2.2, 0),
+    box(WATTLE, 3.3, 2.1, 3.05, 0, 3.3, 0),                    // 2nd storey
+    box(WOOD_DK, 3.5, 0.22, 3.2, 0, 4.4, 0),
+    box(WATTLE, 3.5, 2.1, 3.2, 0, 5.5, 0),                     // 3rd storey (jetty out)
+    ...[-1.68, 1.68].map((x) => box(TIMBER, 0.2, 2.1, 3.05, x, 3.3, 0)),
+    ...[-1.73, 1.73].map((x) => box(TIMBER, 0.2, 2.1, 3.2, x, 5.5, 0)),
+    ...studs(1.55, 3.3, 2.1, 1.56, 3),
+    ...studs(1.65, 5.5, 2.1, 1.63, 3),
+    box(TIMBER, 3.5, 0.2, 3.2, 0, 6.55, 0),
+    ...gableEnd(1.9, 6.55, 1.7, 1.62),
+    ...gableRoof(TILE, 4.0, 3.4, 1.7, 6.55, 0),
+    box(TILE_DK, 0.34, 0.22, 3.4, 0, 8.25, 0),
+    box(WATTLE, 0.9, 0.8, 0.5, 0, 7.35, 1.5),                  // dormer
+    ...gableRoof(TILE, 1.2, 0.7, 0.5, 7.75, 1.5),
+    ...leadWin(0.4, 0.5, 0, 7.4, 1.72, true),
+    ...chimney(1.15, -0.7, 3.0, 8.9),
+    box(TIMBER_DK, 1.1, 1.7, 0.14, -0.6, 0.85, 1.42),
+    box(DOOR, 0.82, 1.5, 0.16, -0.6, 0.75, 1.48),
+    box(STONE_LT, 1.1, 0.2, 0.5, -0.6, 0.1, 1.8),
+    ...lantern(-1.35, 1.4, 1.5),
+    ...leadWin(0.7, 0.8, 0.85, 1.3, 1.48, true),
+    ...leadWin(0.75, 0.95, -0.7, 3.35, 1.6, true),
+    ...leadWin(0.75, 0.95, 0.8, 3.35, 1.6),
+    ...leadWin(0.75, 0.95, 0, 5.55, 1.75, true),
+    ...flowerBox(-0.7, 2.85, 1.55),
+    ...flowerBox(0.8, 5.05, 1.78),
+    box(TIMBER_DK, 0.9, 0.12, 0.1, 2.05, 2.5, 0),              // sign bracket
+    box(SIGNBOARD, 0.1, 0.7, 0.6, 2.5, 2.1, 0),
+    box(MUG_AMBER, 0.06, 0.34, 0.3, 2.56, 2.1, 0),
+  ], null, { hw: 1.7, hd: 1.55 }),
+  def('city-house-3', 'Tudor Cottage', 'structure', [
+    box(STONE, 3.4, 2.0, 3.0, 0, 1.0, 0),
+    box(WOOD_DK, 3.55, 0.24, 3.15, 0, 2.05, 0),
+    box(WATTLE, 3.5, 1.9, 3.25, 0, 3.1, 0),
+    ...[-1.68, 1.68].map((x) => box(TIMBER, 0.2, 1.9, 3.25, x, 3.1, 0)),
+    box(TIMBER, 3.5, 0.18, 3.28, 0, 4.05, 0),
+    box(TIMBER, 3.5, 0.16, 0.1, 0, 3.1, 1.64),
+    ...studs(1.75, 3.1, 1.9, 1.64, 4),
+    ...gableEnd(1.9, 4.05, 2.0, 1.66),
+    ...gableRoof(TILE, 4.1, 3.5, 2.0, 4.05, 0),                // steeper roof
+    box(TILE_DK, 0.34, 0.24, 3.5, 0, 6.05, 0),
+    box(WATTLE, 0.9, 0.75, 0.5, 0.6, 4.9, 1.5),                // dormer
+    ...gableRoof(TILE, 1.15, 0.7, 0.45, 5.25, 1.5, 0.6),
+    ...leadWin(0.4, 0.45, 0.6, 4.95, 1.72),
+    ...chimney(1.15, -0.7, 3.0, 6.8),
+    box(STONE_LT, 1.25, 1.9, 0.2, 0, 0.95, 1.46),              // stone door surround
+    box(DOOR, 0.82, 1.45, 0.16, 0, 0.73, 1.55),
+    box(TILE, 1.4, 0.18, 0.55, 0, 1.95, 1.75),                 // awning
+    box(STONE_LT, 1.1, 0.2, 0.5, 0, 0.1, 1.9),
+    ...lantern(0.9, 1.4, 1.55),
+    ...leadWin(0.6, 0.7, -1.0, 1.35, 1.52),
+    ...leadWin(0.7, 0.9, -0.7, 3.15, 1.66),
+    ...leadWin(0.7, 0.9, 0.9, 3.15, 1.66, true),
+    ...flowerBox(-0.7, 2.72, 1.72),
+  ], null, { hw: 1.8, hd: 1.6 }),
+  def('city-house-4', 'Corner House', 'structure', [
+    box(STONE, 3.0, 2.2, 3.0, -0.8, 1.1, 0),                   // main block (left)
+    box(WOOD_DK, 3.2, 0.24, 3.2, -0.8, 2.2, 0),
+    box(WATTLE, 3.2, 2.0, 3.3, -0.8, 3.3, 0),                  // jettied upper
+    ...[-2.3, 0.7].map((x) => box(TIMBER, 0.2, 2.0, 3.3, x, 3.3, 0)),
+    box(TIMBER, 3.2, 0.18, 3.3, -0.8, 4.3, 0),
+    ...studs(1.4, 3.3, 2.0, 1.68, 3, -0.8),
+    ...gableEnd(1.7, 4.3, 1.8, 1.7, -0.8),
+    ...gableRoof(TILE, 3.7, 3.5, 1.8, 4.3, 0, -0.8),
+    box(TILE_DK, 0.34, 0.24, 3.5, -0.8, 6.1, 0),
+    ...chimney(-0.8, -0.9, 3.0, 6.8),
+    box(STONE, 2.2, 1.5, 2.4, 1.9, 0.75, 0.3),                 // side wing (right, lower)
+    box(WATTLE, 2.1, 1.0, 2.5, 1.9, 2.0, 0.3),
+    ...gableRoof(TILE, 2.6, 2.7, 1.1, 2.5, 0.3, 1.9),
+    box(TILE_DK, 0.3, 0.2, 2.7, 1.9, 3.6, 0.3),
+    ...leadWin(0.6, 0.7, 1.9, 1.9, 1.56, true),
+    ...flowerBox(1.9, 1.35, 1.56),
+    box(STONE_LT, 1.3, 2.0, 0.24, -0.8, 1.0, 1.46),            // arched stone door
+    box(DOOR, 0.85, 1.5, 0.18, -0.8, 0.75, 1.56),
+    box(STONE_DK, 0.95, 0.3, 0.2, -0.8, 1.65, 1.5),
+    box(STONE_LT, 1.2, 0.2, 0.5, -0.8, 0.1, 1.85),
+    ...lantern(0.05, 1.4, 1.5),
+    ...leadWin(0.7, 0.9, -0.7, 3.35, 1.7, true),
+    ...leadWin(0.7, 0.9, 0.1, 3.35, 1.7),
+    ...flowerBox(-0.7, 2.85, 1.68),
+  ], null, { hw: 2.6, hd: 1.7 }),
+  def('city-worker-hut', "Worker's Hut", 'structure', [
+    box(STONE, 3.6, 1.4, 2.8, 0, 0.7, 0),
+    box(WOOD_DK, 3.7, 0.2, 2.9, 0, 1.4, 0),
+    box(WATTLE, 3.6, 1.3, 2.95, 0, 2.05, 0),
+    ...[-1.75, 1.75].map((x) => box(TIMBER, 0.18, 1.3, 2.95, x, 2.05, 0)),
+    ...studs(1.75, 2.05, 1.3, 1.5, 4),
+    ...gableEnd(1.85, 2.7, 1.5, 1.5),
+    ...gableRoof(TILE, 4.0, 3.3, 1.5, 2.7, 0),
+    box(TILE_DK, 0.32, 0.22, 3.3, 0, 4.2, 0),
+    ...chimney(1.2, -0.6, 2.5, 5.0),
+    box(WOOD, 0.16, 1.6, 0.16, -1.9, 0.8, 1.7),                // porch posts
+    box(WOOD, 0.16, 1.6, 0.16, -0.9, 0.8, 1.7),
+    ...gableRoof(TILE, 1.5, 1.2, 0.5, 1.6, 1.85, -1.4),
+    box(DOOR, 0.78, 1.3, 0.16, -1.4, 0.65, 1.44),
+    box(STONE_LT, 1.0, 0.18, 0.5, -1.4, 0.1, 1.9),
+    ...leadWin(0.55, 0.6, 0.4, 1.55, 1.44),
+    ...leadWin(0.55, 0.6, 1.3, 1.55, 1.44, true),
+    box(WOOD_LT, 0.9, 0.5, 0.5, 2.2, 0.9, 1.2),                // wood pile
+    box(WOOD, 0.9, 0.16, 0.5, 2.2, 1.2, 1.2),
+    ...barrel(2.3, 0, 0.1, 0.55),
+  ], null, { hw: 1.9, hd: 1.5 }),
+  def('city-stable', 'Stable', 'structure', [
+    box(STONE, 5.4, 1.2, 3.4, 0, 0.6, 0),
+    box(WATTLE, 5.2, 1.8, 3.5, 0, 2.1, 0),
+    ...[-2.5, -0.9, 0.9, 2.5].map((x) => box(TIMBER, 0.2, 3.0, 3.5, x, 1.5, 0)),
+    box(TIMBER, 5.2, 0.2, 3.55, 0, 3.0, 0),
+    ...gableEnd(2.7, 3.0, 1.9, 1.72),
+    ...gableRoof(TILE, 5.8, 4.0, 1.9, 3.0, 0),
+    box(TILE_DK, 0.4, 0.24, 4.0, 0, 4.9, 0),
+    ...chimney(1.6, -1.0, 3.4, 5.6),
+    box(TIMBER_DK, 2.4, 2.6, 0.3, 0, 1.3, 1.6),                // barn door surround
+    box(WOOD, 1.05, 2.3, 0.16, -0.55, 1.15, 1.72),
+    box(WOOD, 1.05, 2.3, 0.16, 0.55, 1.15, 1.72),
+    box(WOOD_DK, 0.1, 2.3, 0.18, 0, 1.15, 1.74),
+    box(HAY, 1.6, 0.3, 0.6, 0, 0.15, 1.9),                     // hay at the doors
+    box(0x1a1712, 1.0, 0.9, 0.4, 0, 3.4, 1.7),                 // loft opening
+    box(WOOD, 0.5, 0.12, 0.5, 0, 4.0, 1.85),                   // loft beam
+    ...leadWin(0.6, 0.7, -1.9, 1.85, 1.76, true),
+    ...leadWin(0.6, 0.7, 1.9, 1.85, 1.76, true),
+    ...flowerBox(-1.9, 1.3, 1.76),
+    box(WOOD, 0.16, 1.6, 0.16, 3.2, 0.8, 1.4),                 // lean-to posts
+    box(WOOD, 0.16, 1.6, 0.16, 3.2, 0.8, -1.4),
+    box(TILE, 2.0, 0.18, 3.2, 3.6, 1.65, 0),                   // lean-to roof
+    ...[1.2, 0, -1.2].map((z) => box(WOOD, 1.6, 0.12, 0.12, 3.6, 0.7, z)), // fence rails
+    box(HAY, 0.9, 0.6, 0.9, 3.5, 0.3, 0.8),                    // hay bale
+  ], null, { hw: 3.4, hd: 1.8 }),
+  def('city-bathhouse', 'Bathhouse', 'structure', [
+    box(STONE, 3.8, 2.0, 3.2, -0.4, 1.0, 0),
+    box(WOOD_DK, 3.95, 0.24, 3.35, -0.4, 2.05, 0),
+    box(WATTLE, 3.9, 2.0, 3.4, -0.4, 3.1, 0),
+    ...[-2.3, 1.5].map((x) => box(TIMBER, 0.2, 2.0, 3.4, x, 3.1, 0)),
+    ...studs(1.9, 3.1, 2.0, 1.74, 4, -0.4),
+    box(TIMBER, 3.9, 0.2, 3.4, -0.4, 4.1, 0),
+    ...gableEnd(2.0, 4.1, 1.8, 1.76, -0.4),
+    ...gableRoof(TILE, 4.4, 3.7, 1.8, 4.1, 0, -0.4),
+    box(TILE_DK, 0.36, 0.24, 3.7, -0.4, 5.9, 0),
+    ...chimney(-1.6, -0.9, 3.0, 6.5),
+    ...[6.8, 7.3, 7.8].map((y, i) => sph(STEAM, 0.3 + i * 0.08, -1.6, y, -0.9)), // chimney steam
+    box(SIGNBOARD, 1.7, 0.7, 0.16, -0.4, 2.75, 1.78),          // BATHHOUSE sign
+    box(TIMBER_DK, 1.85, 0.14, 0.2, -0.4, 3.15, 1.78),
+    box(STEAM, 0.5, 0.14, 0.06, -0.4, 2.82, 1.88),
+    box(0x2f3f5f, 0.9, 1.6, 0.14, -0.9, 0.8, 1.62),            // blue curtain door
+    box(STONE_LT, 1.1, 0.2, 0.5, -0.9, 0.1, 1.95),
+    ...lantern(-1.9, 1.5, 1.66),
+    ...leadWin(0.6, 0.7, 0.7, 1.3, 1.62, true),
+    ...leadWin(0.65, 0.85, -1.3, 3.15, 1.74, true),
+    ...leadWin(0.65, 0.85, 0.6, 3.15, 1.74, true),
+    ...flowerBox(0.7, 0.95, 1.62),
+    box(STONE, 2.4, 0.9, 2.4, 2.4, 0.45, 0.2),                 // outdoor hot tub
+    box(FOUNT_WATER, 1.9, 0.35, 1.9, 2.4, 0.85, 0.2),
+    ...[1.2, 1.7, 2.2].map((y, i) => sph(STEAM, 0.3 + i * 0.07, 2.4, y, 0.2)), // tub steam
+    ...barrel(3.9, 0, 1.7, 0.5),
+  ], null, { hw: 2.7, hd: 1.8 }),
+  def('city-inn', 'Inn', 'structure', [
+    box(STONE, 4.0, 2.2, 3.4, -1.2, 1.1, 0),                   // main block (left)
+    box(WOOD_DK, 4.2, 0.24, 3.55, -1.2, 2.2, 0),
+    box(WATTLE, 4.1, 2.2, 3.6, -1.2, 3.35, 0),
+    ...[-3.15, 0.75].map((x) => box(TIMBER, 0.2, 2.2, 3.6, x, 3.35, 0)),
+    ...studs(1.9, 3.35, 2.2, 1.82, 4, -1.2),
+    box(TIMBER, 4.1, 0.2, 3.6, -1.2, 4.45, 0),
+    ...gableEnd(2.1, 4.45, 2.0, 1.84, -1.2),
+    ...gableRoof(TILE, 4.6, 3.8, 2.0, 4.45, 0, -1.2),
+    box(TILE_DK, 0.38, 0.24, 3.8, -1.2, 6.45, 0),
+    box(WATTLE, 0.9, 0.8, 0.5, -1.2, 5.4, 1.55),               // dormer
+    ...gableRoof(TILE, 1.2, 0.7, 0.5, 5.8, 1.55, -1.2),
+    ...leadWin(0.4, 0.5, -1.2, 5.45, 1.77, true),
+    ...chimney(0.5, -1.2, 3.2, 7.0),
+    box(STONE_LT, 1.4, 2.2, 0.24, -1.5, 1.1, 1.66),            // arched door
+    box(DOOR, 0.95, 1.6, 0.18, -1.5, 0.8, 1.76),
+    box(STONE_DK, 1.0, 0.34, 0.2, -1.5, 1.8, 1.7),
+    box(STONE_LT, 1.4, 0.2, 0.5, -1.5, 0.1, 2.05),
+    ...leadWin(0.6, 0.7, -2.6, 1.4, 1.72, true),
+    ...leadWin(0.7, 0.9, -2.2, 3.4, 1.86),
+    ...leadWin(0.7, 0.9, -0.4, 3.4, 1.86, true),
+    ...flowerBox(-0.4, 2.9, 1.84),
+    box(TIMBER_DK, 0.9, 0.14, 0.14, -3.5, 2.7, 0),             // mug sign
+    box(SIGNBOARD, 0.12, 0.8, 0.7, -4.0, 2.2, 0),
+    box(MUG_AMBER, 0.06, 0.4, 0.34, -4.07, 2.1, 0),
+    box(MUG_FOAM, 0.06, 0.12, 0.34, -4.07, 2.38, 0),
+    box(STONE, 3.4, 0.4, 3.4, 2.4, 0.2, 0),                    // porch platform (right)
+    ...[0.9, 3.9].flatMap((x) => [1.4, -1.4].map((z) => box(WOOD, 0.2, 2.2, 0.2, x, 1.3, z))),
+    box(TIMBER, 3.6, 0.3, 3.5, 2.4, 2.5, 0),                   // porch beam
+    ...gableRoof(TILE, 4.0, 3.6, 1.2, 2.65, 0, 2.4),
+    box(TILE_DK, 0.3, 0.2, 3.6, 2.4, 3.85, 0),
+    box(WATTLE, 3.0, 1.6, 0.2, 2.4, 1.3, -1.5),                // porch back wall
+    ...[1.2, 2.4, 3.6].flatMap((x) => lantern(x, 1.9, 1.4)),
+    ...[0.9, 1.9, 2.9, 3.9].map((x) => box(WOOD, 0.6, 0.7, 0.12, x, 0.75, 1.5)), // railing
+  ], null, { hw: 3.6, hd: 1.8 }),
+  def('city-church', 'Church', 'structure', [
+    box(STONE_LT, 4.0, 4.0, 6.0, -1.0, 2.0, 0),                // nave
+    box(STONE_DK, 4.3, 0.4, 6.3, -1.0, 0.2, 0),                // plinth
+    ...gableEnd(2.0, 4.0, 2.2, 3.02, -1.0, STONE_LT),
+    ...gableRoof(TILE, 4.4, 6.4, 2.2, 4.0, 0, -1.0),
+    box(TILE_DK, 0.4, 0.26, 6.4, -1.0, 6.2, 0),
+    box(STONE_DK, 0.2, 0.95, 0.2, -1.0, 6.75, 3.0),            // front cross
+    box(STONE_DK, 0.65, 0.2, 0.2, -1.0, 6.95, 3.0),
+    cyl(STONE_DK, 0.72, 0.72, 0.2, -1.0, 4.7, 3.02),           // rose window
+    cyl(LEAD, 0.55, 0.55, 0.18, -1.0, 4.7, 3.06),
+    ...[-2.4, -0.8, 0.8].flatMap((z) => [                       // gothic side windows (+X wall)
+      box(LEAD, 0.5, 1.8, 0.3, 1.05, 2.4, z),
+      box(STONE_DK, 0.72, 0.4, 0.32, 1.05, 3.4, z),
+    ]),
+    ...[-2.6, -1.0, 0.6, 2.2].map((z) => box(STONE, 0.5, 3.2, 0.5, 1.2, 1.6, z)), // buttresses
+    box(STONE, 1.9, 2.2, 1.3, -1.0, 1.1, 3.35),                // entrance porch
+    box(DOOR, 1.0, 1.7, 0.18, -1.0, 0.85, 4.02),
+    box(STONE_DK, 1.2, 0.4, 0.3, -1.0, 1.95, 4.0),
+    ...gableRoof(TILE, 2.3, 1.5, 0.9, 2.2, 4.0, -1.0),
+    ...lantern(-2.05, 1.6, 3.5),
+    ...lantern(0.05, 1.6, 3.5),
+    box(STONE_LT, 2.0, 0.3, 0.6, -1.0, 0.15, 4.35),            // steps
+    box(STONE_LT, 3.0, 9.0, 3.0, 2.4, 4.5, -2.0),              // bell tower
+    box(STONE_DK, 3.2, 0.4, 3.2, 2.4, 3.0, -2.0),
+    box(STONE_DK, 3.2, 0.4, 3.2, 2.4, 7.2, -2.0),
+    box(0x1a1712, 1.0, 1.6, 0.4, 2.4, 8.4, -0.55),             // bell openings
+    box(0x1a1712, 0.4, 1.6, 1.0, 3.85, 8.4, -2.0),
+    cyl(0x8a6a2a, 0.5, 0.62, 0.85, 2.4, 8.15, -0.55),          // bell
+    box(STONE_DK, 3.4, 0.5, 3.4, 2.4, 9.25, -2.0),
+    cone(TILE, 2.4, 3.4, 2.4, 11.15, -2.0),                    // spire
+    box(STONE_DK, 0.2, 1.0, 0.2, 2.4, 13.3, -2.0),             // tower cross
+    box(STONE_DK, 0.62, 0.2, 0.2, 2.4, 13.5, -2.0),
+    box(LEAD, 0.5, 1.4, 0.3, 2.4, 5.6, -0.55),                 // tower window
+  ], 3.6, { hw: 3.4, hd: 3.2 }),
+  def('city-manor-tower', 'Tower Manor', 'structure', [
+    box(STONE, 5.0, 2.4, 4.2, 0.6, 1.2, 0),                    // main manor block
+    box(WOOD_DK, 5.2, 0.24, 4.35, 0.6, 2.4, 0),
+    box(WATTLE, 5.1, 2.4, 4.4, 0.6, 3.7, 0),
+    ...[-1.9, 3.1].map((x) => box(TIMBER, 0.18, 2.4, 4.4, x, 3.7, 0)),
+    ...studs(2.3, 3.7, 2.4, 2.24, 5, 0.6),
+    box(TIMBER, 5.1, 0.2, 4.4, 0.6, 4.9, 0),
+    ...gableEnd(2.55, 4.9, 2.2, 2.26, 0.6),
+    ...gableRoof(TILE, 5.5, 4.6, 2.2, 4.9, 0, 0.6),
+    box(TILE_DK, 0.4, 0.26, 4.6, 0.6, 7.1, 0),
+    box(WATTLE, 2.0, 1.6, 0.6, 0.6, 5.5, 2.0),                 // front cross-gable
+    ...gableRoof(TILE, 2.4, 1.0, 1.2, 6.3, 2.0, 0.6),
+    ...leadWin(0.7, 0.9, 0.6, 5.6, 2.24, true),
+    ...chimney(2.6, -1.2, 3.4, 7.6),
+    box(STONE, 2.6, 6.0, 2.6, -2.8, 3.0, -0.2),                // tall tower (left)
+    box(WOOD_DK, 2.75, 0.22, 2.75, -2.8, 5.2, -0.2),
+    box(WATTLE, 2.7, 2.4, 2.7, -2.8, 6.4, -0.2),
+    ...[-4.0, -1.6].map((x) => box(TIMBER, 0.18, 2.4, 2.7, x, 6.4, -0.2)),
+    box(TIMBER, 2.7, 0.2, 2.7, -2.8, 7.6, -0.2),
+    cone(TILE, 2.1, 3.2, -2.8, 9.3, -0.2),                     // tower spire
+    box(STONE_DK, 0.16, 0.7, 0.16, -2.8, 11.2, -0.2),
+    ...leadWin(0.6, 1.0, -2.8, 5.0, 1.15, true),
+    ...leadWin(0.6, 0.9, -2.8, 6.4, 1.16, true),
+    box(WOOD, 0.16, 1.8, 0.16, -0.4, 0.9, 2.4),                // entrance porch
+    box(WOOD, 0.16, 1.8, 0.16, 1.6, 0.9, 2.4),
+    ...gableRoof(TILE, 1.8, 1.4, 0.6, 1.85, 2.4, 0.6),
+    box(DOOR, 0.9, 1.5, 0.16, 0.6, 0.75, 2.16),
+    box(STONE_LT, 1.4, 0.24, 0.6, 0.6, 0.12, 2.5),
+    ...lantern(-0.4, 1.5, 2.3),
+    ...leadWin(0.7, 0.9, 2.2, 1.4, 2.12, true),
+    ...leadWin(0.7, 0.9, 2.2, 3.7, 2.24),
+    ...leadWin(0.7, 0.9, -1.0, 3.7, 2.24, true),
+    ...flowerBox(2.2, 2.9, 2.2),
+  ], 3.6, { hw: 3.6, hd: 2.3 }),
+  def('city-grand-manor', 'Grand Manor', 'structure', [
+    box(STONE, 9.0, 2.4, 4.0, 0, 1.2, 0),                      // wide stone ground floor
+    box(WOOD_DK, 9.2, 0.24, 4.2, 0, 2.4, 0),
+    box(WATTLE, 9.0, 2.2, 4.25, 0, 3.6, 0),                    // timber upper
+    ...[-4.4, -1.5, 1.5, 4.4].map((x) => box(TIMBER, 0.2, 2.2, 4.25, x, 3.6, 0)),
+    ...studs(4.2, 3.6, 2.2, 2.15, 8),
+    box(TIMBER, 9.0, 0.2, 4.25, 0, 4.7, 0),
+    ...gableRoofX(TILE, 4.25, 9.0, 2.0, 4.7, 0, 0),            // main roof (ridge along the wide X axis)
+    box(TILE_DK, 9.0, 0.24, 0.36, 0, 6.7, 0),                 // ridge cap
+    ...gableEndX(2.12, 4.7, 2.0, -4.5),                        // left gable end
+    ...gableEndX(2.12, 4.7, 2.0, 4.5),                         // right gable end
+    // three front cross-gables (left, centre, right)
+    ...[-3.0, 0, 3.0].flatMap((cx) => [
+      box(WATTLE, 2.0, 1.7, 0.6, cx, 5.4, 1.9),
+      ...gableRoof(TILE, 2.4, 1.1, 1.1, 6.2, 1.9, cx),
+      ...gableEnd(1.0, 5.4, 1.1, 1.92, cx),
+      ...leadWin(0.6, 0.8, cx, 5.5, 2.14, true),
+    ]),
+    ...chimney(-3.6, -1.4, 3.4, 7.8),                          // two chimneys
+    ...chimney(3.6, -1.4, 3.4, 7.8),
+    box(WATTLE, 2.4, 2.4, 0.8, 0, 1.2, 2.1),                   // central entrance projection
+    box(STONE_LT, 1.6, 2.2, 0.3, 0, 1.1, 2.5),
+    box(DOOR, 1.0, 1.7, 0.18, 0, 0.85, 2.66),
+    box(STONE_DK, 1.2, 0.36, 0.24, 0, 1.9, 2.6),
+    ...gableRoof(TILE, 2.8, 1.6, 0.9, 2.5, 2.5, 0),            // porch roof
+    box(STONE_LT, 1.8, 0.3, 0.7, 0, 0.15, 2.8),               // steps
+    ...lantern(-1.2, 1.5, 2.55),
+    ...lantern(1.2, 1.5, 2.55),
+    ...[-3.6, -2.2].flatMap((x) => leadWin(0.7, 0.9, x, 1.4, 2.02, true)),
+    ...[2.2, 3.6].flatMap((x) => leadWin(0.7, 0.9, x, 1.4, 2.02, true)),
+    ...[-3.6, -2.0, 2.0, 3.6].flatMap((x) => leadWin(0.7, 0.9, x, 3.6, 2.16, x < 0)),
+    ...flowerBox(-3.6, 0.95, 2.02),
+    ...flowerBox(3.6, 0.95, 2.02),
+  ], 4.2, { hw: 4.6, hd: 2.2 }),
+  def('city-fountain', 'Stone Fountain', 'structure', [
+    cyl(STONE_LT, 3.0, 3.2, 0.9, 0, 0.45, 0),                  // basin outer wall
+    cyl(STONE_DK, 3.05, 3.25, 0.14, 0, 0.9, 0),                // rim cap
+    cyl(FOUNT_WATER, 2.8, 2.8, 0.7, 0, 0.62, 0),               // water (raised so it reads blue)
+    ...Array.from({ length: 6 }, (_, k) => {                    // rim corner posts
+      const a = (k / 6) * Math.PI * 2;
+      return box(STONE, 0.5, 0.35, 0.5, Math.cos(a) * 2.95, 1.0, Math.sin(a) * 2.95);
+    }),
+    ...Array.from({ length: 6 }, (_, k) => {                    // gold quatrefoils on the wall
+      const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
+      return box(GOLD, 0.34, 0.34, 0.1, Math.cos(a) * 3.05, 0.5, Math.sin(a) * 3.05, a);
+    }),
+    box(STONE, 1.8, 1.4, 1.8, 0, 1.2, 0),                      // central column base
+    box(STONE_DK, 2.0, 0.2, 2.0, 0, 1.95, 0),
+    box(STONE, 1.4, 1.3, 1.4, 0, 2.6, 0),                      // column mid
+    ...Array.from({ length: 4 }, (_, k) => {                    // gold medallions on the column
+      const a = (k / 4) * Math.PI * 2;
+      return box(GOLD, 0.3, 0.4, 0.1, Math.cos(a) * 0.72, 2.6, Math.sin(a) * 0.72, a);
+    }),
+    box(STONE_DK, 1.6, 0.2, 1.6, 0, 3.3, 0),
+    box(STONE, 1.0, 0.9, 1.0, 0, 3.85, 0),                     // column top
+    ...Array.from({ length: 4 }, (_, k) => {                    // crenellations
+      const a = (k / 4) * Math.PI * 2 + Math.PI / 4;
+      return box(STONE_LT, 0.4, 0.4, 0.4, Math.cos(a) * 0.5, 4.4, Math.sin(a) * 0.5);
+    }),
+    cone(STONE, 0.7, 1.0, 0, 4.9, 0),                          // finial cap
+    box(STONE_DK, 0.16, 0.7, 0.16, 0, 5.6, 0),                 // cross finial
+    box(STONE_DK, 0.5, 0.16, 0.16, 0, 5.75, 0),
+    ...Array.from({ length: 4 }, (_, k) => {                    // water jets from the column
+      const a = (k / 4) * Math.PI * 2 + Math.PI / 4;
+      return part('box', JET, [0.12, 0.9, 0.12], [Math.cos(a) * 1.3, 1.5, Math.sin(a) * 1.3], [Math.cos(a) * -0.5, 0, Math.sin(a) * -0.5]);
+    }),
+  ], 3.2, { hw: 3.2, hd: 3.2 }),
 
   // ── Bridges (decorative — walk across on the terrain beneath; raise via Height offset) ──
   def('wooden-bridge', 'Wooden Bridge', 'structure', [
