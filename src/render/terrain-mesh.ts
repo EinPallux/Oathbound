@@ -8,10 +8,10 @@ import { biomeFactors, dominantBiome } from '../world/biomes';
 import { TERRAIN_RENDER_RES } from '../world/layout';
 
 // ── Voxel / Cube-World terrain constants (shared by the sim collision grid + the renderer) ──
-/** Horizontal cube size (m). Fine enough to read as "Cube World" (≈1.5× the player). */
-export const VOXEL_CUBE = 3;
-/** Vertical quantization (m) — the height step between stacked cubes. */
-export const VOXEL_STEP = 2;
+// VOXEL_CUBE/VOXEL_STEP are the *collision* grid, so they live in world/layout.ts (the sim,
+// incl. a headless server, reads them). Re-exported here so existing renderer imports are
+// unchanged. VOXEL_VIEW is render-only (the visible bubble's half-extent) and stays here.
+export { VOXEL_CUBE, VOXEL_STEP } from '../world/layout';
 /** Half-extent (m) of the fine-cube bubble rendered around the player (≈ the voxel-mode fog far). */
 export const VOXEL_VIEW = 340;
 

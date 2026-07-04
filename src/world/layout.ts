@@ -39,3 +39,15 @@ export const HUB_RADIUS = 6;
  * both key off this value.
  */
 export const ZONE_THRESHOLD = 120;
+
+/**
+ * "Cube World" voxel collision grid. When a heightfield's `voxelCube`/`voxelStep` are set
+ * to these, {@link Heightfield.sample} snaps to a fixed grid of `VOXEL_CUBE`-metre cells and
+ * quantizes height to `VOXEL_STEP`, so the cubes you *see* are the cubes you *stand on*.
+ * These live here (not in the renderer) because collision (src/sim/systems/movement.ts) reads
+ * them, so the sim — including a headless server — must agree with the renderer on one value.
+ * The render *view distance* for the voxel bubble (`VOXEL_VIEW`) stays in the renderer; it's
+ * purely visual and the sim never needs it.
+ */
+export const VOXEL_CUBE = 3;
+export const VOXEL_STEP = 2;
