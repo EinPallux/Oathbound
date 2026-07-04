@@ -6,9 +6,10 @@
 
 import { Heightfield, type CylinderCollider, type BoxCollider } from './heightfield';
 import { clamp } from '../core/math';
-import { TERRAIN_RENDER_RES } from './layout';
+import { TERRAIN_RENDER_RES, VOXEL_CUBE, VOXEL_STEP } from './layout';
 import { unpackHeights, ENEMY_IDS, BOSS_IDS, type AssetDef, type OathboundMap } from './map-format';
 import { presetById } from './presets';
+import { villageBoxes, villageCylinders } from './village';
 import type { Scenery } from './scenery';
 import type { Spawn } from '../sim/content/spawns';
 import type { EnemyTemplateId, Tier } from '../sim/content/enemies';
@@ -130,5 +131,60 @@ export function customSceneryForMinimap(map: OathboundMap): Scenery {
     ferns: [], mushrooms: [], logs: [], lilies: [],
     rivers: map.rivers.map((p) => ({ points: p.points, width: p.width })),
     roads: map.roads.map((p) => ({ points: p.points, width: p.width })),
+  };
+}
+
+/** All the render-free world data createSimWorld needs to build a sim from a custom map. */
+export interface WorldData {
+  field: Heightfield;
+  colliders: CylinderCollider[];
+  boxes: BoxCollider[];
+  playerStart: { x: number; z: number };
+  spawns: Spawn[];
+  bosses: { id: BossId; x: number; z: number }[];
+  oathstones: { id: string; name: string; x: number; z: number }[];
+  vendor: { name: string; x: number; z: number };
+}
+
+/**
+ * Build the complete render-free sim world data for a custom map — the heightfield (with its
+ * voxel collision grid switched on), colliders, spawns/bosses/oathstones and vendor. Used by
+ * the headless server and tests; the browser bootstrap makes the same decisions inline while
+ * it also builds the meshes. KEEP THE TWO IN SYNC (village inclusion, the "Home" oathstone
+ * fallback, the wilderness vendor offset) — src/game/bootstrap.ts is the mirror, exactly like
+ * the map-format copies. M1 will unify them once bootstrap's mesh-building is untangled.
+ */
+export function buildCustomWorldData(map: OathboundMap): WorldData {
+  const field = buildCustomHeightfield(map);
+  // Cube-World collision grid (the sim snaps to the cubes the client draws).
+  field.voxelCube = VOXEL_CUBE;
+  field.voxelStep = VOXEL_STEP;
+  const playerStart = { x: map.playerSpawn.x, z: map.playerSpawn.z };
+
+  const assetCols = customColliders(map);
+  const boxCols = customBoxColliders(map);
+  // The standard Oathhold town (rendered at the origin) is included when the map opts in.
+  const colliders = map.village != null ? [...assetCols, ...villageCylinders()] : assetCols;
+  const boxes = map.village != null ? [...boxCols, ...villageBoxes()] : boxCols;
+
+  // Oathstones: use the map's, or drop a "Home" stone at spawn so respawn/travel still work.
+  const oathstones = map.oathstones.length
+    ? map.oathstones.map((o) => ({ id: o.id, name: o.name, x: o.x, z: o.z }))
+    : [{ id: 'home', name: 'Home', x: playerStart.x, z: playerStart.z }];
+
+  // Vendor: at the town when present; otherwise just beside the player spawn.
+  const vendor = map.village == null
+    ? { name: 'Quartermaster', x: playerStart.x + 3, z: playerStart.z - 3 }
+    : { name: 'Quartermaster', x: 3, z: -3 };
+
+  return {
+    field,
+    colliders,
+    boxes,
+    playerStart,
+    spawns: customSpawns(map),
+    bosses: customBosses(map),
+    oathstones,
+    vendor,
   };
 }

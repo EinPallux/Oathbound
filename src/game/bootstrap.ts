@@ -30,24 +30,11 @@ import {
   villageBoxes,
   villageCylinders,
 } from '../world/village';
-import { createMovementSystem } from '../sim/systems/movement';
-import { createCombatSystem } from '../sim/systems/combat';
-import { createEnemyAiSystem } from '../sim/systems/enemy-ai';
-import { createLootSystem, pickUpNearest } from '../sim/systems/loot';
-import { createRecoverySystem } from '../sim/systems/recovery';
-import { createWaypointSystem } from '../sim/systems/waypoint';
-import { createSpatialSystem } from '../sim/systems/spatial';
-import { createProjectileSystem } from '../sim/systems/projectile';
-import { createTrapSystem } from '../sim/systems/trap';
-import { createGroundAoeSystem } from '../sim/systems/ground-aoe';
-import { createBossAiSystem } from '../sim/systems/boss-ai';
-import { SpatialGrid } from '../sim/spatial-grid';
-import { Projectiles } from '../sim/projectiles';
-import { Telemetry, createTelemetrySystem } from '../sim/telemetry';
-import { createPlayer, setPlayerClass, createOathstone, createVendor, PLAYER_HALF } from '../sim/factory';
-import { spawnEnemy } from '../sim/content/enemies';
+import { pickUpNearest } from '../sim/systems/loot';
+import { createSimWorld } from '../sim/boot/sim-world';
+import { setPlayerClass, PLAYER_HALF } from '../sim/factory';
 import { WORLD_SPAWNS } from '../sim/content/spawns';
-import { spawnBoss, BOSS_SPAWNS } from '../sim/content/bosses';
+import { BOSS_SPAWNS } from '../sim/content/bosses';
 import { relicEffectDesc } from '../sim/loot/relics';
 import { addItem, equipItem, recomputeDerived } from '../sim/inventory';
 import { generateItem } from '../sim/loot/items';
@@ -95,7 +82,6 @@ import {
   type OathstoneActivatedEvent,
 } from '../sim/combat/events';
 import type { TelemetrySnapshot } from '../sim/telemetry';
-import { Rng } from '../core/rng';
 import { buildProps, terrainColorRGB, VOXEL_CUBE, VOXEL_STEP, VOXEL_VIEW } from '../render/terrain-mesh';
 import { VoxelTerrain } from '../render/voxel-terrain';
 import { buildScenery } from '../render/scenery-view';
@@ -332,20 +318,13 @@ export function boot(options: BootOptions = {}): Game {
   voxelTerrain.rebuildAt(playerStart.x, playerStart.z);
   renderer.scene.add(voxelTerrain.group);
 
-  // Entities.
-  const world = new World();
-  const rng = new Rng(0xc0ffee);
-  const grid = new SpatialGrid(8);
-  const projectiles = new Projectiles();
-  const telemetry = new Telemetry();
-  const player = createPlayer(world, field, playerStart.x, playerStart.z);
+  // Entities + systems — the pure sim world. Assembled by the shared, render-free
+  // createSimWorld (src/sim/boot/sim-world.ts) so the browser and the headless multiplayer
+  // server register the identical entity set + system pipeline and can never drift
+  // (docs/technical/MMO_ARCHITECTURE.md). The render-coupled decisions — which map, where the
+  // town/vendor sit — stay here; the ECS assembly lives in one place.
   const spawnList = customMap ? customSpawns(customMap) : SPAWNS;
-  for (const s of spawnList) {
-    spawnEnemy(world, field, s.id, s.x, s.z, { level: s.level, tier: s.tier, name: s.name });
-  }
-  // World bosses (0.6.0 CP2): one solo boss deep in each of the three highest frontiers.
   const bossList = customMap ? customBosses(customMap) : BOSS_SPAWNS;
-  for (const b of bossList) spawnBoss(world, field, b.id, b.x, b.z);
   // Oathstones (fast-travel network). For a custom map with none placed, drop a "Home"
   // stone at the spawn so the player's respawn binds and travel still works.
   const stoneList = customMap
@@ -353,30 +332,22 @@ export function boot(options: BootOptions = {}): Game {
       ? customMap.oathstones
       : [{ id: 'home', name: 'Home', x: playerStart.x, z: playerStart.z }]
     : OATHSTONES;
-  for (const o of stoneList) createOathstone(world, field, o.id, o.name, o.x, o.z);
   // Vendor: at the town when present; otherwise just beside the player spawn so the
   // sell/buy loop works on a wilderness map.
   const vendorPos = customMap && customMap.village == null
     ? { x: playerStart.x + 3, z: playerStart.z - 3 }
     : { x: 3, z: -3 };
-  createVendor(world, field, 'Quartermaster', vendorPos.x, vendorPos.z);
-  telemetry.attach(world, player);
-
-  // Systems: spatial → movement → combat → enemy AI → projectiles → traps → loot →
-  // waypoint → recovery → telemetry. Waypoint runs after movement so it sees the
-  // updated position, and before recovery so respawn binds to the stone just visited.
-  world.addSystem(createSpatialSystem(grid));
-  world.addSystem(createMovementSystem({ input, field, colliders, boxes: movementBoxes }));
-  world.addSystem(createCombatSystem({ input, rng, colliders, field, projectiles, grid }));
-  world.addSystem(createEnemyAiSystem({ field, colliders, rng, grid, projectiles }));
-  world.addSystem(createBossAiSystem({ field }));
-  world.addSystem(createProjectileSystem(projectiles, rng));
-  world.addSystem(createTrapSystem(rng));
-  world.addSystem(createGroundAoeSystem(rng));
-  world.addSystem(createLootSystem());
-  world.addSystem(createWaypointSystem());
-  world.addSystem(createRecoverySystem({ field, spawnX: playerStart.x, spawnZ: playerStart.z }));
-  world.addSystem(createTelemetrySystem(telemetry));
+  const { world, player, rng, projectiles, telemetry } = createSimWorld({
+    field,
+    colliders,
+    boxes: movementBoxes,
+    playerStart,
+    spawns: spawnList,
+    bosses: bossList,
+    oathstones: stoneList,
+    vendor: { name: 'Quartermaster', x: vendorPos.x, z: vendorPos.z },
+    input,
+  });
 
   // Render / UI.
   const sky = new Sky(renderer.scene);

@@ -1,0 +1,49 @@
+// Server configuration, resolved from environment variables with friends-server-friendly
+// defaults. In production these come from the systemd unit / server.toml (see
+// docs/technical/VPS_HOSTING_GUIDE.md); in dev, none are required — `npm run server:dev`
+// boots the default Talar map on port 8080.
+
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { SIM_HZ } from '../src/core/time';
+
+export interface ServerConfig {
+  /** TCP port the WebSocket server listens on. */
+  port: number;
+  /** URL path clients connect to (Caddy proxies wss://host/ws → here in production). */
+  wsPath: string;
+  /** Map name (without extension), used in the welcome message + logging. */
+  mapName: string;
+  /** Absolute path to the `.oathbound-map.json` the world is built from. */
+  mapPath: string;
+  /** Simulation tick rate — fixed to the sim's DT (do not change without rescaling DT). */
+  tickHz: number;
+  /** Snapshot broadcast rate (M1+). Declared now; unused in M0 (no state is sent yet). */
+  snapshotHz: number;
+  /** Gameplay RNG seed — the authority for loot/crit/AI rolls. */
+  seed: number;
+}
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+/** The server/ dir sits at the repo root; authored maps live in public/maps. */
+const REPO_ROOT = resolve(HERE, '..');
+
+function intEnv(value: string | undefined, fallback: number): number {
+  if (value == null || value.trim() === '') return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.trunc(n) : fallback;
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
+  const mapName = env.OATHBOUND_MAP ?? 'talar';
+  const mapDir = env.OATHBOUND_MAP_DIR ?? resolve(REPO_ROOT, 'public', 'maps');
+  return {
+    port: intEnv(env.OATHBOUND_PORT, 8080),
+    wsPath: env.OATHBOUND_WS_PATH ?? '/ws',
+    mapName,
+    mapPath: resolve(mapDir, `${mapName}.oathbound-map.json`),
+    tickHz: SIM_HZ,
+    snapshotHz: intEnv(env.OATHBOUND_SNAPSHOT_HZ, 15),
+    seed: intEnv(env.OATHBOUND_SEED, 0xc0ffee),
+  };
+}
