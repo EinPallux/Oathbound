@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { normalizeMap } from '../src/world/map-format';
 import { buildCustomWorldData } from '../src/world/custom-map';
 import { createSimWorld, type SimWorld } from '../src/sim/boot/sim-world';
-import { createNullControlState } from '../src/platform/null-input';
+import type { ControlState } from '../src/platform/input';
 import type { ServerConfig } from './config';
 
 export interface ServerWorld {
@@ -19,14 +19,14 @@ export interface ServerWorld {
   mapName: string;
 }
 
-export function bootServerWorld(config: ServerConfig): ServerWorld {
+/**
+ * Boot the authoritative sim world from the configured map, driving the player with `input`
+ * (a NetworkControlState fed by client packets in M1; a null input in headless smoke tests).
+ */
+export function bootServerWorld(config: ServerConfig, input: ControlState): ServerWorld {
   const raw = readFileSync(config.mapPath, 'utf8');
   const map = normalizeMap(JSON.parse(raw));
   const data = buildCustomWorldData(map);
-  const sim = createSimWorld({
-    ...data,
-    input: createNullControlState(),
-    seed: config.seed,
-  });
+  const sim = createSimWorld({ ...data, input, seed: config.seed });
   return { sim, mapName: config.mapName };
 }

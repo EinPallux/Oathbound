@@ -1,33 +1,27 @@
-// WebSocket handling. M0 scope is deliberately tiny: validate every incoming frame with the
-// shared protocol schemas, answer `ping` with `pong`, and answer `hello` with `welcome`. No
-// gameplay is sent yet (input/snapshots/events land in M1). Every message is zod-validated on
-// receipt — a malformed frame gets a coded `error`, never a crash.
+// WebSocket handling. Validates every incoming frame with the shared protocol schemas and
+// routes it: `ping`→`pong`, `hello`→`welcome` (+ an initial snapshot), `input`→the game. Each
+// connection is registered with the GameServer so it receives broadcast snapshots. A malformed
+// frame gets a coded `error`, never a crash — the server stays authoritative and untrusting.
 
-import type { WebSocketServer, WebSocket, RawData } from 'ws';
+import { WebSocket, type WebSocketServer, type RawData } from 'ws';
 import {
   PROTOCOL_VERSION,
   decodeClientMessage,
   encode,
   type ServerMessage,
 } from '../src/net/protocol';
-import type { ServerConfig } from './config';
-import type { ServerWorld } from './world-boot';
-import type { ServerClock } from './clock';
-
-export interface NetDeps {
-  config: ServerConfig;
-  world: ServerWorld;
-  clock: ServerClock;
-  /** Current connected-client count (M0's stand-in for "players online"). */
-  playerCount: () => number;
-}
+import type { GameServer } from './game';
 
 function send(ws: WebSocket, msg: ServerMessage): void {
-  ws.send(encode(msg));
+  if (ws.readyState === WebSocket.OPEN) ws.send(encode(msg));
 }
 
-export function attachNet(wss: WebSocketServer, deps: NetDeps): void {
+export function attachNet(wss: WebSocketServer, game: GameServer): void {
   wss.on('connection', (ws: WebSocket) => {
+    game.addClient(ws);
+    ws.on('close', () => game.removeClient(ws));
+    ws.on('error', () => game.removeClient(ws));
+
     ws.on('message', (data: RawData) => {
       const raw = typeof data === 'string' ? data : data.toString();
       const res = decodeClientMessage(raw);
@@ -38,7 +32,7 @@ export function attachNet(wss: WebSocketServer, deps: NetDeps): void {
       const msg = res.msg;
       switch (msg.t) {
         case 'ping':
-          send(ws, { t: 'pong', time: msg.time, serverTick: deps.clock.ticks });
+          send(ws, { t: 'pong', time: msg.time, serverTick: game.tick });
           break;
         case 'hello':
           if (msg.protocol !== PROTOCOL_VERSION) {
@@ -49,18 +43,21 @@ export function attachNet(wss: WebSocketServer, deps: NetDeps): void {
             });
             return;
           }
-          // M0: there is one shared world player; every client is told about it. Per-connection
-          // player entities (a createPlayer per session) arrive in M1.
+          // M1: one shared world player; every client is told about it and drives it via input.
           send(ws, {
             t: 'welcome',
             protocol: PROTOCOL_VERSION,
-            entityId: deps.world.sim.player,
-            map: deps.world.mapName,
-            tick: deps.clock.ticks,
-            tickHz: deps.config.tickHz,
-            snapshotHz: deps.config.snapshotHz,
-            players: deps.playerCount(),
+            entityId: game.playerEntity,
+            map: game.mapName,
+            tick: game.tick,
+            tickHz: game.tickHz,
+            snapshotHz: game.snapshotHz,
+            players: game.playerCount,
           });
+          game.sendSnapshotTo(ws); // seed the client with the current world immediately
+          break;
+        case 'input':
+          game.onInput(msg);
           break;
       }
     });
