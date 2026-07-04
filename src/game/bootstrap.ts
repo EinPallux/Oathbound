@@ -23,6 +23,7 @@ import {
   customSceneryForMinimap,
   biomeIndexAt,
 } from '../world/custom-map';
+import { dominantBiome } from '../world/biomes';
 import {
   VILLAGE_FLAT,
   VILLAGE_CLEARING,
@@ -322,7 +323,12 @@ export function boot(options: BootOptions = {}): Game {
         out[0] = _terrCol.r; out[1] = _terrCol.g; out[2] = _terrCol.b;
       }
     : terrainColorRGB;
-  const voxelTerrain = new VoxelTerrain(field, voxelColorAt, VOXEL_CUBE, VOXEL_VIEW, cm ? (x, z) => biomeIndexAt(cm, x, z) : null);
+  // Ground code per position → picks each cube's detail texture (grass/rock/grit/paved). Custom
+  // maps use the painted index; the procedural world maps its dominant biome to a stand-in index.
+  const groundAt: (x: number, z: number) => number = cm
+    ? (x, z) => biomeIndexAt(cm, x, z)
+    : (x, z) => { const b = dominantBiome(x, z); return b === 'ember' || b === 'riven' || b === 'gravereach' ? 20 : 0; };
+  const voxelTerrain = new VoxelTerrain(field, voxelColorAt, VOXEL_CUBE, VOXEL_VIEW, groundAt);
   voxelTerrain.rebuildAt(playerStart.x, playerStart.z);
   renderer.scene.add(voxelTerrain.group);
 

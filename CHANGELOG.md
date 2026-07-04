@@ -5,13 +5,14 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
-## Textured ground — per-material grain instead of flat colours (owner-requested)
-**Goal:** stop the terrain reading as one flat colour per cube — give each ground type a bit of *feeling* (grassy speckle, craggy stone, fine sandy/snowy grit) so it looks richer in the world.
-- **`colorForBiome` + `terrainColor` grain:** after picking a ground's base colour, a small **deterministic per-spot variation** is layered on, keyed to a **material style** — `grass` (per-blade speckle + warmer/cooler meadow patches), `rock` (blocky craggy grey mottle), `grit` (subtle sand/snow grain), or `flat` (paved tops, which already carry the stone texture). It's a pure function of world position, so it stays **stable as the cube bubble rebuilds** and never shimmers.
-- Applied to **every** painted ground index (custom maps, `custom-map-view.ts`) and to the **procedural world** (`terrain-mesh.ts`, craggier on the Riven/Gravereach rock frontiers). The Mountains' old one-off `rockNoise` is folded into the shared `rock` grain.
-- Render-only and cheap — no new meshes/textures/draw calls; it just enriches the per-cube vertex colour the voxel bubble already uses. Kept **byte-identical** with the Map Builder's copy (`AdminTools src/oathbound/palette.ts`) so the editor preview matches 1:1.
+## Textured ground — real material textures on the cube tops (owner-requested)
+**Goal:** make each terrain cube read as its *surface* — grassy blades, craggy stone, sandy grit — the same way City ground already reads as cobbled stone, instead of a flat colour. (Supersedes a first pass that only varied the per-cube colour, which read as a noisy mosaic rather than a texture.)
+- **Procedural material textures** (`render/paving.ts`, `makeGroundTexture`): tileable canvas textures for **grass** (blades + soft meadow blotches), **rock** (irregular chunks + dark cracks) and **grit** (fine sandy/snowy speckle), alongside the existing cobble paving. Light-keyed detail so a per-cube biome tint shows through.
+- **Per-material cube-top overlays** (`render/voxel-terrain.ts`): the single paving overlay became **one overlay mesh per material**. Each cube top emits a world-UV quad into its material's overlay (chosen by `groundMaterial(biome)`), tinted by the biome colour × a small boost — so the detail tiles seamlessly across cubes and reads as continuous grass/rock/sand. Cobble keeps its grey/warm tint.
+- **`colorForBiome` reverted to flat** base colours (height gradients + snow caps only) — it's now just the *tint* the texture multiplies under; the old per-cube grain + `rockNoise` are gone. New `groundMaterial(biome)` maps each painted index to a material. The **procedural world** feeds a stand-in index from its dominant biome so it's textured too (grass / rock).
+- Kept **byte-identical** with the Map Builder (`AdminTools`: `engine/paving.ts`, `oathbound/palette.ts`, `engine/terrain.ts`) so the editor preview matches the game 1:1.
 
-**Verified:** `typecheck` ✓ · `npm test` → 344/344 ✓ · `build` ✓ · headless renders of the shipped colour code over the real Talar map (via the Map Builder bundle): grass reads as a varied meadow, mountains as craggy rock, the city keeps its stone paving — and an in-game `?autostart` boot renders the terrain with the paving intact and **zero console errors**.
+**Verified:** `typecheck` ✓ · `npm test` → 344/344 ✓ · `build` ✓ (both repos) · headless renders over the real Talar map: grass cubes show grassy blades, mountains show craggy stone, the city keeps its cobbles — each cube textured like its material. In-game `?autostart` boot: the player stands on textured grass and textured cobbles with **zero console errors**.
 
 ---
 
