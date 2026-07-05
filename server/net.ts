@@ -3,6 +3,7 @@
 // import). Only once in-world does `input` flow. Every frame is zod-validated; a bad frame gets
 // a coded `error`, never a crash. The server is authoritative and untrusting.
 
+import type { IncomingMessage } from 'node:http';
 import { WebSocket, type WebSocketServer, type RawData } from 'ws';
 import {
   PROTOCOL_VERSION,
@@ -10,25 +11,51 @@ import {
   encode,
   type ServerMessage,
 } from '../src/net/protocol';
+import { RateLimiter } from '../src/net/rate-limit';
 import type { GameServer, EnterResult } from './game';
+
+/** Per-connection message budget: comfortably above the 30 Hz input stream, with burst room. */
+const RL_CAPACITY = 60;
+const RL_REFILL_PER_SEC = 45;
+/** Drop this many over-rate messages from one connection, then disconnect the flooder. */
+const RL_MAX_DROPPED = 200;
+/** Max simultaneous connections from a single IP. */
+const MAX_CONN_PER_IP = 8;
 
 function send(ws: WebSocket, msg: ServerMessage): void {
   if (ws.readyState === WebSocket.OPEN) ws.send(encode(msg));
 }
 
 export function attachNet(wss: WebSocketServer, game: GameServer): void {
-  wss.on('connection', (ws: WebSocket) => {
+  const ipCounts = new Map<string, number>();
+
+  wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+    const ip = req.socket.remoteAddress ?? 'unknown';
+    if ((ipCounts.get(ip) ?? 0) >= MAX_CONN_PER_IP) {
+      ws.close(1008, 'too many connections');
+      return;
+    }
+    ipCounts.set(ip, (ipCounts.get(ip) ?? 0) + 1);
+
+    const limiter = new RateLimiter(RL_CAPACITY, RL_REFILL_PER_SEC, Date.now());
+    let dropped = 0;
     let accountId: number | null = null;
     let inWorld = false;
+    let cleanedUp = false;
 
-    const dropIfInWorld = (): void => {
+    const cleanup = (): void => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      const c = (ipCounts.get(ip) ?? 1) - 1;
+      if (c <= 0) ipCounts.delete(ip);
+      else ipCounts.set(ip, c);
       if (inWorld) {
         game.leave(ws);
         inWorld = false;
       }
     };
-    ws.on('close', dropIfInWorld);
-    ws.on('error', dropIfInWorld);
+    ws.on('close', cleanup);
+    ws.on('error', cleanup);
 
     const sendCharList = (): void => {
       if (accountId != null) send(ws, { t: 'charList', chars: game.characters(accountId) });
@@ -54,6 +81,11 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
     };
 
     ws.on('message', (data: RawData) => {
+      // Rate limit: drop over-budget messages; disconnect a persistent flooder.
+      if (!limiter.tryConsume(Date.now())) {
+        if (++dropped > RL_MAX_DROPPED) ws.close(1008, 'rate limit exceeded');
+        return;
+      }
       const parsed = decodeClientMessage(typeof data === 'string' ? data : data.toString());
       if (!parsed.ok) {
         send(ws, { t: 'error', code: 'bad_message', message: parsed.error });

@@ -90,7 +90,7 @@ export const InputMessage = z.object({
   back: z.boolean(),
   left: z.boolean(),
   right: z.boolean(),
-  yaw: z.number(),
+  yaw: z.number().finite(), // reject NaN/±Infinity — would poison the movement integration
   jump: z.boolean(),
   /** Queued ability slot (0-based) this tick, or null/absent. (M2: fight over the wire.) */
   ability: z.number().int().nullable().optional(),

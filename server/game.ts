@@ -9,17 +9,21 @@ import { NetworkControlState } from '../src/net/net-input';
 import { buildSnapshot } from '../src/net/snapshot';
 import { encode, type InputMessage } from '../src/net/protocol';
 import { addPlayer } from '../src/sim/boot/sim-world';
+import { createNullControlState } from '../src/platform/null-input';
 import { pickUpNearest } from '../src/sim/systems/loot';
 import { serialize, applySave, SCHEMA_VERSION, type SaveData } from '../src/sim/save';
 import { DT } from '../src/core/time';
 import type { Entity } from '../src/core/ecs/world';
-import type { ClassId } from '../src/core/ecs/components';
+import { C, type ClassId } from '../src/core/ecs/components';
+import type { ControlState } from '../src/platform/input';
 import { bootServerWorld, type ServerWorld } from './world-boot';
 import { Db, type CharacterSummary, type CharacterFlush } from './db';
 import { hashPassword, verifyPassword, newSessionToken, hashToken } from './auth';
 import type { ServerConfig } from './config';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+/** How long a disconnected player's entity lingers so a quick reconnect resumes it in place. */
+const RECONNECT_GRACE_MS = 20_000;
 
 interface ConnectedPlayer {
   entity: Entity;
@@ -38,6 +42,10 @@ export class GameServer {
   readonly world: ServerWorld;
   private readonly db: Db;
   private readonly clients = new Map<WebSocket, ConnectedPlayer>();
+  /** Disconnected-but-still-alive players, keyed by `accountId:slot`, for seamless reconnect. */
+  private readonly orphans = new Map<string, { entity: Entity; accountId: number; slot: number; deadAt: number }>();
+  /** `accountId:slot` currently in the world (blocks a duplicate concurrent session). */
+  private readonly active = new Set<string>();
   private readonly snapshotEvery: number;
   private sinceSnapshot = 0;
   private tickCount = 0;
@@ -114,8 +122,23 @@ export class GameServer {
 
   // ── Entering the world ───────────────────────────────────────────────────────────────────
 
-  /** Enter as an existing character (loaded from the DB). */
+  /** Enter as an existing character — re-attaching to a still-alive orphan if reconnecting, else
+   *  loading from the DB. */
   enterExisting(ws: WebSocket, accountId: number, slot: number): EnterResult {
+    const k = `${accountId}:${slot}`;
+    // Seamless reconnect: re-attach to the entity kept alive from the recent disconnect.
+    const orphan = this.orphans.get(k);
+    if (orphan) {
+      this.orphans.delete(k);
+      const input = new NetworkControlState();
+      this.world.sim.world.set<ControlState>(orphan.entity, C.PlayerInput, input);
+      this.clients.set(ws, { entity: orphan.entity, input, accountId, slot });
+      this.active.add(k);
+      return { ok: true, entity: orphan.entity };
+    }
+    if (this.active.has(k)) {
+      return { ok: false, code: 'already_playing', message: 'that character is already in the world' };
+    }
     const row = this.db.getCharacter(accountId, slot);
     if (!row) return { ok: false, code: 'no_character', message: 'no character in that slot' };
     let save: SaveData;
@@ -143,6 +166,7 @@ export class GameServer {
       return { ok: false, code: 'name_taken', message: 'that character name is taken' };
     }
     this.clients.set(ws, { entity, input, accountId, slot });
+    this.active.add(`${accountId}:${slot}`);
     return { ok: true, entity };
   }
 
@@ -180,6 +204,7 @@ export class GameServer {
       return { ok: false, code: 'bad_save', message: 'could not apply the save' };
     }
     this.clients.set(ws, { entity, input, accountId, slot });
+    this.active.add(`${accountId}:${slot}`);
     return { ok: true, entity };
   }
 
@@ -194,6 +219,7 @@ export class GameServer {
     for (const p of this.clients.values()) {
       if (p.input.consumeInteract()) pickUpNearest(this.world.sim.world, p.entity);
     }
+    this.reap();
     this.tickCount++;
     if (++this.sinceSnapshot >= this.snapshotEvery) {
       this.sinceSnapshot = 0;
@@ -201,10 +227,31 @@ export class GameServer {
     }
   }
 
-  /** Flush one in-world character to the DB (serialize → row). */
+  /** Destroy orphaned (disconnected past the grace window) player entities. */
+  private reap(): void {
+    if (this.orphans.size === 0) return;
+    const now = Date.now();
+    for (const [k, o] of this.orphans) {
+      if (o.deadAt <= now) {
+        try {
+          this.flushEntity(o.accountId, o.slot, o.entity);
+        } catch {
+          /* best-effort */
+        }
+        this.world.sim.world.destroyEntity(o.entity);
+        this.orphans.delete(k);
+      }
+    }
+  }
+
+  /** Flush one character (by entity) to the DB (serialize → row). */
+  private flushEntity(accountId: number, slot: number, entity: Entity): void {
+    const save = serialize(this.world.sim.world, entity);
+    this.db.saveCharacter(accountId, slot, this.flushFrom(save));
+  }
+
   private flush(p: ConnectedPlayer): void {
-    const save = serialize(this.world.sim.world, p.entity);
-    this.db.saveCharacter(p.accountId, p.slot, this.flushFrom(save));
+    this.flushEntity(p.accountId, p.slot, p.entity);
   }
 
   private flushFrom(save: SaveData): CharacterFlush {
@@ -218,22 +265,46 @@ export class GameServer {
     };
   }
 
-  /** Persist every in-world character (periodic + shutdown). */
+  /** Persist every character still in the world (active + orphaned) — periodic + shutdown. */
   flushAll(): void {
-    for (const p of this.clients.values()) this.flush(p);
+    for (const p of this.clients.values()) {
+      try {
+        this.flush(p);
+      } catch {
+        /* best-effort */
+      }
+    }
+    for (const o of this.orphans.values()) {
+      try {
+        this.flushEntity(o.accountId, o.slot, o.entity);
+      } catch {
+        /* best-effort */
+      }
+    }
   }
 
-  /** A connection dropped: flush its character and remove its entity. */
+  /** A connection dropped: flush the character and keep its entity alive briefly (reconnect
+   *  grace) so a quick return resumes in place; the reaper destroys it after the window. */
   leave(ws: WebSocket): void {
     const p = this.clients.get(ws);
     if (!p) return;
+    const k = `${p.accountId}:${p.slot}`;
     try {
       this.flush(p);
     } catch {
       /* best-effort on disconnect */
     }
-    this.world.sim.world.destroyEntity(p.entity);
     this.clients.delete(ws);
+    this.active.delete(k);
+    // Neutralize input so the orphaned body stands still during the grace window (its old
+    // NetworkControlState may still hold "forward", which would walk it away).
+    this.world.sim.world.set<ControlState>(p.entity, C.PlayerInput, createNullControlState());
+    this.orphans.set(k, {
+      entity: p.entity,
+      accountId: p.accountId,
+      slot: p.slot,
+      deadAt: Date.now() + RECONNECT_GRACE_MS,
+    });
   }
 
   close(): void {

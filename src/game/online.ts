@@ -1,8 +1,9 @@
-// Online client (M3). Flow: connect → authenticate (login/register) → pick a character
+// Online client (M3/M4). Flow: connect → authenticate (login/register) → pick a character
 // (select / create / import an offline save) → enter the world. Only the world half runs a
-// scene; before that it's a small login + character panel. There is NO local simulation — the
-// server owns gameplay truth; this client sends intents and renders replicated snapshots with
-// interpolation (the local player moves by server echo; prediction is M4). Terrain is
+// scene; before that it's a small login + character panel. The server owns gameplay truth, but
+// M4 hides latency: the LOCAL player is client-side predicted (its movement runs locally through
+// the same sim code and is reconciled to the server's authoritative snapshots), while REMOTE
+// entities are rendered from a small interpolation-delay buffer for smooth motion. Terrain is
 // deterministic (same map as the server), so only entities cross the wire. Reuses the game's
 // Renderer / CameraRig / Sky + terrain mesh; entity visuals are simple stand-in meshes.
 
@@ -16,11 +17,13 @@ import { lerpAngle } from '../core/math';
 import { InputController } from '../platform/input';
 import { loadKeybinds } from './keybinds';
 import { loadSave } from '../platform/save-store';
-import { generateHeightfield, type Heightfield } from '../world/heightfield';
+import { generateHeightfield, type Heightfield, type CylinderCollider } from '../world/heightfield';
 import { WORLD_SIZE, WORLD_RES, VOXEL_CUBE, VOXEL_STEP } from '../world/layout';
 import { getActiveMap } from '../world/active-map';
-import { buildCustomHeightfield } from '../world/custom-map';
+import { buildCustomWorldData } from '../world/custom-map';
+import type { BoxCollider } from '../sim/collision';
 import { PLAYER_HALF } from '../sim/factory';
+import { PredictedPlayer } from '../net/prediction';
 import {
   PROTOCOL_VERSION,
   encode,
@@ -30,6 +33,30 @@ import {
 } from '../net/protocol';
 
 type ClassId = 'warrior' | 'hunter' | 'priest';
+
+interface Sample {
+  t: number;
+  x: number;
+  z: number;
+  yaw: number;
+}
+
+/** Interpolate a buffered entity's position at render time `t` (ms). */
+function sampleAt(samples: Sample[], t: number): [number, number, number] {
+  if (samples.length === 0) return [0, 0, 0];
+  if (t <= samples[0].t) return [samples[0].x, samples[0].z, samples[0].yaw];
+  const newest = samples[samples.length - 1];
+  if (t >= newest.t) return [newest.x, newest.z, newest.yaw];
+  for (let i = 0; i < samples.length - 1; i++) {
+    const a = samples[i];
+    const b = samples[i + 1];
+    if (t >= a.t && t <= b.t) {
+      const f = (t - a.t) / (b.t - a.t || 1);
+      return [a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f, lerpAngle(a.yaw, b.yaw, f)];
+    }
+  }
+  return [newest.x, newest.z, newest.yaw];
+}
 
 export interface OnlineOptions {
   /** WebSocket URL, e.g. wss://play.example.com/ws or ws://127.0.0.1:8080/ws. */
@@ -45,12 +72,8 @@ export interface OnlineOptions {
 interface Replica {
   kind: string;
   mesh: THREE.Object3D;
-  px: number;
-  pz: number;
-  pyaw: number;
-  cx: number;
-  cz: number;
-  cyaw: number;
+  /** Recent authoritative samples (for interpolation-delay rendering of remote entities). */
+  samples: Sample[];
   seen: number;
 }
 
@@ -90,6 +113,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
   const panel = makePanel();
   let ws: WebSocket;
   let started = false;
+  let stopping = false;
   let world: { stop(): void } | null = null;
 
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, css: string, text?: string): HTMLElementTagNameMap[K] => {
@@ -190,7 +214,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
   }
 
   // ── The 3D world (built once, on welcome) ──
-  function startWorld(selfId: number, snapshotHz: number): void {
+  function startWorld(selfId: number): void {
     if (started) return;
     started = true;
     panel.hide();
@@ -201,12 +225,24 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     const input = new InputController(canvas, keybinds);
     new Sky(renderer.scene);
 
+    // Build the SAME field + colliders the server used (deterministic) so client-side prediction
+    // resolves collision identically. Custom map (Talar) → full world data; else procedural.
     const map = getActiveMap();
-    const field: Heightfield = map
-      ? buildCustomHeightfield(map)
-      : generateHeightfield(WORLD_SIZE, WORLD_RES, 1337, []);
-    field.voxelCube = VOXEL_CUBE;
-    field.voxelStep = VOXEL_STEP;
+    let field: Heightfield;
+    let colliders: CylinderCollider[];
+    let boxes: BoxCollider[];
+    if (map) {
+      const data = buildCustomWorldData(map);
+      field = data.field;
+      colliders = data.colliders;
+      boxes = data.boxes;
+    } else {
+      field = generateHeightfield(WORLD_SIZE, WORLD_RES, 1337, []);
+      field.voxelCube = VOXEL_CUBE;
+      field.voxelStep = VOXEL_STEP;
+      colliders = [];
+      boxes = [];
+    }
     const terrain = buildTerrainMesh(field);
     renderer.scene.add(terrain);
     renderer.setFogRange(60, 340);
@@ -259,32 +295,34 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
 
     const replicas = new Map<number, Replica>();
     let snapIndex = 0;
-    let lastSnapAt = performance.now();
-    const snapIntervalMs = 1000 / (snapshotHz || 15);
     let seq = 0;
+    let pred: PredictedPlayer | null = null;
+    const INTERP_DELAY_MS = 100; // render remote entities this far in the past → smooth motion
     let camX = 0;
     let camZ = 0;
     let camY = field.sample(0, 0) + PLAYER_HALF;
 
-    const applySnapshot = (ents: SnapshotEntity[]): void => {
+    const applySnapshot = (ents: SnapshotEntity[], ack: number): void => {
       snapIndex++;
-      lastSnapAt = performance.now();
+      const now = performance.now();
+      // Local player: reconcile prediction to the server's authoritative state (create it on the
+      // first snapshot that includes us).
+      const self = ents.find((e) => e.id === selfId);
+      if (self) {
+        if (!pred) pred = new PredictedPlayer(field, colliders, boxes, { x: self.x, z: self.z });
+        else pred.reconcile(self.x, self.z, self.yaw, ack);
+      }
       for (const e of ents) {
         let r = replicas.get(e.id);
         if (!r) {
           const mesh = buildMesh(e.k, e.id === selfId);
           renderer.scene.add(mesh);
-          r = { kind: e.k, mesh, px: e.x, pz: e.z, pyaw: e.yaw, cx: e.x, cz: e.z, cyaw: e.yaw, seen: snapIndex };
+          r = { kind: e.k, mesh, samples: [], seen: snapIndex };
           replicas.set(e.id, r);
-        } else {
-          r.px = r.cx;
-          r.pz = r.cz;
-          r.pyaw = r.cyaw;
-          r.cx = e.x;
-          r.cz = e.z;
-          r.cyaw = e.yaw;
-          r.seen = snapIndex;
         }
+        r.samples.push({ t: now, x: e.x, z: e.z, yaw: e.yaw });
+        if (r.samples.length > 6) r.samples.shift();
+        r.seen = snapIndex;
         r.mesh.visible = !(e.k === 'enemy' && e.st === 'dead');
       }
       for (const [id, r] of replicas) {
@@ -299,50 +337,56 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
 
     const sendInput = (): void => {
       if (ws.readyState !== WebSocket.OPEN) return;
-      ws.send(
-        encode({
-          t: 'input',
-          seq: ++seq,
-          forward: input.forward,
-          back: input.back,
-          left: input.left,
-          right: input.right,
-          yaw: input.yaw,
-          jump: input.consumeJump(),
-          ability: input.consumeAbility(),
-          interact: input.consumeInteract(),
-          cycle: input.consumeTargetCycle(),
-        }),
-      );
+      const msg = {
+        t: 'input' as const,
+        seq: ++seq,
+        forward: input.forward,
+        back: input.back,
+        left: input.left,
+        right: input.right,
+        yaw: input.yaw,
+        jump: input.consumeJump(),
+        ability: input.consumeAbility(),
+        interact: input.consumeInteract(),
+        cycle: input.consumeTargetCycle(),
+      };
+      pred?.predict(msg); // move the local player immediately (reconciled against snapshots)
+      ws.send(encode(msg));
     };
 
-    const renderFrame = (): void => {
-      const t = Math.min(1, (performance.now() - lastSnapAt) / snapIntervalMs);
-      for (const r of replicas.values()) {
-        const x = r.px + (r.cx - r.px) * t;
-        const z = r.pz + (r.cz - r.pz) * t;
-        const groundY = field.sample(x, z);
-        r.mesh.position.set(x, groundY + (r.kind === 'player' ? PLAYER_HALF : 0.4), z);
-        r.mesh.rotation.y = lerpAngle(r.pyaw, r.cyaw, t);
+    const renderFrame = (alpha: number): void => {
+      // Remote entities: render at a fixed delay from their sample buffer (smooth under jitter).
+      const renderT = performance.now() - INTERP_DELAY_MS;
+      for (const [id, r] of replicas) {
+        if (id === selfId) continue; // the local player is drawn from prediction, below
+        const [x, z, yaw] = sampleAt(r.samples, renderT);
+        r.mesh.position.set(x, field.sample(x, z) + (r.kind === 'player' ? PLAYER_HALF : 0.4), z);
+        r.mesh.rotation.y = yaw;
       }
-      const me = replicas.get(selfId);
-      if (me) {
-        camX = me.mesh.position.x;
-        camZ = me.mesh.position.z;
-        camY = field.sample(camX, camZ) + PLAYER_HALF;
+      // Local player: predicted, sub-tick-interpolated between the last two ticks by alpha.
+      const meMesh = replicas.get(selfId)?.mesh;
+      if (pred && meMesh) {
+        const tr = pred.transform;
+        const x = tr.prevX + (tr.x - tr.prevX) * alpha;
+        const z = tr.prevZ + (tr.z - tr.prevZ) * alpha;
+        camX = x;
+        camZ = z;
+        camY = field.sample(x, z) + PLAYER_HALF;
+        meMesh.position.set(x, camY, z);
+        meMesh.rotation.y = lerpAngle(tr.prevYaw, tr.yaw, alpha);
       }
       cameraRig.update(camX, camY, camZ);
       renderer.render();
     };
 
-    const loop = new GameLoop({ step: () => sendInput(), render: () => renderFrame() });
+    const loop = new GameLoop({ step: () => sendInput(), render: (alpha) => renderFrame(alpha) });
     loop.start();
     setStatus(`playing — WASD move · 1-6 abilities · F loot`);
     world = { stop: () => loop.stop() };
   }
 
   // Snapshot handler is set once the world scene exists.
-  let onSnapshot: ((ents: SnapshotEntity[]) => void) | null = null;
+  let onSnapshot: ((ents: SnapshotEntity[], ack: number) => void) | null = null;
 
   // ── WebSocket lifecycle ──
   function connect(): void {
@@ -357,7 +401,17 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         showLogin();
       }
     };
-    ws.onclose = () => setStatus('disconnected');
+    ws.onclose = () => {
+      if (stopping) return;
+      if (started) {
+        // Dropped mid-session: reload to re-enter. The server keeps our entity alive for a short
+        // grace window, so re-selecting the same character resumes it in place (M4 reconnect).
+        setStatus('connection lost — reconnecting…');
+        setTimeout(() => location.reload(), 800);
+      } else {
+        setStatus('disconnected');
+      }
+    };
     ws.onerror = () => setStatus('connection error');
     ws.onmessage = (ev: MessageEvent) => {
       const res = decodeServerMessage(typeof ev.data === 'string' ? ev.data : String(ev.data));
@@ -371,10 +425,10 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
           if (!autoEnter(m.chars)) showChars(m.chars);
           break;
         case 'welcome':
-          startWorld(m.entityId, m.snapshotHz);
+          startWorld(m.entityId);
           break;
         case 'snapshot':
-          onSnapshot?.(m.ents);
+          onSnapshot?.(m.ents, m.ack);
           break;
         case 'error':
           // A failed auto-login falls back to the register/login form.
@@ -393,6 +447,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
 
   return {
     stop(): void {
+      stopping = true;
       world?.stop();
       ws.close();
     },
