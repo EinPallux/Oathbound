@@ -5,6 +5,17 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## M6 "Chat & Presence" — the minimum social layer
+**Goal (see [docs/production/MMO_ROADMAP.md](./docs/production/MMO_ROADMAP.md)):** the smallest social layer a friends server needs — talk to each other and see who's around.
+- **Chat** (`chat` C→S; `chatLine`/`system` S→C, zod-validated, 200-char cap): zone-wide chat broadcast with the sender's **character name**. Commands: **`/who`** (roster) and **`/me …`** (emote). Server-side **per-player throttle** (token bucket, 5 burst · ~1/s) tells a spammer they're "chatting too fast" and drops the excess.
+- **Presence + system lines:** `X joined`/`X left the world` on connect/disconnect, plus **live event lines** the server derives from the sim's own event bus — **`X reached level N`** (LevelUp) and **`X has slain <boss>!`** (a boss Death) — so the world feels alive. A configurable **MOTD** (`OATHBOUND_MOTD`) greets each player on entry.
+- **Client chat overlay** (`src/game/online.ts`): a scrolling log + input, **Enter** to focus/send, **Esc** to cancel; system lines are styled distinctly; while the chat box is focused the client sends a **neutral input** (and drains edge-triggers) so typing never moves or fires the player. Offline mode is untouched.
+- **Deferred (documented):** extra channels (whisper/party), a persistent chat-log table (off by default for privacy), client-side/admin **mute** + moderation, and a keybind-configurable chat toggle (Enter is hardcoded for now).
+
+**Verified:** `typecheck` ✓ (client + server) · `npm test` → **359/359** ✓ (unchanged; chat is transport, not sim) · `server:test` ✓ · `build` ✓ (offline bundle unchanged) · `server:build` ✓. **Live two-client end-to-end:** player *Aria*'s "hello world" reached *Bram* as **`Aria: hello world`**; `/who` returned **`Online (2): Aria, Bram`**; Aria saw **`Bram joined the world.`** and the **MOTD** on entry; a 12-line flood was **throttled** (only the first few delivered, then "You are chatting too fast."). **e2e: parity with baseline** — 9/9 (a transient 10th failure on one run was the known borderline WASD flake; the clean re-run matched baseline). **Next phase → M7 "Ops & Hardening"** (prod deploy scripts, systemd/Caddy/TLS/UFW, nightly SQLite backups + restore drill, admin commands, bot load test) — confirm with the owner.
+
+---
+
 ## M5 "Playing Together" — the multiplayer game rules (threat, shared XP, instanced loot, boss scaling)
 **Goal (see [docs/production/MMO_ROADMAP.md](./docs/production/MMO_ROADMAP.md)):** the *rules* that make shared PvE fair — the first real game-design of the online track. Every rule is **behaviour-neutral for a single player** (respecting [SOLO_BALANCE_RULES](./docs/design/SOLO_BALANCE_RULES.md)) and lives entirely in the shared sim, so the server runs them automatically.
 - **Threat table** (`src/sim/combat/threat.ts` + a `Threat` component): every player's damage to an enemy builds per-player aggro (recorded in `applyDamage`, so melee/ranged/trap/AoE all count). Enemy **and boss** AI now target the **highest-threat living player** instead of merely the nearest — with the nearest as the fallback before any threat exists (the pull). Threat clears on leash-home and respawn. Solo → the one contributor = the nearest = unchanged.

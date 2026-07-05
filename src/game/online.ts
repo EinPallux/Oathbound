@@ -335,8 +335,87 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     // Route snapshots from the shared socket into this scene.
     onSnapshot = applySnapshot;
 
+    // Chat overlay: a scrolling log + an input. Enter focuses/sends, Esc blurs back to the game.
+    const chatWrap = document.createElement('div');
+    chatWrap.style.cssText =
+      'position:fixed;left:12px;bottom:44px;width:min(46vw,420px);z-index:9;display:flex;' +
+      'flex-direction:column;gap:4px;font:13px/1.4 system-ui,sans-serif;pointer-events:none';
+    const chatLog = document.createElement('div');
+    chatLog.style.cssText = 'max-height:26vh;overflow-y:auto;display:flex;flex-direction:column;gap:2px';
+    const chatInput = document.createElement('input');
+    chatInput.type = 'text';
+    chatInput.maxLength = 200;
+    chatInput.placeholder = 'Press Enter to chat…  (/who, /me)';
+    chatInput.style.cssText =
+      'pointer-events:auto;padding:6px 8px;border-radius:6px;border:1px solid #33445a;' +
+      'background:rgba(15,21,29,.85);color:#e8eef6;opacity:.35';
+    chatWrap.append(chatLog, chatInput);
+    document.body.appendChild(chatWrap);
+
+    pushChat = (text: string, system: boolean): void => {
+      const line = document.createElement('div');
+      line.textContent = text;
+      line.style.cssText =
+        `padding:2px 8px;border-radius:5px;background:rgba(15,21,29,.6);align-self:flex-start;` +
+        `max-width:100%;word-break:break-word;color:${system ? '#9fd6ff' : '#e8eef6'};` +
+        (system ? 'font-style:italic' : '');
+      chatLog.appendChild(line);
+      while (chatLog.childElementCount > 60 && chatLog.firstChild) chatLog.removeChild(chatLog.firstChild);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    };
+    chatInput.addEventListener('focus', () => {
+      chatFocused = true;
+      chatInput.style.opacity = '1';
+    });
+    chatInput.addEventListener('blur', () => {
+      chatFocused = false;
+      chatInput.style.opacity = '.35';
+    });
+    chatInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        const text = chatInput.value.trim();
+        chatInput.value = '';
+        if (text) ws.send(encode({ t: 'chat', text }));
+        chatInput.blur();
+      } else if (e.key === 'Escape') {
+        chatInput.value = '';
+        chatInput.blur();
+      }
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !chatFocused) {
+        e.preventDefault();
+        chatInput.focus();
+      }
+    });
+
     const sendInput = (): void => {
       if (ws.readyState !== WebSocket.OPEN) return;
+      if (chatFocused) {
+        // While typing in chat, don't drive the player — drain edge-triggers so nothing fires on
+        // blur, and send a neutral (idle) input this tick.
+        input.consumeJump();
+        input.consumeAbility();
+        input.consumeInteract();
+        input.consumeTargetCycle();
+        const idle = {
+          t: 'input' as const,
+          seq: ++seq,
+          forward: false,
+          back: false,
+          left: false,
+          right: false,
+          yaw: input.yaw,
+          jump: false,
+          ability: null,
+          interact: false,
+          cycle: false,
+        };
+        pred?.predict(idle);
+        ws.send(encode(idle));
+        return;
+      }
       const msg = {
         t: 'input' as const,
         seq: ++seq,
@@ -387,6 +466,9 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
 
   // Snapshot handler is set once the world scene exists.
   let onSnapshot: ((ents: SnapshotEntity[], ack: number) => void) | null = null;
+  // Chat overlay hooks (wired once the world scene exists).
+  let pushChat: ((text: string, system: boolean) => void) | null = null;
+  let chatFocused = false;
 
   // ── WebSocket lifecycle ──
   function connect(): void {
@@ -429,6 +511,12 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
           break;
         case 'snapshot':
           onSnapshot?.(m.ents, m.ack);
+          break;
+        case 'chatLine':
+          pushChat?.(m.me ? `• ${m.from} ${m.text}` : `${m.from}: ${m.text}`, false);
+          break;
+        case 'system':
+          pushChat?.(m.text, true);
           break;
         case 'error':
           // A failed auto-login falls back to the register/login form.

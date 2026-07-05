@@ -71,6 +71,12 @@ export const ImportCharMessage = z.object({
   save: z.unknown(),
 });
 
+/** A chat line from the client. `/who`, `/me …` etc. are handled server-side. */
+export const ChatMessage = z.object({
+  t: z.literal('chat'),
+  text: z.string().min(1).max(200),
+});
+
 /** Latency probe: `time` is the client's clock (ms) and is echoed back untouched. */
 export const PingMessage = z.object({
   t: z.literal('ping'),
@@ -110,6 +116,7 @@ export const ClientMessage = z.discriminatedUnion('t', [
   SelectCharMessage,
   DeleteCharMessage,
   ImportCharMessage,
+  ChatMessage,
   PingMessage,
   InputMessage,
 ]);
@@ -158,6 +165,20 @@ export const CharListMessage = z.object({
   chars: z.array(CharSummary),
 });
 
+/** A chat line to display: `from` is the sender's character name; `me` marks a /me emote. */
+export const ChatLineMessage = z.object({
+  t: z.literal('chatLine'),
+  from: z.string(),
+  text: z.string(),
+  me: z.boolean().optional(),
+});
+
+/** A server/system line (joins, leaves, level-ups, boss kills, MOTD, /who results). */
+export const SystemMessage = z.object({
+  t: z.literal('system'),
+  text: z.string(),
+});
+
 /** Reject/inform: a coded error (e.g. bad protocol version, malformed message). */
 export const ErrorMessage = z.object({
   t: z.literal('error'),
@@ -203,6 +224,8 @@ export const ServerMessage = z.discriminatedUnion('t', [
   SnapshotMessage,
   AuthOkMessage,
   CharListMessage,
+  ChatLineMessage,
+  SystemMessage,
 ]);
 export type ServerMessage = z.infer<typeof ServerMessage>;
 

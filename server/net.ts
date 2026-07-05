@@ -78,6 +78,7 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
         players: game.playerCount,
       });
       game.sendSnapshotTo(ws);
+      game.announceJoin(ws); // MOTD to us + "joined" to everyone else
     };
 
     ws.on('message', (data: RawData) => {
@@ -162,6 +163,10 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
 
         case 'input':
           if (inWorld) game.onInput(ws, msg);
+          return;
+
+        case 'chat':
+          if (inWorld) game.chat(ws, msg.text);
           return;
       }
     });

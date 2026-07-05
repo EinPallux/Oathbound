@@ -7,14 +7,16 @@
 import { WebSocket } from 'ws';
 import { NetworkControlState } from '../src/net/net-input';
 import { buildSnapshot } from '../src/net/snapshot';
-import { encode, type InputMessage } from '../src/net/protocol';
+import { encode, type InputMessage, type ServerMessage } from '../src/net/protocol';
+import { RateLimiter } from '../src/net/rate-limit';
 import { addPlayer } from '../src/sim/boot/sim-world';
 import { createNullControlState } from '../src/platform/null-input';
 import { pickUpNearest } from '../src/sim/systems/loot';
 import { serialize, applySave, SCHEMA_VERSION, type SaveData } from '../src/sim/save';
+import { CombatEvent, type LevelUpEvent, type DeathEvent } from '../src/sim/combat/events';
 import { DT } from '../src/core/time';
 import type { Entity } from '../src/core/ecs/world';
-import { C, type ClassId } from '../src/core/ecs/components';
+import { C, type ClassId, type EnemyInfo } from '../src/core/ecs/components';
 import type { ControlState } from '../src/platform/input';
 import { bootServerWorld, type ServerWorld } from './world-boot';
 import { Db, type CharacterSummary, type CharacterFlush } from './db';
@@ -30,6 +32,10 @@ interface ConnectedPlayer {
   input: NetworkControlState;
   accountId: number;
   slot: number;
+  /** Character display name (for chat + presence). */
+  name: string;
+  /** Per-player chat throttle (5 lines, ~1/s sustained) to curb spam. */
+  chatLimiter: RateLimiter;
 }
 
 export type AuthResult =
@@ -43,7 +49,10 @@ export class GameServer {
   private readonly db: Db;
   private readonly clients = new Map<WebSocket, ConnectedPlayer>();
   /** Disconnected-but-still-alive players, keyed by `accountId:slot`, for seamless reconnect. */
-  private readonly orphans = new Map<string, { entity: Entity; accountId: number; slot: number; deadAt: number }>();
+  private readonly orphans = new Map<
+    string,
+    { entity: Entity; accountId: number; slot: number; name: string; deadAt: number }
+  >();
   /** `accountId:slot` currently in the world (blocks a duplicate concurrent session). */
   private readonly active = new Set<string>();
   private readonly snapshotEvery: number;
@@ -54,6 +63,19 @@ export class GameServer {
     this.db = new Db(config.dbPath);
     this.world = bootServerWorld(config);
     this.snapshotEvery = Math.max(1, Math.round(config.tickHz / config.snapshotHz));
+
+    // Sim events → world-wide system chat lines (level-ups, world-boss kills).
+    const events = this.world.sim.world.events;
+    events.on<LevelUpEvent>(CombatEvent.LevelUp, (e) => {
+      const name = this.nameOf(e.entity);
+      if (name) this.broadcastSystem(`${name} reached level ${e.level}.`);
+    });
+    events.on<DeathEvent>(CombatEvent.Death, (e) => {
+      if (this.world.sim.world.get(e.entity, C.Boss) == null) return;
+      const info = this.world.sim.world.get<EnemyInfo>(e.entity, C.EnemyInfo);
+      const killer = this.nameOf(e.killer);
+      this.broadcastSystem(`${killer ?? 'A hero'} has slain ${info?.name ?? 'a world boss'}!`);
+    });
   }
 
   get tick(): number {
@@ -132,7 +154,7 @@ export class GameServer {
       this.orphans.delete(k);
       const input = new NetworkControlState();
       this.world.sim.world.set<ControlState>(orphan.entity, C.PlayerInput, input);
-      this.clients.set(ws, { entity: orphan.entity, input, accountId, slot });
+      this.clients.set(ws, this.makeClient(orphan.entity, input, accountId, slot, orphan.name));
       this.active.add(k);
       return { ok: true, entity: orphan.entity };
     }
@@ -147,7 +169,7 @@ export class GameServer {
     } catch {
       return { ok: false, code: 'bad_save', message: 'stored save is corrupt' };
     }
-    return this.spawn(ws, accountId, slot, save, save.classId, false);
+    return this.spawn(ws, accountId, slot, save, save.classId, row.name);
   }
 
   /** Create a fresh character in a slot, then enter as it. */
@@ -165,7 +187,7 @@ export class GameServer {
       this.world.sim.world.destroyEntity(entity);
       return { ok: false, code: 'name_taken', message: 'that character name is taken' };
     }
-    this.clients.set(ws, { entity, input, accountId, slot });
+    this.clients.set(ws, this.makeClient(entity, input, accountId, slot, name));
     this.active.add(`${accountId}:${slot}`);
     return { ok: true, entity };
   }
@@ -177,7 +199,7 @@ export class GameServer {
     }
     const save = validateSave(raw);
     if (!save) return { ok: false, code: 'bad_save', message: 'the imported save is not valid' };
-    const res = this.spawn(ws, accountId, slot, save, save.classId, true);
+    const res = this.spawn(ws, accountId, slot, save, save.classId, name);
     if (res.ok) {
       try {
         this.db.createCharacter(accountId, slot, name, save.classId, this.flushFrom(save));
@@ -190,7 +212,7 @@ export class GameServer {
   }
 
   /** Spawn a player entity, apply a save onto it, and register the connection. */
-  private spawn(ws: WebSocket, accountId: number, slot: number, save: SaveData, classId: ClassId, _imported: boolean): EnterResult {
+  private spawn(ws: WebSocket, accountId: number, slot: number, save: SaveData, classId: ClassId, name: string): EnterResult {
     const input = new NetworkControlState();
     const entity = addPlayer(this.world.sim.world, this.world.field, input, {
       x: save.position?.x ?? this.world.playerStart.x,
@@ -203,9 +225,13 @@ export class GameServer {
       this.world.sim.world.destroyEntity(entity);
       return { ok: false, code: 'bad_save', message: 'could not apply the save' };
     }
-    this.clients.set(ws, { entity, input, accountId, slot });
+    this.clients.set(ws, this.makeClient(entity, input, accountId, slot, name));
     this.active.add(`${accountId}:${slot}`);
     return { ok: true, entity };
+  }
+
+  private makeClient(entity: Entity, input: NetworkControlState, accountId: number, slot: number, name: string): ConnectedPlayer {
+    return { entity, input, accountId, slot, name, chatLimiter: new RateLimiter(5, 1, Date.now()) };
   }
 
   // ── In-world tick / input / persistence ──────────────────────────────────────────────────
@@ -303,12 +329,75 @@ export class GameServer {
       entity: p.entity,
       accountId: p.accountId,
       slot: p.slot,
+      name: p.name,
       deadAt: Date.now() + RECONNECT_GRACE_MS,
     });
+    this.broadcastSystem(`${p.name} left the world.`);
   }
 
   close(): void {
     this.db.close();
+  }
+
+  // ── Chat & presence ──────────────────────────────────────────────────────────────────────
+
+  /** Send the MOTD to a freshly-entered player and announce the join to everyone else. */
+  announceJoin(ws: WebSocket): void {
+    const p = this.clients.get(ws);
+    if (!p) return;
+    this.sendTo(ws, { t: 'system', text: this.config.motd });
+    this.broadcastSystem(`${p.name} joined the world.`, ws);
+  }
+
+  /** Handle a chat line from a connection: throttle, run any /command, else broadcast it. */
+  chat(ws: WebSocket, text: string): void {
+    const p = this.clients.get(ws);
+    if (!p) return;
+    if (!p.chatLimiter.tryConsume(Date.now())) {
+      this.sendTo(ws, { t: 'system', text: 'You are chatting too fast.' });
+      return;
+    }
+    const t = text.trim();
+    if (!t) return;
+    if (t.startsWith('/')) {
+      this.command(ws, p, t.slice(1));
+      return;
+    }
+    this.sendAll({ t: 'chatLine', from: p.name, text: t });
+  }
+
+  private command(ws: WebSocket, p: ConnectedPlayer, raw: string): void {
+    const sp = raw.indexOf(' ');
+    const cmd = (sp === -1 ? raw : raw.slice(0, sp)).toLowerCase();
+    const arg = sp === -1 ? '' : raw.slice(sp + 1).trim();
+    if (cmd === 'who') {
+      const names = [...this.clients.values()].map((c) => c.name).sort();
+      this.sendTo(ws, { t: 'system', text: `Online (${names.length}): ${names.join(', ')}` });
+    } else if (cmd === 'me' && arg) {
+      this.sendAll({ t: 'chatLine', from: p.name, text: arg, me: true });
+    } else {
+      this.sendTo(ws, { t: 'system', text: `Unknown command: /${cmd}` });
+    }
+  }
+
+  private nameOf(entity: Entity): string | undefined {
+    for (const p of this.clients.values()) if (p.entity === entity) return p.name;
+    return undefined;
+  }
+
+  private broadcastSystem(text: string, except?: WebSocket): void {
+    this.sendAll({ t: 'system', text }, except);
+  }
+
+  private sendTo(ws: WebSocket, msg: ServerMessage): void {
+    if (ws.readyState === WebSocket.OPEN) ws.send(encode(msg));
+  }
+
+  private sendAll(msg: ServerMessage, except?: WebSocket): void {
+    const frame = encode(msg);
+    for (const ws of this.clients.keys()) {
+      if (ws !== except && ws.readyState === WebSocket.OPEN) ws.send(frame);
+    }
   }
 
   sendSnapshotTo(ws: WebSocket): void {

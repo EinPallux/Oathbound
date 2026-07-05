@@ -28,6 +28,8 @@ export interface ServerConfig {
   joinPassword: string;
   /** How often (seconds) to flush in-world characters to the DB. */
   saveIntervalS: number;
+  /** Message of the day, sent to each player as they enter the world. */
+  motd: string;
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -54,5 +56,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     dbPath: env.OATHBOUND_DB ?? resolve(REPO_ROOT, 'oathbound.db'),
     joinPassword: env.OATHBOUND_JOIN_PASSWORD ?? '',
     saveIntervalS: intEnv(env.OATHBOUND_SAVE_INTERVAL_S, 30),
+    motd: env.OATHBOUND_MOTD ?? 'Welcome to Oathbound Online — be excellent to each other.',
   };
 }
