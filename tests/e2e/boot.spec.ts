@@ -59,7 +59,7 @@ test('boots the vertical slice, renders, and runs the loop', async ({ page }) =>
   await page.goto('/?autostart');
 
   await expect(page.locator('#game')).toBeVisible();
-  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.7.2-INDEV');
+  await expect(page.locator('.perf-overlay')).toContainText('Oathbound 0.8.0-ONLINE.7');
 
   await page.waitForFunction(() => (window.__oathbound?.enemies().length ?? 0) >= 1);
   const running = await page.evaluate(() => window.__oathbound!.loop.isRunning);

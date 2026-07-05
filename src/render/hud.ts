@@ -21,10 +21,10 @@ import {
 import { getClass, resolveKit, empowerKit } from '../sim/classes';
 import { MOUNT_CAST_TIME } from '../sim/systems/movement';
 import { hasStatus, Status } from '../sim/combat/statuses';
+import { PICKUP_RADIUS } from '../sim/systems/loot';
 import { icon } from './ui/icons';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
-const PICKUP_RADIUS = 2.5;
 /** Class portrait icon for the unit-frame (game-icons SVG). */
 const CLASS_ICON: Record<string, string> = { warrior: 'sword', hunter: 'bow', priest: 'staff' };
 const RES_ICON: Record<string, string> = { Fury: 'flame', Focus: 'focus', Mana: 'droplet' };

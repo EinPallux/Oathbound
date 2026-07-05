@@ -91,15 +91,15 @@ export const PingMessage = z.object({
  */
 export const InputMessage = z.object({
   t: z.literal('input'),
-  seq: z.number().int(),
+  seq: z.number().int().nonnegative(),
   forward: z.boolean(),
   back: z.boolean(),
   left: z.boolean(),
   right: z.boolean(),
   yaw: z.number().finite(), // reject NaN/±Infinity — would poison the movement integration
   jump: z.boolean(),
-  /** Queued ability slot (0-based) this tick, or null/absent. (M2: fight over the wire.) */
-  ability: z.number().int().nullable().optional(),
+  /** Queued ability slot (0-based) this tick, or null/absent. Bounded to a sane hotbar range. */
+  ability: z.number().int().min(0).max(9).nullable().optional(),
   /** Interact pressed (F) — server-side loot pickup / vendor. */
   interact: z.boolean().optional(),
   /** Cycle target pressed (Tab). */

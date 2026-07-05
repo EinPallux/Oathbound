@@ -205,7 +205,9 @@ export function boot(options: BootOptions = {}): Game {
   const renderer = new Renderer(canvas);
   const keybinds = loadKeybinds();
   const input = new InputController(canvas, keybinds);
-  const overlay = new PerfOverlay(uiRoot);
+  // Dev-only devtool — kept out of production bundles' visible UI (still present in the dev server
+  // the e2e suite runs against).
+  const overlay = import.meta.env.DEV ? new PerfOverlay(uiRoot) : null;
   const sfx = new Sfx();
   const music = new Music();
 
@@ -818,7 +820,7 @@ export function boot(options: BootOptions = {}): Game {
         `Lv ${prog.level}  HP ${Math.ceil(h.current)}/${h.max}  [${state}]\n` +
         `kills ${tel.kills}  ttk ${tel.avgTtk.toFixed(1)}s  ` +
         `down ${tel.avgDowntime.toFixed(1)}s  deaths ${tel.deaths}`;
-      overlay.update(frameMs, renderer.drawCalls, world.entityCount, steps, extra);
+      overlay?.update(frameMs, renderer.drawCalls, world.entityCount, steps, extra);
     },
   });
   loop.start();

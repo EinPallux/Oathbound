@@ -69,7 +69,7 @@ Use **Requires** to chain quests. Example — a 2-step line:
 
 A quest can require **several** prerequisites (all must be done — AND logic), so you can build straight
 chains *and* convergent lines (e.g. a finale that needs three earlier quests). Cycles never unlock
-(A requires B, B requires A) — don't do that. Try the bundled demo: **`?map=sample`** ships a working
+(A requires B, B requires A) — don't do that. Try the bundled map (Talar): **`?map=talar`** ships a working
 two-step questline plus kill/talk quests and item rewards.
 
 ---

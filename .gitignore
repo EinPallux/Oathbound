@@ -4,6 +4,13 @@ dist-server/
 coverage/
 oathbound.db
 oathbound.db-*
+# any ad-hoc SQLite db from a local server run (WAL/SHM siblings too)
+*.db
+*.db-shm
+*.db-wal
+# local server config (the real one lives in /etc/oathbound on the VPS)
+.env
+server.env
 test-results/
 playwright-report/
 .vite/

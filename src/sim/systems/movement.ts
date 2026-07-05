@@ -9,6 +9,7 @@ import {
   type Velocity,
   type Character,
   type Statuses,
+  type Health,
 } from '../../core/ecs/components';
 import { clamp } from '../../core/math';
 import type { ControlState } from '../../platform/input';
@@ -52,6 +53,10 @@ export function createMovementSystem(deps: MovementDeps): System {
         t.prevY = t.y;
         t.prevZ = t.z;
         t.prevYaw = t.yaw;
+
+        // Dead players don't move — hold still through the respawn window (recovery.ts revives).
+        const h = world.get<Health>(e, C.Health);
+        if (h && h.current <= 0) continue;
 
         // Normalised input in the camera's local frame.
         let fwd = (input.forward ? 1 : 0) - (input.back ? 1 : 0);

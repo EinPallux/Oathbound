@@ -72,13 +72,15 @@ async function main(): Promise<void> {
     const { bootOnline } = await import('./game/online');
     const cls = params.get('class');
     const charParam = params.get('char');
-    bootOnline({
+    const online = bootOnline({
       url: resolveServerUrl(server),
       user: params.get('user') ?? undefined,
       pass: params.get('pass') ?? undefined,
       char: charParam != null && charParam !== '' ? Number(charParam) : undefined,
       className: cls === 'hunter' || cls === 'priest' || cls === 'warrior' ? cls : undefined,
     });
+    // Keep the teardown handle reachable (e.g. for a future reload-free logout / hot-reload).
+    (window as unknown as { __oathboundOnline?: { stop(): void } }).__oathboundOnline = online;
     return;
   }
   runApp();

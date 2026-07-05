@@ -139,10 +139,6 @@ export function createReaver(world: World, field: Heightfield, x: number, z: num
   return spawnEnemy(world, field, 'reaver', x, z, { level });
 }
 
-export function createWisp(world: World, field: Heightfield, x: number, z: number, level = 1): Entity {
-  return spawnEnemy(world, field, 'wisp', x, z, { level });
-}
-
 // ── World props ──────────────────────────────────────────────────────────────
 
 /** Create an Oathstone waypoint (inactive until visited). */
