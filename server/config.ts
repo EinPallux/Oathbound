@@ -18,10 +18,16 @@ export interface ServerConfig {
   mapPath: string;
   /** Simulation tick rate — fixed to the sim's DT (do not change without rescaling DT). */
   tickHz: number;
-  /** Snapshot broadcast rate (M1+). Declared now; unused in M0 (no state is sent yet). */
+  /** Snapshot broadcast rate. */
   snapshotHz: number;
   /** Gameplay RNG seed — the authority for loot/crit/AI rolls. */
   seed: number;
+  /** SQLite database file path (accounts, characters, world state). */
+  dbPath: string;
+  /** Optional server-wide join password (empty = open registration). Checked at register/login. */
+  joinPassword: string;
+  /** How often (seconds) to flush in-world characters to the DB. */
+  saveIntervalS: number;
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -45,5 +51,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     tickHz: SIM_HZ,
     snapshotHz: intEnv(env.OATHBOUND_SNAPSHOT_HZ, 15),
     seed: intEnv(env.OATHBOUND_SEED, 0xc0ffee),
+    dbPath: env.OATHBOUND_DB ?? resolve(REPO_ROOT, 'oathbound.db'),
+    joinPassword: env.OATHBOUND_JOIN_PASSWORD ?? '',
+    saveIntervalS: intEnv(env.OATHBOUND_SAVE_INTERVAL_S, 30),
   };
 }

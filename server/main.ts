@@ -42,12 +42,21 @@ function main(): void {
     lastAt = now;
   }, 5000);
 
+  // Write-behind persistence: periodically flush every in-world character to SQLite.
+  const saver = setInterval(() => game.flushAll(), config.saveIntervalS * 1000);
+  console.log(`[oathbound] persisting to ${config.dbPath} · autosave every ${config.saveIntervalS}s`);
+
+  let shuttingDown = false;
   const shutdown = (signal: string): void => {
-    console.log(`[oathbound] ${signal} — shutting down`);
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[oathbound] ${signal} — flushing characters and shutting down`);
     clearInterval(heartbeat);
+    clearInterval(saver);
     clock.stop();
+    game.flushAll(); // graceful: persist everyone before exit
+    game.close();
     wss.close();
-    // (M3 will flush characters to SQLite here before exit.)
     process.exit(0);
   };
   process.on('SIGINT', () => shutdown('SIGINT'));
