@@ -23,18 +23,18 @@ export interface BossAiDeps {
 
 export function createBossAiSystem(deps: BossAiDeps): System {
   const { field } = deps;
+  const players: { t: Transform; alive: boolean }[] = [];
   return {
     name: 'boss-ai',
     update(world: World, dt: number): void {
-      // Locate the (single) player; bail if there's none or they're down.
-      let player: Entity | null = null;
+      // All players in the slice; each boss targets the nearest living one (M2).
+      players.length = 0;
       for (const p of world.query(C.PlayerControlled, C.Transform, C.Health)) {
-        player = p;
-        break;
+        players.push({
+          t: world.get<Transform>(p, C.Transform)!,
+          alive: (world.get<Health>(p, C.Health)?.current ?? 0) > 0,
+        });
       }
-      const playerAlive =
-        player != null && (world.get<Health>(player, C.Health)?.current ?? 0) > 0;
-      const pt = player != null ? world.get<Transform>(player, C.Transform) : undefined;
 
       for (const e of world.query(C.Boss, C.Enemy, C.Health)) {
         const boss = world.get<Boss>(e, C.Boss)!;
@@ -63,10 +63,25 @@ export function createBossAiSystem(deps: BossAiDeps): System {
           });
         }
 
+        // Nearest living player to this boss — its telegraphed heavy targets them.
+        const bt = world.get<Transform>(e, C.Transform);
+        let pt: Transform | undefined;
+        let best = Infinity;
+        if (bt) {
+          for (const pl of players) {
+            if (!pl.alive) continue;
+            const d = (pl.t.x - bt.x) ** 2 + (pl.t.z - bt.z) ** 2;
+            if (d < best) {
+              best = d;
+              pt = pl.t;
+            }
+          }
+        }
+
         // Only telegraph heavies while actively fighting a living player; otherwise keep
         // the timer primed so a fresh pull doesn't open with an instant slam.
         const fighting = en.state === 'engage' || en.state === 'attack';
-        if (!fighting || !playerAlive || pt == null) {
+        if (!fighting || pt == null) {
           boss.heavyTimer = boss.heavyCadence[0] * 0.6;
           continue;
         }

@@ -7,6 +7,9 @@ export const C = {
   Velocity: 'velocity',
   Character: 'character',
   PlayerControlled: 'playerControlled',
+  /** Per-player intent source (a ControlState). Lets N players each drive their own entity —
+   *  filled from the keyboard offline, from network packets on the server. */
+  PlayerInput: 'playerInput',
   // Combat (0.0.4)
   Health: 'health',
   Offense: 'offense',

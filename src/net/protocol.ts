@@ -28,7 +28,32 @@ export const PingMessage = z.object({
   time: z.number(),
 });
 
-export const ClientMessage = z.discriminatedUnion('t', [HelloMessage, PingMessage]);
+/**
+ * Per-tick player intent — the serialized movement subset of ControlState. `seq` is a
+ * monotonic counter the server echoes back in snapshots (informational in M1; the basis for
+ * M4 prediction/reconciliation). M1 is movement-only; ability/interact/target intents join in
+ * later phases. `yaw` rides here because movement is camera-relative (the server needs it).
+ */
+export const InputMessage = z.object({
+  t: z.literal('input'),
+  seq: z.number().int(),
+  forward: z.boolean(),
+  back: z.boolean(),
+  left: z.boolean(),
+  right: z.boolean(),
+  yaw: z.number(),
+  jump: z.boolean(),
+  /** Queued ability slot (0-based) this tick, or null/absent. (M2: fight over the wire.) */
+  ability: z.number().int().nullable().optional(),
+  /** Interact pressed (F) — server-side loot pickup / vendor. */
+  interact: z.boolean().optional(),
+  /** Cycle target pressed (Tab). */
+  cycle: z.boolean().optional(),
+});
+
+export type InputMessage = z.infer<typeof InputMessage>;
+
+export const ClientMessage = z.discriminatedUnion('t', [HelloMessage, PingMessage, InputMessage]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 
 // ── Server → Client ──────────────────────────────────────────────────────────────────────
@@ -59,7 +84,43 @@ export const ErrorMessage = z.object({
   message: z.string(),
 });
 
-export const ServerMessage = z.discriminatedUnion('t', [WelcomeMessage, PongMessage, ErrorMessage]);
+/**
+ * One replicated entity in a snapshot. Short keys because a snapshot may carry many of these.
+ * `k` = kind (player | enemy | boss | vendor | oathstone | loot); `st` = an optional state tag
+ * (e.g. an enemy's 'dead'); hp/mhp present only for entities that have Health.
+ */
+export const SnapshotEntity = z.object({
+  id: z.number().int(),
+  k: z.string(),
+  x: z.number(),
+  z: z.number(),
+  yaw: z.number(),
+  hp: z.number().optional(),
+  mhp: z.number().optional(),
+  st: z.string().optional(),
+});
+export type SnapshotEntity = z.infer<typeof SnapshotEntity>;
+
+/**
+ * A world snapshot: the authoritative state of the replicated entities at server `tick`. `ack`
+ * is the last input `seq` the server had applied for this client (informational in M1; used for
+ * reconciliation in M4). The client interpolates between successive snapshots.
+ */
+export const SnapshotMessage = z.object({
+  t: z.literal('snapshot'),
+  tick: z.number().int(),
+  ack: z.number().int(),
+  ents: z.array(SnapshotEntity),
+});
+
+export type SnapshotMessage = z.infer<typeof SnapshotMessage>;
+
+export const ServerMessage = z.discriminatedUnion('t', [
+  WelcomeMessage,
+  PongMessage,
+  ErrorMessage,
+  SnapshotMessage,
+]);
 export type ServerMessage = z.infer<typeof ServerMessage>;
 
 // ── (de)serialization helpers ────────────────────────────────────────────────────────────

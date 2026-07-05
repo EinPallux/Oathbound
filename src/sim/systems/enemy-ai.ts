@@ -54,21 +54,23 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
   const bound = field.size / 2 - 1;
   const enemies: Entity[] = [];
   const socialScratch: Entity[] = [];
+  const players: { e: Entity; t: Transform; alive: boolean }[] = [];
   let tick = 0;
 
   return {
     name: 'enemy-ai',
     update(world: World, dt: number): void {
       tick++;
-      // Single player in the slice.
-      let player: Entity | null = null;
+      // All players in the slice (M2: an enemy targets the nearest of them; threat comes in M5).
+      players.length = 0;
       for (const p of world.query(C.PlayerControlled, C.Transform, C.Health)) {
-        player = p;
-        break;
+        players.push({
+          e: p,
+          t: world.get<Transform>(p, C.Transform)!,
+          alive: world.get<Health>(p, C.Health)!.current > 0,
+        });
       }
-      if (player == null) return;
-      const pt = world.get<Transform>(player, C.Transform)!;
-      const playerAlive = world.get<Health>(player, C.Health)!.current > 0;
+      if (players.length === 0) return;
 
       enemies.length = 0;
       for (const e of world.query(C.Enemy, C.Transform, C.Velocity, C.Health)) enemies.push(e);
@@ -78,6 +80,31 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
         const tr = world.get<Transform>(e, C.Transform)!;
         const v = world.get<Velocity>(e, C.Velocity)!;
         const h = world.get<Health>(e, C.Health)!;
+
+        // Target the nearest player, preferring a living one (so an enemy leashes only when the
+        // nearest players are all down). With one player this is exactly the old behaviour.
+        let playerE = players[0].e;
+        let pt = players[0].t;
+        let playerAlive = players[0].alive;
+        let bestAlive = Infinity;
+        let bestAny = Infinity;
+        let haveAlive = false;
+        for (const pl of players) {
+          const d = (pl.t.x - tr.x) ** 2 + (pl.t.z - tr.z) ** 2;
+          if (pl.alive && d < bestAlive) {
+            bestAlive = d;
+            playerE = pl.e;
+            pt = pl.t;
+            playerAlive = true;
+            haveAlive = true;
+          }
+          if (!haveAlive && d < bestAny) {
+            bestAny = d;
+            playerE = pl.e;
+            pt = pl.t;
+            playerAlive = false;
+          }
+        }
 
         // Throttle: distant idle enemies do nothing useful — update them rarely.
         if (en.state === 'idle' && h.current > 0 && tick % THROTTLE_EVERY !== 0) {
@@ -173,7 +200,7 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
                 en.windupTimer = -1;
                 en.attackTimer = en.attackCooldown;
                 if (playerAlive)
-                  fireAttack(world, e, en, tr, player, distPlayer, usesProjectile, projectiles, rng);
+                  fireAttack(world, e, en, tr, playerE, distPlayer, usesProjectile, projectiles, rng);
               }
             } else if (
               en.attackTimer <= 0 &&

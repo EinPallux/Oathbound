@@ -43,4 +43,36 @@ async function loadRequestedMap(): Promise<void> {
   }
 }
 
-void loadRequestedMap().then(runApp);
+/**
+ * Resolve a `?server=` value into a WebSocket URL. Accepts a full `ws(s)://host/path`, or a
+ * bare `host[:port]` (defaults to ws/wss matching the page and the `/ws` path).
+ */
+function resolveServerUrl(raw: string): string {
+  let s = raw.trim();
+  if (!/^wss?:\/\//i.test(s)) {
+    const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+    s = `${scheme}://${s}`;
+  }
+  try {
+    const url = new URL(s);
+    if (url.pathname === '' || url.pathname === '/') url.pathname = '/ws';
+    return url.toString();
+  } catch {
+    return s;
+  }
+}
+
+async function main(): Promise<void> {
+  await loadRequestedMap();
+  // Online mode: ?server=<ws-url|host> connects to a running Oathbound server (M1). Without it,
+  // the game runs the local single-player experience exactly as before.
+  const server = new URLSearchParams(location.search).get('server');
+  if (server) {
+    const { bootOnline } = await import('./game/online');
+    bootOnline({ url: resolveServerUrl(server), name: new URLSearchParams(location.search).get('name') ?? undefined });
+    return;
+  }
+  runApp();
+}
+
+void main();

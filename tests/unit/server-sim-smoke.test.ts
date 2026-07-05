@@ -55,8 +55,8 @@ describe('server sim smoke — the sim ticks headless on Node', () => {
     }).not.toThrow();
 
     // The player is still a live entity (alive, or respawned by the recovery system).
-    expect(sim.world.has(sim.player)).toBe(true);
-    expect(sim.world.get(sim.player, C.Health)).toBeDefined();
+    expect(sim.world.has(sim.player!)).toBe(true);
+    expect(sim.world.get(sim.player!, C.Health)).toBeDefined();
 
     // Enemy AI ran: at least one enemy changed position over the 300 ticks.
     let moved = 0;
