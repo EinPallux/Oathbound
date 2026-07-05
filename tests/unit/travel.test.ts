@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { World } from '../../src/core/ecs/world';
+import { World, type Entity } from '../../src/core/ecs/world';
 import {
   C,
   type Transform,
   type Inventory,
   type CombatState,
   type Respawn,
-  type Oathstone,
+  type WaypointUnlocks,
 } from '../../src/core/ecs/components';
 import { createPlayer, createOathstone } from '../../src/sim/factory';
 import { activatedOathstones, fastTravel, TRAVEL_TOLL } from '../../src/sim/travel';
@@ -18,15 +18,20 @@ function giveGold(world: World, player: number, gold: number): void {
   world.get<Inventory>(player, C.Inventory)!.gold = gold;
 }
 
-describe('fast travel', () => {
-  it('lists only activated Oathstones', () => {
-    const world = new World();
-    createPlayer(world, FIELD, 0, 0);
-    const a = createOathstone(world, FIELD, 'a', 'Stone A', 10, 0);
-    createOathstone(world, FIELD, 'b', 'Stone B', 20, 0);
-    world.get<Oathstone>(a, C.Oathstone)!.activated = true;
+/** Activation is per-player now: add a stone id to this player's own unlock set. */
+function unlock(world: World, player: Entity, ...ids: string[]): void {
+  world.get<WaypointUnlocks>(player, C.WaypointUnlocks)!.ids.push(...ids);
+}
 
-    const list = activatedOathstones(world);
+describe('fast travel', () => {
+  it('lists only the stones THIS player has activated', () => {
+    const world = new World();
+    const player = createPlayer(world, FIELD, 0, 0);
+    createOathstone(world, FIELD, 'a', 'Stone A', 10, 0);
+    createOathstone(world, FIELD, 'b', 'Stone B', 20, 0);
+    unlock(world, player, 'a');
+
+    const list = activatedOathstones(world, player);
     expect(list.map((d) => d.id)).toEqual(['a']);
   });
 
@@ -34,7 +39,7 @@ describe('fast travel', () => {
     const world = new World();
     const player = createPlayer(world, FIELD, 0, 0);
     const dest = createOathstone(world, FIELD, 'frostgate', 'Frostgate Keep', 40, 40);
-    world.get<Oathstone>(dest, C.Oathstone)!.activated = true;
+    unlock(world, player, 'frostgate');
     giveGold(world, player, 50);
 
     const res = fastTravel(world, player, dest, FIELD);
@@ -53,7 +58,7 @@ describe('fast travel', () => {
     const world = new World();
     const player = createPlayer(world, FIELD, 0, 0);
     const dest = createOathstone(world, FIELD, 'frostgate', 'Frostgate Keep', 40, 40);
-    world.get<Oathstone>(dest, C.Oathstone)!.activated = true;
+    unlock(world, player, 'frostgate');
     giveGold(world, player, 50);
     world.get<CombatState>(player, C.CombatState)!.inCombat = true;
 
@@ -66,7 +71,7 @@ describe('fast travel', () => {
     const world = new World();
     const player = createPlayer(world, FIELD, 0, 0);
     const dest = createOathstone(world, FIELD, 'frostgate', 'Frostgate Keep', 40, 40);
-    world.get<Oathstone>(dest, C.Oathstone)!.activated = true;
+    unlock(world, player, 'frostgate');
     giveGold(world, player, TRAVEL_TOLL - 1);
 
     const res = fastTravel(world, player, dest, FIELD);
@@ -87,10 +92,27 @@ describe('fast travel', () => {
     const world = new World();
     const player = createPlayer(world, FIELD, 0, 0);
     const dest = createOathstone(world, FIELD, 'spawn', 'Oathhold', 0, 0);
-    world.get<Oathstone>(dest, C.Oathstone)!.activated = true;
+    unlock(world, player, 'spawn');
     giveGold(world, player, 50);
 
     const res = fastTravel(world, player, dest, FIELD);
     expect(res).toEqual({ ok: false, reason: 'here' });
+  });
+
+  // H2/H4 regression: two players in the same world have INDEPENDENT networks — one player's
+  // unlock is invisible to (and not usable by) another, even though the stone is globally lit.
+  it('keeps each player fast-travel network independent (no cross-player leak)', () => {
+    const world = new World();
+    const alice = createPlayer(world, FIELD, 0, 0);
+    const bob = createPlayer(world, FIELD, 5, 5);
+    const dest = createOathstone(world, FIELD, 'frostgate', 'Frostgate Keep', 40, 40);
+    unlock(world, alice, 'frostgate'); // only Alice discovered it
+    giveGold(world, alice, 50);
+    giveGold(world, bob, 50);
+
+    expect(activatedOathstones(world, alice).map((d) => d.id)).toEqual(['frostgate']);
+    expect(activatedOathstones(world, bob)).toEqual([]); // Bob sees nothing
+    expect(fastTravel(world, bob, dest, FIELD)).toEqual({ ok: false, reason: 'invalid' });
+    expect(fastTravel(world, alice, dest, FIELD).ok).toBe(true);
   });
 });

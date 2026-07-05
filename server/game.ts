@@ -58,6 +58,10 @@ export class GameServer {
   >();
   /** `accountId:slot` currently in the world (blocks a duplicate concurrent session). */
   private readonly active = new Set<string>();
+  /** Quest progress the server can't re-derive (it doesn't simulate quests). Kept by
+   *  `accountId:slot` from the loaded save and re-attached on every flush so a re-serialize
+   *  doesn't wipe an imported character's quests. Cleared on fresh-create and on reap. */
+  private readonly questCache = new Map<string, SaveData['quests']>();
   private readonly snapshotEvery: number;
   private sinceSnapshot = 0;
   private tickCount = 0;
@@ -204,6 +208,7 @@ export class GameServer {
       this.world.sim.world.destroyEntity(entity);
       return { ok: false, code: 'name_taken', message: 'that character name is taken' };
     }
+    this.questCache.delete(`${accountId}:${slot}`); // a fresh character has no quests
     this.clients.set(ws, this.makeClient(entity, input, accountId, slot, name));
     this.active.add(`${accountId}:${slot}`);
     return { ok: true, entity };
@@ -242,8 +247,12 @@ export class GameServer {
       this.world.sim.world.destroyEntity(entity);
       return { ok: false, code: 'bad_save', message: 'could not apply the save' };
     }
+    // Remember quests from the loaded save so re-serializing on flush doesn't drop them.
+    const k = `${accountId}:${slot}`;
+    if (save.quests) this.questCache.set(k, save.quests);
+    else this.questCache.delete(k);
     this.clients.set(ws, this.makeClient(entity, input, accountId, slot, name));
-    this.active.add(`${accountId}:${slot}`);
+    this.active.add(k);
     return { ok: true, entity };
   }
 
@@ -287,13 +296,17 @@ export class GameServer {
         }
         this.world.sim.world.destroyEntity(o.entity);
         this.orphans.delete(k);
+        this.questCache.delete(k);
       }
     }
   }
 
-  /** Flush one character (by entity) to the DB (serialize → row). */
+  /** Flush one character (by entity) to the DB (serialize → row), re-attaching any quest
+   *  progress the sim doesn't model so it survives the round-trip. */
   private flushEntity(accountId: number, slot: number, entity: Entity): void {
     const save = serialize(this.world.sim.world, entity);
+    const quests = this.questCache.get(`${accountId}:${slot}`);
+    if (quests) save.quests = quests;
     this.db.saveCharacter(accountId, slot, this.flushFrom(save));
   }
 

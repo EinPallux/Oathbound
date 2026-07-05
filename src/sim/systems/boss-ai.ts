@@ -60,6 +60,20 @@ export function createBossAiSystem(deps: BossAiDeps): System {
           continue;
         }
 
+        // Leashed home (gave up): un-scale so the NEXT pull re-scales from base for however many
+        // players engage it then. enemy-ai heals the boss to h.max on the leash→idle transition
+        // (which is still the *scaled* max), so restore base and clamp current back down here —
+        // otherwise a 3-player pull would leave the boss at 2.2× HP forever for the next soloist.
+        if (en.state === 'idle' && (boss.scaledForPlayers ?? 0) !== 0) {
+          boss.phase = 0;
+          boss.heavyTimer = boss.heavyCadence[0] * 0.6;
+          if (boss.baseMaxHp != null) {
+            h.max = boss.baseMaxHp;
+            if (h.current > h.max) h.current = h.max;
+          }
+          boss.scaledForPlayers = 0;
+        }
+
         // Derive the current phase from HP and announce escalations (never de-escalate).
         const frac = h.current / h.max;
         let phase = 0;

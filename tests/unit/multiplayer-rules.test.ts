@@ -19,6 +19,8 @@ import {
   type Progression,
   type LootDrop,
   type Boss,
+  type GroundAoe,
+  type Transform,
 } from '../../src/core/ecs/components';
 
 function makeWorld() {
@@ -119,5 +121,61 @@ describe('M5 playing together', () => {
       expect(sim.world.get<Boss>(boss, C.Boss)!.scaledForPlayers).toBe(3);
       expect(hp(sim, boss).max).toBe(Math.round(base * 2.2));
     }
+  });
+
+  // QA H3: a scaled boss that leashes home must un-scale, so the next (solo) pull faces base HP.
+  it('un-scales a boss when it leashes home (no permanently-inflated HP for the next puller)', () => {
+    const { sim, field } = makeWorld();
+    const players = [
+      addPlayer(sim.world, field, createNullControlState(), { x: 1, z: 0 }),
+      addPlayer(sim.world, field, createNullControlState(), { x: 2, z: 0 }),
+      addPlayer(sim.world, field, createNullControlState(), { x: 3, z: 0 }),
+    ];
+    const boss = spawnBoss(sim.world, field, BOSS_SPAWNS[0].id, 0, 0);
+    const base = hp(sim, boss).max;
+    const en = sim.world.get<Enemy>(boss, C.Enemy)!;
+    en.state = 'engage';
+    sim.world.update(DT);
+    expect(hp(sim, boss).max).toBe(Math.round(base * 2.2)); // scaled by the 3-player pull
+
+    // The party wipes/flees far away → the boss leashes home. Move players out of aggro range so
+    // it actually gives up, then simulate the leash→home heal enemy-ai performs (idle, healed to
+    // the still-scaled max). boss-ai must then restore base HP and clamp current down.
+    for (const p of players) sim.world.get<Transform>(p, C.Transform)!.x = 500;
+    en.state = 'idle';
+    hp(sim, boss).current = hp(sim, boss).max;
+    sim.world.update(DT);
+    expect(sim.world.get<Boss>(boss, C.Boss)!.scaledForPlayers).toBe(0);
+    expect(hp(sim, boss).max).toBe(base);
+    expect(hp(sim, boss).current).toBe(base); // not left above the restored max
+  });
+
+  // QA H1: the boss heavy (a hitsPlayer ground-AoE) damages EVERY player standing in it.
+  it('boss ground-AoE damages every player in the radius, not just the first', () => {
+    const { sim, field } = makeWorld();
+    const a = addPlayer(sim.world, field, createNullControlState(), { x: 0, z: 0 });
+    const b = addPlayer(sim.world, field, createNullControlState(), { x: 1, z: 0 });
+    const boss = spawnBoss(sim.world, field, BOSS_SPAWNS[0].id, 0.5, 0);
+    // A telegraphed heavy centered between both players, ticking immediately.
+    const aoe = sim.world.createEntity();
+    sim.world.set<Transform>(aoe, C.Transform, {
+      x: 0.5, y: 0, z: 0, yaw: 0, prevX: 0.5, prevY: 0, prevZ: 0, prevYaw: 0,
+    });
+    sim.world.set<GroundAoe>(aoe, C.GroundAoe, {
+      source: boss,
+      radius: 6,
+      base: 40,
+      coeff: 1,
+      damageType: 'physical',
+      ttl: 1,
+      tickEvery: 0.5,
+      tickTimer: 0,
+      hitsPlayer: true,
+    });
+    const aMax = hp(sim, a).max;
+    const bMax = hp(sim, b).max;
+    sim.world.update(DT);
+    expect(hp(sim, a).current).toBeLessThan(aMax);
+    expect(hp(sim, b).current).toBeLessThan(bMax);
   });
 });

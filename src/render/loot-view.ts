@@ -50,6 +50,8 @@ export class LootView {
     for (const [e, m] of this.beams) {
       if (seen.has(e)) continue;
       this.scene.remove(m);
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
       this.beams.delete(e);
     }
   }

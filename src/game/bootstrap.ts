@@ -886,7 +886,11 @@ export function boot(options: BootOptions = {}): Game {
       const primary = cls.primaryStatId === 'VIT' ? 'STR' : cls.primaryStatId;
       addItem(world, player, generateItem(rng, { ilvl: prog.level, slot: 'weapon', rarity, primaryStat: primary }));
     },
-    save: () => writeSave(serialize(world, player)),
+    save: () => {
+      const data = serialize(world, player);
+      data.quests = questLog.toSave(); // keep quest progress (serialize() doesn't capture it)
+      return writeSave(data);
+    },
     stop: () => {
       loop.stop();
       input.dispose();
