@@ -7,14 +7,14 @@
 import { WebSocket } from 'ws';
 import { NetworkControlState } from '../src/net/net-input';
 import { buildSnapshot } from '../src/net/snapshot';
-import { encode, type InputMessage, type ServerMessage } from '../src/net/protocol';
+import { encode, type InputMessage, type ServerMessage, type FxEvent } from '../src/net/protocol';
 import { RateLimiter } from '../src/net/rate-limit';
 import { addPlayer } from '../src/sim/boot/sim-world';
 import { createNullControlState } from '../src/platform/null-input';
 import { pickUpNearest } from '../src/sim/systems/loot';
 import { serialize, applySave, SCHEMA_VERSION, type SaveData } from '../src/sim/save';
 import { LEVEL_CAP } from '../src/sim/stats';
-import { CombatEvent, type LevelUpEvent, type DeathEvent } from '../src/sim/combat/events';
+import { CombatEvent, type LevelUpEvent, type DeathEvent, type DamageEvent, type HealEvent } from '../src/sim/combat/events';
 import { DT } from '../src/core/time';
 import type { Entity } from '../src/core/ecs/world';
 import { C, type ClassId, type EnemyInfo } from '../src/core/ecs/components';
@@ -44,6 +44,8 @@ interface ConnectedPlayer {
   isAdmin: boolean;
   /** Per-player chat throttle (5 lines, ~1/s sustained) to curb spam. */
   chatLimiter: RateLimiter;
+  /** Combat text (damage/heal) involving this player, buffered until the next snapshot. */
+  fx: FxEvent[];
 }
 
 export type AuthResult =
@@ -89,6 +91,24 @@ export class GameServer {
       const killer = this.nameOf(e.killer);
       this.broadcastSystem(`${killer ?? 'A hero'} has slain ${info?.name ?? 'a world boss'}!`);
     });
+    // Floating combat text: route each damage/heal to the client(s) it involves (their own
+    // outgoing hits + incoming damage), buffered until the next snapshot.
+    events.on<DamageEvent>(CombatEvent.Damage, (e) => {
+      for (const p of this.clients.values()) {
+        if (p.entity === e.source || p.entity === e.target) this.pushFx(p, e.x, e.y, e.z, e.amount, e.isCrit, false);
+      }
+    });
+    events.on<HealEvent>(CombatEvent.Heal, (e) => {
+      for (const p of this.clients.values()) {
+        if (p.entity === e.entity) this.pushFx(p, e.x, e.y, e.z, e.amount, false, true);
+      }
+    });
+  }
+
+  private pushFx(p: ConnectedPlayer, x: number, y: number, z: number, amount: number, crit: boolean, heal: boolean): void {
+    if (amount <= 0) return;
+    p.fx.push({ x, y, z, amount, crit, heal });
+    if (p.fx.length > 40) p.fx.shift(); // bound a burst between snapshots
   }
 
   get tick(): number {
@@ -270,7 +290,7 @@ export class GameServer {
 
   private makeClient(entity: Entity, input: NetworkControlState, accountId: number, slot: number, name: string): ConnectedPlayer {
     const isAdmin = (this.db.getAccount(accountId)?.is_admin ?? 0) === 1;
-    return { entity, input, accountId, slot, name, isAdmin, chatLimiter: new RateLimiter(5, 1, Date.now()) };
+    return { entity, input, accountId, slot, name, isAdmin, chatLimiter: new RateLimiter(5, 1, Date.now()), fx: [] };
   }
 
   /** Set by main so `/admin shutdown` can trigger a graceful exit. */
@@ -532,14 +552,12 @@ export class GameServer {
   sendSnapshotTo(ws: WebSocket): void {
     const p = this.clients.get(ws);
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(
-        encode(
-          buildSnapshot(this.world.sim.world, this.tickCount, p?.input.seq ?? 0, {
-            self: p?.entity,
-            names: this.playerNames(),
-          }),
-        ),
-      );
+      const snap = buildSnapshot(this.world.sim.world, this.tickCount, p?.input.seq ?? 0, {
+        self: p?.entity,
+        names: this.playerNames(),
+      });
+      ws.send(encode(snap));
+      if (p) p.fx.length = 0;
     }
   }
 
@@ -548,10 +566,11 @@ export class GameServer {
     const names = this.playerNames();
     for (const [ws, p] of this.clients) {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(
-          encode(buildSnapshot(this.world.sim.world, this.tickCount, p.input.seq, { self: p.entity, names })),
-        );
+        const snap = buildSnapshot(this.world.sim.world, this.tickCount, p.input.seq, { self: p.entity, names });
+        if (p.fx.length > 0) snap.fx = p.fx.slice();
+        ws.send(encode(snap));
       }
+      p.fx.length = 0; // clear whether or not the socket was open, so it can't accumulate
     }
   }
 }

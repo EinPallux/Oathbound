@@ -244,6 +244,17 @@ export type SelfState = z.infer<typeof SelfState>;
  * is the last input `seq` the server had applied for this client (informational in M1; used for
  * reconciliation in M4). The client interpolates between successive snapshots.
  */
+/** A floating-combat-text event (damage/heal) at a world position, for the receiving client. */
+export const FxEvent = z.object({
+  x: z.number(),
+  y: z.number(),
+  z: z.number(),
+  amount: z.number(),
+  crit: z.boolean(),
+  heal: z.boolean(),
+});
+export type FxEvent = z.infer<typeof FxEvent>;
+
 export const SnapshotMessage = z.object({
   t: z.literal('snapshot'),
   tick: z.number().int(),
@@ -251,6 +262,8 @@ export const SnapshotMessage = z.object({
   ents: z.array(SnapshotEntity),
   /** The receiving client's own HUD state (absent only in pathological cases). */
   self: SelfState.optional(),
+  /** Combat text (damage/heal) involving this client since the last snapshot. */
+  fx: z.array(FxEvent).optional(),
 });
 
 export type SnapshotMessage = z.infer<typeof SnapshotMessage>;

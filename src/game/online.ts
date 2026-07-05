@@ -24,11 +24,18 @@ import { buildCustomWorldData } from '../world/custom-map';
 import type { BoxCollider } from '../sim/collision';
 import { PLAYER_HALF } from '../sim/factory';
 import { PredictedPlayer } from '../net/prediction';
+import { ShadowWorld } from '../net/shadow-world';
+import { Hud } from '../render/hud';
+import { TargetFrame } from '../render/target-frame';
+import { Minimap } from '../render/minimap';
+import { DamageNumbers } from '../render/damage-numbers';
+import { customSceneryForMinimap } from '../world/custom-map';
+import { generateScenery, type Scenery } from '../world/scenery';
 import {
   PROTOCOL_VERSION,
   encode,
   decodeServerMessage,
-  type SnapshotEntity,
+  type SnapshotMessage,
   type CharSummary,
 } from '../net/protocol';
 
@@ -308,36 +315,51 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     let camZ = 0;
     let camY = field.sample(0, 0) + PLAYER_HALF;
 
-    // Minimal HUD: a local health bar driven from the snapshot, so a player can see they're taking
-    // damage / dying instead of guessing. (Resource/hotbar/target/minimap parity is a later item.)
-    const hpBar = document.createElement('div');
-    hpBar.style.cssText =
-      'position:fixed;left:12px;top:12px;width:220px;height:18px;z-index:9;border:1px solid #33445a;' +
-      'border-radius:6px;background:rgba(15,21,29,.8);overflow:hidden;font:12px/18px system-ui,sans-serif';
-    const hpFill = document.createElement('div');
-    hpFill.style.cssText = 'height:100%;width:100%;background:linear-gradient(#e5484d,#b02a2f);transition:width .12s';
-    const hpText = document.createElement('div');
-    hpText.style.cssText = 'position:absolute;left:0;top:0;width:220px;text-align:center;color:#fff;text-shadow:0 1px 2px #000';
-    hpBar.append(hpFill, hpText);
-    document.body.appendChild(hpBar);
-    cleanups.push(() => hpBar.remove());
-    const setHp = (hp: number, mhp: number): void => {
-      const frac = mhp > 0 ? Math.max(0, Math.min(1, hp / mhp)) : 0;
-      hpFill.style.width = `${(frac * 100).toFixed(1)}%`;
-      hpText.textContent = `${Math.round(hp)} / ${Math.round(mhp)}`;
-    };
+    // Full HUD: reuse the entire offline UI (unit frames, ability hotbar with cooldowns, cast bar,
+    // buffs, target frame, minimap, floating damage numbers), driven by a client-side shadow ECS
+    // world synced from the snapshot's `self` block + replicated entities. All UI lives under one
+    // root so stop() removes it in one go.
+    const hudRoot = document.createElement('div');
+    document.body.appendChild(hudRoot);
+    cleanups.push(() => hudRoot.remove());
+    const hud = new Hud(hudRoot);
+    const targetFrame = new TargetFrame(hudRoot);
+    const dmgNumbers = new DamageNumbers(hudRoot);
+    const scenery: Scenery = map ? customSceneryForMinimap(map) : generateScenery(WORLD_SIZE, { seed: 7777 });
+    const minimap = new Minimap(hudRoot, field.size, field, scenery);
+    let shadow: ShadowWorld | null = null;
 
-    const applySnapshot = (ents: SnapshotEntity[], ack: number): void => {
+    const applySnapshot = (msg: SnapshotMessage): void => {
+      const ents = msg.ents;
+      const ack = msg.ack;
       snapIndex++;
       const now = performance.now();
       // Local player: reconcile prediction to the server's authoritative state (create it on the
       // first snapshot that includes us).
       const self = ents.find((e) => e.id === selfId);
       if (self) {
-        if (self.hp != null && self.mhp != null) setHp(self.hp, self.mhp);
         if (!pred) pred = new PredictedPlayer(field, colliders, boxes, { x: self.x, z: self.z });
         else pred.reconcile(self.x, self.z, self.yaw, ack);
+        // Spin up the shadow world once we know our class (from the self block).
+        if (!shadow && msg.self) {
+          shadow = new ShadowWorld(field, selfId, msg.self.cls, { x: self.x, z: self.z });
+          if (self.name) hud.setPlayerName(self.name);
+        }
       }
+      // Sync HUD state + replicas into the shadow world.
+      if (shadow) {
+        shadow.applySnapshot(ents);
+        if (msg.self) shadow.applySelf(msg.self);
+      }
+      // Target frame (data-driven from the self block).
+      if (msg.self?.tgt) {
+        const tg = msg.self.tgt;
+        targetFrame.set(tg.name, tg.lvl, tg.hp, tg.mhp);
+      } else {
+        targetFrame.clear();
+      }
+      // Floating combat text.
+      if (msg.fx) for (const f of msg.fx) dmgNumbers.spawn(f.x, f.y + 1.2, f.z, f.amount, f.crit, f.heal);
       for (const e of ents) {
         let r = replicas.get(e.id);
         if (!r) {
@@ -422,6 +444,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
 
     const sendInput = (): void => {
       if (ws.readyState !== WebSocket.OPEN) return;
+      if (input.consumeToggleMap()) minimap.toggleMap(); // M toggles the big map (client-only UI)
       if (chatFocused) {
         // While typing in chat, don't drive the player — drain edge-triggers so nothing fires on
         // blur, and send a neutral (idle) input this tick.
@@ -485,6 +508,14 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         meMesh.rotation.y = lerpAngle(tr.prevYaw, tr.yaw, alpha);
       }
       cameraRig.update(camX, camY, camZ);
+      // Reused offline HUD + minimap, driven off the shadow world (local player position from
+      // prediction); floating damage numbers project through the now-positioned camera.
+      if (shadow) {
+        shadow.setLocalTransform(camX, camY, camZ, pred ? pred.transform.yaw : 0);
+        hud.update(shadow.world, shadow.localPlayer);
+        minimap.update(shadow.world, shadow.localPlayer);
+      }
+      dmgNumbers.update(renderer.camera, window.innerWidth, window.innerHeight);
       renderer.render();
     };
 
@@ -495,7 +526,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
   }
 
   // Snapshot handler is set once the world scene exists.
-  let onSnapshot: ((ents: SnapshotEntity[], ack: number) => void) | null = null;
+  let onSnapshot: ((msg: SnapshotMessage) => void) | null = null;
   // Chat overlay hooks (wired once the world scene exists).
   let pushChat: ((text: string, system: boolean) => void) | null = null;
   let chatFocused = false;
@@ -540,7 +571,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
           startWorld(m.entityId);
           break;
         case 'snapshot':
-          onSnapshot?.(m.ents, m.ack);
+          onSnapshot?.(m);
           break;
         case 'chatLine':
           pushChat?.(m.me ? `• ${m.from} ${m.text}` : `${m.from}: ${m.text}`, false);
