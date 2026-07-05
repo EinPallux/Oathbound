@@ -200,8 +200,44 @@ export const SnapshotEntity = z.object({
   hp: z.number().optional(),
   mhp: z.number().optional(),
   st: z.string().optional(),
+  /** Display name (players → character name; enemies/bosses/vendors/oathstones → their name). */
+  name: z.string().optional(),
 });
 export type SnapshotEntity = z.infer<typeof SnapshotEntity>;
+
+/** One active status effect on the local player (for buff/debuff display). */
+export const SelfStatus = z.object({ id: z.string(), r: z.number() });
+
+/** The local player's authoritative HUD state, sent per-client inside each snapshot. Lets the
+ *  online client drive the full offline HUD (bars, hotbar cooldowns, buffs, target frame) without
+ *  the client re-simulating combat. */
+export const SelfState = z.object({
+  cls: ClassIdSchema,
+  /** Talent choices (choice-node id → option index), for the correct ability kit. */
+  ch: z.record(z.string(), z.number()).optional(),
+  hp: z.number(),
+  mhp: z.number(),
+  res: z.number(),
+  mres: z.number(),
+  lvl: z.number().int(),
+  xp: z.number(),
+  /** XP to next level, or null at the cap (Infinity doesn't survive JSON). */
+  xpNext: z.number().nullable(),
+  /** Global-cooldown remaining (s) + per-ability cooldowns (s), indexed like the kit. */
+  gcd: z.number(),
+  cds: z.array(z.number()),
+  st: z.array(SelfStatus),
+  inC: z.boolean(),
+  shield: z.number(),
+  gold: z.number(),
+  /** Active cast (ability index + seconds left), or null. Client derives the bar from its kit. */
+  cast: z.object({ idx: z.number().int(), remaining: z.number() }).nullable(),
+  /** "Call Mount" summon channel remaining (s); 0 = not summoning. */
+  mount: z.number(),
+  /** The server's authoritative target for this player (frame data), or null. */
+  tgt: z.object({ id: z.number().int(), name: z.string(), lvl: z.number().int(), hp: z.number(), mhp: z.number() }).nullable(),
+});
+export type SelfState = z.infer<typeof SelfState>;
 
 /**
  * A world snapshot: the authoritative state of the replicated entities at server `tick`. `ack`
@@ -213,6 +249,8 @@ export const SnapshotMessage = z.object({
   tick: z.number().int(),
   ack: z.number().int(),
   ents: z.array(SnapshotEntity),
+  /** The receiving client's own HUD state (absent only in pathological cases). */
+  self: SelfState.optional(),
 });
 
 export type SnapshotMessage = z.infer<typeof SnapshotMessage>;

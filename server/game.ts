@@ -520,18 +520,37 @@ export class GameServer {
     }
   }
 
+  /** Map of in-world player entity → character name (clients + reconnect-grace orphans), for
+   *  nameplates. Rebuilt per broadcast; cheap at friends scale. */
+  private playerNames(): Map<number, string> {
+    const names = new Map<number, string>();
+    for (const p of this.clients.values()) names.set(p.entity, p.name);
+    for (const o of this.orphans.values()) names.set(o.entity, o.name);
+    return names;
+  }
+
   sendSnapshotTo(ws: WebSocket): void {
     const p = this.clients.get(ws);
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(encode(buildSnapshot(this.world.sim.world, this.tickCount, p?.input.seq ?? 0)));
+      ws.send(
+        encode(
+          buildSnapshot(this.world.sim.world, this.tickCount, p?.input.seq ?? 0, {
+            self: p?.entity,
+            names: this.playerNames(),
+          }),
+        ),
+      );
     }
   }
 
   private broadcast(): void {
     if (this.clients.size === 0) return;
+    const names = this.playerNames();
     for (const [ws, p] of this.clients) {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(encode(buildSnapshot(this.world.sim.world, this.tickCount, p.input.seq)));
+        ws.send(
+          encode(buildSnapshot(this.world.sim.world, this.tickCount, p.input.seq, { self: p.entity, names })),
+        );
       }
     }
   }
