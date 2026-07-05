@@ -29,6 +29,7 @@ import { Hud } from '../render/hud';
 import { TargetFrame } from '../render/target-frame';
 import { Minimap } from '../render/minimap';
 import { DamageNumbers } from '../render/damage-numbers';
+import { Nameplates, type NameplateEntry } from '../render/nameplates';
 import { customSceneryForMinimap } from '../world/custom-map';
 import { generateScenery, type Scenery } from '../world/scenery';
 import {
@@ -82,6 +83,9 @@ interface Replica {
   /** Recent authoritative samples (for interpolation-delay rendering of remote entities). */
   samples: Sample[];
   seen: number;
+  name?: string;
+  hp?: number;
+  mhp?: number;
 }
 
 function statusBar(): (text: string) => void {
@@ -97,14 +101,25 @@ function statusBar(): (text: string) => void {
 
 /** A centred overlay panel for the login + character screens. */
 function makePanel(): { root: HTMLDivElement; body: HTMLDivElement; show(): void; hide(): void } {
+  if (!document.getElementById('ob-online-style')) {
+    const style = document.createElement('style');
+    style.id = 'ob-online-style';
+    style.textContent =
+      '.ob-panel button:hover{filter:brightness(1.12)}.ob-panel button:active{filter:brightness(.95)}' +
+      '.ob-panel input:focus,.ob-panel select:focus{border-color:#5a9bd6;box-shadow:0 0 0 2px rgba(90,155,214,.25)}';
+    document.head.appendChild(style);
+  }
   const root = document.createElement('div');
   root.style.cssText =
     'position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;' +
-    'background:rgba(10,14,20,.72);font:14px/1.5 system-ui,sans-serif;color:#e8eef6';
+    'background:radial-gradient(120% 120% at 50% 0%, #12202e 0%, #0a0e14 70%);' +
+    'backdrop-filter:blur(2px);font:14px/1.5 system-ui,sans-serif;color:#e8eef6';
   const body = document.createElement('div');
+  body.className = 'ob-panel';
   body.style.cssText =
-    'min-width:280px;max-width:360px;background:#1b2430;border:1px solid #33445a;border-radius:10px;' +
-    'padding:20px;display:flex;flex-direction:column;gap:10px';
+    'min-width:300px;max-width:380px;background:linear-gradient(#1e2836,#161e28);' +
+    'border:1px solid #34506e;border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:12px;' +
+    'box-shadow:0 18px 60px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05)';
   root.appendChild(body);
   document.body.appendChild(root);
   return {
@@ -134,8 +149,10 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     return n;
   };
   const btnCss =
-    'padding:8px 12px;border:0;border-radius:6px;background:#3a6ea5;color:#fff;font-weight:600;cursor:pointer';
-  const inputCss = 'padding:8px;border-radius:6px;border:1px solid #33445a;background:#0f151d;color:#e8eef6';
+    'padding:9px 14px;border:0;border-radius:8px;background:linear-gradient(#4076ad,#325f8c);color:#fff;' +
+    'font-weight:600;cursor:pointer;transition:filter .12s;box-shadow:0 2px 6px rgba(0,0,0,.35)';
+  const inputCss =
+    'padding:9px 10px;border-radius:8px;border:1px solid #34506e;background:#0d131b;color:#e8eef6;outline:none';
 
   const send = (m: unknown): void => {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m));
@@ -145,7 +162,8 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
   function showLogin(err?: string): void {
     panel.show();
     panel.body.replaceChildren();
-    panel.body.appendChild(el('h2', 'margin:0 0 4px;font-size:18px', 'Oathbound Online'));
+    panel.body.appendChild(el('h2', 'margin:0;font-size:22px;letter-spacing:.5px;font-weight:800', 'Oathbound'));
+    panel.body.appendChild(el('div', 'margin:-6px 0 6px;font-size:12px;color:#8aa0b8', 'Online — enter the realm of Aldermere'));
     if (err) panel.body.appendChild(el('div', 'color:#ff9a8a;font-size:13px', err));
     const user = el('input', inputCss) as HTMLInputElement;
     user.placeholder = 'username';
@@ -327,6 +345,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     const dmgNumbers = new DamageNumbers(hudRoot);
     const scenery: Scenery = map ? customSceneryForMinimap(map) : generateScenery(WORLD_SIZE, { seed: 7777 });
     const minimap = new Minimap(hudRoot, field.size, field, scenery);
+    const nameplates = new Nameplates(hudRoot);
     let shadow: ShadowWorld | null = null;
 
     const applySnapshot = (msg: SnapshotMessage): void => {
@@ -371,6 +390,9 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         r.samples.push({ t: now, x: e.x, z: e.z, yaw: e.yaw });
         if (r.samples.length > 6) r.samples.shift();
         r.seen = snapIndex;
+        if (e.name) r.name = e.name;
+        r.hp = e.hp;
+        r.mhp = e.mhp;
         r.mesh.visible = !((e.k === 'enemy' || e.k === 'boss') && e.st === 'dead');
       }
       for (const [id, r] of replicas) {
@@ -515,6 +537,19 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         hud.update(shadow.world, shadow.localPlayer);
         minimap.update(shadow.world, shadow.localPlayer);
       }
+      // Nameplates over other players + living enemies (nearest first, headroom above the mesh).
+      const plates: Array<{ e: NameplateEntry; d: number }> = [];
+      for (const [id, r] of replicas) {
+        if (id === selfId || !r.name || !r.mesh.visible) continue;
+        if (r.kind !== 'player' && r.kind !== 'enemy' && r.kind !== 'boss') continue;
+        if ((r.kind === 'enemy' || r.kind === 'boss') && r.hp != null && r.hp <= 0) continue;
+        const pos = r.mesh.position;
+        const head = pos.y + (r.kind === 'boss' ? 2.6 : r.kind === 'player' ? 1.5 : 1.1);
+        const d = (pos.x - camX) ** 2 + (pos.z - camZ) ** 2;
+        plates.push({ e: { x: pos.x, y: head, z: pos.z, name: r.name, hp: r.hp ?? 1, mhp: r.mhp ?? 1, kind: r.kind }, d });
+      }
+      plates.sort((a, b) => a.d - b.d);
+      nameplates.render(renderer.camera, window.innerWidth, window.innerHeight, plates.map((p) => p.e));
       dmgNumbers.update(renderer.camera, window.innerWidth, window.innerHeight);
       renderer.render();
     };
