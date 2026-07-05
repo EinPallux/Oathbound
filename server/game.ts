@@ -13,6 +13,7 @@ import { addPlayer } from '../src/sim/boot/sim-world';
 import { createNullControlState } from '../src/platform/null-input';
 import { pickUpNearest } from '../src/sim/systems/loot';
 import { serialize, applySave, SCHEMA_VERSION, type SaveData } from '../src/sim/save';
+import { LEVEL_CAP } from '../src/sim/stats';
 import { CombatEvent, type LevelUpEvent, type DeathEvent } from '../src/sim/combat/events';
 import { DT } from '../src/core/time';
 import type { Entity } from '../src/core/ecs/world';
@@ -104,21 +105,21 @@ export class GameServer {
 
   // ── Accounts / auth ──────────────────────────────────────────────────────────────────────
 
-  register(username: string, password: string, joinPassword?: string): AuthResult {
+  async register(username: string, password: string, joinPassword?: string): Promise<AuthResult> {
     if (this.config.joinPassword !== '' && joinPassword !== this.config.joinPassword) {
       return { ok: false, code: 'join_denied', message: 'wrong server password' };
     }
     if (this.db.findAccountByUsername(username)) {
       return { ok: false, code: 'username_taken', message: 'that username is taken' };
     }
-    const { hash, salt } = hashPassword(password);
+    const { hash, salt } = await hashPassword(password);
     const accountId = this.db.createAccount(username, hash, salt);
     return this.issueSession(accountId, username);
   }
 
-  login(username: string, password: string): AuthResult {
+  async login(username: string, password: string): Promise<AuthResult> {
     const acc = this.db.findAccountByUsername(username);
-    if (!acc || !verifyPassword(password, acc.pass_hash, acc.pass_salt)) {
+    if (!acc || !(await verifyPassword(password, acc.pass_hash, acc.pass_salt))) {
       return { ok: false, code: 'bad_credentials', message: 'wrong username or password' };
     }
     if (acc.is_banned) return { ok: false, code: 'banned', message: 'this account is banned' };
@@ -146,8 +147,16 @@ export class GameServer {
     return this.db.listCharacters(accountId);
   }
 
-  deleteChar(accountId: number, slot: number): void {
+  /** Delete a character slot — refused while that character is in the world (live or in the
+   *  reconnect-grace window), since deleting a live entity would orphan it and its grace-window
+   *  flush could later clobber a freshly-created character in the same slot. */
+  deleteChar(accountId: number, slot: number): { ok: true } | { ok: false; code: string; message: string } {
+    const k = `${accountId}:${slot}`;
+    if (this.active.has(k) || this.orphans.has(k)) {
+      return { ok: false, code: 'char_in_world', message: 'log that character out before deleting it' };
+    }
     this.db.deleteCharacter(accountId, slot);
+    return { ok: true };
   }
 
   // ── Entering the world ───────────────────────────────────────────────────────────────────
@@ -503,15 +512,45 @@ export class GameServer {
   }
 }
 
-/** Structurally validate an untrusted imported save before applySave touches the world. */
+/** Finite number within an (optional) inclusive range. Rejects NaN/±Infinity — the whole point:
+ *  a NaN position would poison distance math and propagate into every client's snapshot. */
+function fin(v: unknown, min = -Infinity, max = Infinity): v is number {
+  return typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
+}
+
+/** Upper bounds on untrusted array sizes so an import can't bloat the DB or the world. */
+const MAX_INVENTORY = 200;
+const MAX_OATHSTONES = 128;
+const MAX_RELICS = 512;
+
+/**
+ * Structurally AND value-validate an untrusted imported save before applySave touches the shared
+ * world. This is a live trust boundary (any authenticated client can `importChar`): every scalar
+ * must be finite and in a sane range, and every array bounded. Deep per-item/affix validation is
+ * still deferred (save v1), but the crash/economy-breaking vectors — NaN position, absurd
+ * level/gold, giant arrays — are closed here.
+ */
 function validateSave(raw: unknown): SaveData | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const s = raw as Partial<SaveData>;
   if (typeof s.schemaVersion !== 'number' || s.schemaVersion > SCHEMA_VERSION) return null;
   if (s.classId !== 'warrior' && s.classId !== 'hunter' && s.classId !== 'priest') return null;
-  if (!s.character || typeof s.character.level !== 'number') return null;
-  if (!s.position || typeof s.position.x !== 'number' || typeof s.position.z !== 'number') return null;
-  if (!Array.isArray(s.inventory) || typeof s.equipment !== 'object' || s.equipment === null) return null;
-  if (typeof s.gold !== 'number') return null;
+
+  if (!s.character || typeof s.character !== 'object') return null;
+  if (!fin(s.character.level, 1, LEVEL_CAP)) return null;
+  if (!fin(s.character.xp, 0, 1e12)) return null;
+
+  if (!s.position || !fin(s.position.x) || !fin(s.position.z)) return null;
+  if (s.respawn != null && (typeof s.respawn !== 'object' || !fin(s.respawn.x) || !fin(s.respawn.z))) return null;
+
+  if (!fin(s.gold, 0, 1e12)) return null;
+  if (s.materials != null && !fin(s.materials, 0, 1e12)) return null;
+  if (s.pity != null && !fin(s.pity, 0, 1e6)) return null;
+
+  if (!Array.isArray(s.inventory) || s.inventory.length > MAX_INVENTORY) return null;
+  if (typeof s.equipment !== 'object' || s.equipment === null) return null;
+  if (s.oathstones != null && (!Array.isArray(s.oathstones) || s.oathstones.length > MAX_OATHSTONES)) return null;
+  if (s.relics != null && (!Array.isArray(s.relics) || s.relics.length > MAX_RELICS)) return null;
+
   return raw as SaveData;
 }

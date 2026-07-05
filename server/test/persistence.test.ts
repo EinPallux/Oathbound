@@ -32,11 +32,11 @@ function sampleFlush(level = 3, gold = 500, x = 12, z = -8) {
   };
 }
 
-function run(): void {
-  // ── auth primitives ──
-  const { hash, salt } = hashPassword('hunter2!');
-  assert.equal(verifyPassword('hunter2!', hash, salt), true, 'correct password verifies');
-  assert.equal(verifyPassword('wrong', hash, salt), false, 'wrong password rejected');
+async function run(): Promise<void> {
+  // ── auth primitives (async scrypt) ──
+  const { hash, salt } = await hashPassword('hunter2!');
+  assert.equal(await verifyPassword('hunter2!', hash, salt), true, 'correct password verifies');
+  assert.equal(await verifyPassword('wrong', hash, salt), false, 'wrong password rejected');
 
   // ── first boot ──
   let db = new Db(dbPath);
@@ -69,7 +69,7 @@ function run(): void {
 
   const acc = db.findAccountByUsername('Alice');
   assert.ok(acc, 'account survived restart');
-  assert.equal(verifyPassword('hunter2!', acc!.pass_hash, acc!.pass_salt), true, 'password hash survived');
+  assert.equal(await verifyPassword('hunter2!', acc!.pass_hash, acc!.pass_salt), true, 'password hash survived');
   const chars = db.listCharacters(accId);
   assert.equal(chars.length, 1, 'character survived restart');
   assert.equal(chars[0].name, 'Alaric');
@@ -87,13 +87,14 @@ function run(): void {
   db.close();
 }
 
-try {
-  run();
-  cleanup();
-  console.log('persistence.test: ALL PASSED');
-} catch (err) {
-  cleanup();
-  console.error('persistence.test: FAILED');
-  console.error(err);
-  process.exit(1);
-}
+run()
+  .then(() => {
+    cleanup();
+    console.log('persistence.test: ALL PASSED');
+  })
+  .catch((err) => {
+    cleanup();
+    console.error('persistence.test: FAILED');
+    console.error(err);
+    process.exit(1);
+  });

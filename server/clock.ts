@@ -62,7 +62,13 @@ export class ServerClock {
     let ran = 0;
     while (now >= this.nextTickAt && ran < maxCatchUp) {
       const t0 = performance.now();
-      this.step(DT);
+      // A single bad tick (e.g. an unexpected throw in a sim system) must never kill the loop
+      // and disconnect everyone. Log it and keep ticking; the next tick usually recovers.
+      try {
+        this.step(DT);
+      } catch (err) {
+        console.error('[oathbound] sim step threw — continuing:', err);
+      }
       const stepMs = performance.now() - t0;
       this.sumStepMs += stepMs;
       this.stepSamples++;

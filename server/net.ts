@@ -19,16 +19,47 @@ const RL_CAPACITY = 60;
 const RL_REFILL_PER_SEC = 45;
 /** Drop this many over-rate messages from one connection, then disconnect the flooder. */
 const RL_MAX_DROPPED = 200;
+/**
+ * A much stricter, separate budget for auth messages (register/login) — these do an async but
+ * still CPU-real scrypt hash. A few burst then ~1 per 5 s is ample for a human logging in and
+ * makes an unauthenticated scrypt-flood a non-event even before the per-IP connection cap.
+ */
+const AUTH_CAPACITY = 6;
+const AUTH_REFILL_PER_SEC = 0.2;
 
 function send(ws: WebSocket, msg: ServerMessage): void {
   if (ws.readyState === WebSocket.OPEN) ws.send(encode(msg));
+}
+
+/** True for a loopback peer — i.e. the local Caddy reverse proxy, whose X-Forwarded-For we trust. */
+function isLoopback(addr: string): boolean {
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+
+/**
+ * The real client IP for per-IP limiting. In production every socket's peer address is the local
+ * Caddy proxy (127.0.0.1), so a raw `remoteAddress` would lump ALL players into one bucket and
+ * cap the whole server at `maxConnPerIp`. When the peer is loopback we trust Caddy's
+ * `X-Forwarded-For` and take its last hop — the address Caddy itself observed (the real client);
+ * a client-spoofed prefix is appended *before* that, so the last entry is the authoritative one.
+ * A direct (non-proxied) connection just uses the socket address.
+ */
+function clientIp(req: IncomingMessage): string {
+  const peer = req.socket.remoteAddress ?? 'unknown';
+  const xff = req.headers['x-forwarded-for'];
+  if (isLoopback(peer) && xff) {
+    const chain = (Array.isArray(xff) ? xff.join(',') : xff).split(',');
+    const last = chain[chain.length - 1]?.trim();
+    if (last) return last;
+  }
+  return peer;
 }
 
 export function attachNet(wss: WebSocketServer, game: GameServer): void {
   const ipCounts = new Map<string, number>();
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-    const ip = req.socket.remoteAddress ?? 'unknown';
+    const ip = clientIp(req);
     if ((ipCounts.get(ip) ?? 0) >= game.maxConnPerIp) {
       ws.close(1008, 'too many connections');
       return;
@@ -36,6 +67,7 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
     ipCounts.set(ip, (ipCounts.get(ip) ?? 0) + 1);
 
     const limiter = new RateLimiter(RL_CAPACITY, RL_REFILL_PER_SEC, Date.now());
+    const authLimiter = new RateLimiter(AUTH_CAPACITY, AUTH_REFILL_PER_SEC, Date.now());
     let dropped = 0;
     let accountId: number | null = null;
     let inWorld = false;
@@ -57,6 +89,26 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
 
     const sendCharList = (): void => {
       if (accountId != null) send(ws, { t: 'charList', chars: game.characters(accountId) });
+    };
+
+    // Register/login hash a password (async scrypt on the libuv pool, so it never blocks the
+    // tick). Fire-and-forget: if the client sends more before this resolves, those messages just
+    // see accountId still null (→ auth_required), which is harmless.
+    const handleAuth = async (
+      msg: { t: 'register'; username: string; password: string; joinPassword?: string }
+        | { t: 'login'; username: string; password: string },
+    ): Promise<void> => {
+      const r =
+        msg.t === 'register'
+          ? await game.register(msg.username, msg.password, msg.joinPassword)
+          : await game.login(msg.username, msg.password);
+      if (!r.ok) {
+        send(ws, { t: 'error', code: r.code, message: r.message });
+        return;
+      }
+      accountId = r.accountId;
+      send(ws, { t: 'authOk', token: r.token, username: r.username });
+      sendCharList();
     };
 
     const finishEnter = (res: EnterResult): void => {
@@ -107,17 +159,11 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
             });
             return;
           }
-          const r =
-            msg.t === 'register'
-              ? game.register(msg.username, msg.password, msg.joinPassword)
-              : game.login(msg.username, msg.password);
-          if (!r.ok) {
-            send(ws, { t: 'error', code: r.code, message: r.message });
+          if (!authLimiter.tryConsume(Date.now())) {
+            send(ws, { t: 'error', code: 'auth_rate_limited', message: 'too many attempts — slow down' });
             return;
           }
-          accountId = r.accountId;
-          send(ws, { t: 'authOk', token: r.token, username: r.username });
-          sendCharList();
+          void handleAuth(msg);
           return;
         }
 
@@ -154,8 +200,9 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
           else if (msg.t === 'createChar') finishEnter(game.enterNew(ws, accountId, msg.slot, msg.name, msg.classId));
           else if (msg.t === 'importChar') finishEnter(game.enterImport(ws, accountId, msg.slot, msg.name, msg.save));
           else {
-            game.deleteChar(accountId, msg.slot);
-            sendCharList();
+            const del = game.deleteChar(accountId, msg.slot);
+            if (!del.ok) send(ws, { t: 'error', code: del.code, message: del.message });
+            else sendCharList();
           }
           return;
 

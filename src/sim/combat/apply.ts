@@ -41,10 +41,14 @@ export function applyDamage(
   rng: Rng,
   leech = 0,
 ): ApplyResult {
-  const off = world.get<Offense>(source, C.Offense)!;
-  const def = world.get<Defense>(target, C.Defense)!;
-  const h = world.get<Health>(target, C.Health)!;
-  if (h.current <= 0) return { amount: 0, isCrit: false, killed: false };
+  // The source or target may have been destroyed since this hit was scheduled — a trap or
+  // projectile can outlive its caster (e.g. the caster disconnected and was reaped), and a
+  // target can despawn mid-flight. Guard the component lookups (mirrors heal.ts) so a stale
+  // entity never throws inside the tick loop and takes the whole server down.
+  const off = world.get<Offense>(source, C.Offense);
+  const def = world.get<Defense>(target, C.Defense);
+  const h = world.get<Health>(target, C.Health);
+  if (!off || !def || !h || h.current <= 0) return { amount: 0, isCrit: false, killed: false };
 
   const targetStatuses = world.get<Statuses>(target, C.Statuses);
   const sourceStatuses = world.get<Statuses>(source, C.Statuses);
@@ -101,7 +105,7 @@ export function applyDamage(
     addThreat(world, target, source, amount);
   }
 
-  const tr = world.get<Transform>(target, C.Transform)!;
+  const tr = world.get<Transform>(target, C.Transform);
   world.events.emit<DamageEvent>(CombatEvent.Damage, {
     source,
     target,
@@ -109,9 +113,9 @@ export function applyDamage(
     isCrit: res.isCrit,
     damageType: hit.damageType,
     abilityId: '',
-    x: tr.x,
-    y: tr.y,
-    z: tr.z,
+    x: tr?.x ?? 0,
+    y: tr?.y ?? 0,
+    z: tr?.z ?? 0,
   });
 
   // Bloodroot relic: critical hits leech extra (on top of any ability/gear leech).

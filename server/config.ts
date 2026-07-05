@@ -32,7 +32,9 @@ export interface ServerConfig {
   motd: string;
   /** Usernames (lower-cased) auto-promoted to admin on login (from OATHBOUND_ADMINS, comma-sep). */
   admins: string[];
-  /** Max simultaneous connections from one IP (raise for a local load test). */
+  /** Max simultaneous connections from one *client* IP (behind Caddy, resolved from
+   *  X-Forwarded-For — see server/net.ts). Headroom for a NAT'd household + reconnect overlap;
+   *  raise for a local load test. */
   maxConnPerIp: number;
 }
 
@@ -65,6 +67,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
       .split(',')
       .map((s) => s.trim().toLowerCase())
       .filter((s) => s !== ''),
-    maxConnPerIp: intEnv(env.OATHBOUND_MAX_CONN_PER_IP, 8),
+    maxConnPerIp: intEnv(env.OATHBOUND_MAX_CONN_PER_IP, 16),
   };
 }
