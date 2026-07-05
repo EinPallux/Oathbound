@@ -21,6 +21,7 @@ import {
   type Oathstone,
   type LootLuck,
   type RelicCollection,
+  type WaypointUnlocks,
 } from '../core/ecs/components';
 import { recomputeDerived } from './inventory';
 import { xpToNext } from './stats';
@@ -62,11 +63,9 @@ export function serialize(world: World, player: Entity): SaveData {
   const tr = world.get<Transform>(player, C.Transform)!;
   const respawn = world.get<Respawn>(player, C.Respawn);
 
-  const oathstones: string[] = [];
-  for (const e of world.query(C.Oathstone)) {
-    const os = world.get<Oathstone>(e, C.Oathstone)!;
-    if (os.activated) oathstones.push(os.id);
-  }
+  // This player's OWN activated stones (per-character), not a scan of the shared world's global
+  // `activated` flags — otherwise one character's unlocks would leak into another's save.
+  const oathstones = [...(world.get<WaypointUnlocks>(player, C.WaypointUnlocks)?.ids ?? [])];
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -132,8 +131,12 @@ export function applySave(world: World, player: Entity, data: SaveData): void {
     coll.discovered = [...set];
   }
 
-  // Re-mark Oathstones that were activated in the saved run.
-  const activated = new Set(data.oathstones ?? []);
+  // Restore this player's OWN activated-stone set (per-character); also light those stones in the
+  // world (cosmetic `activated` flag) so the obelisks/minimap reflect what they've discovered.
+  const savedStones = data.oathstones ?? [];
+  const unlocks = world.get<WaypointUnlocks>(player, C.WaypointUnlocks);
+  if (unlocks) unlocks.ids = [...savedStones];
+  const activated = new Set(savedStones);
   for (const e of world.query(C.Oathstone)) {
     const os = world.get<Oathstone>(e, C.Oathstone)!;
     if (activated.has(os.id)) os.activated = true;

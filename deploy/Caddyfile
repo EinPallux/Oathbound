@@ -1,0 +1,34 @@
+# Oathbound — Caddy site config. Copy to /etc/caddy/Caddyfile and replace the
+# domain with yours. Caddy obtains + renews a real TLS cert automatically, serves
+# the built client statically, and proxies the WebSocket path to the Node server.
+#
+# Browsers require secure WebSockets (wss://) on a secure page (https://), so a
+# real domain pointed at the VPS is effectively required. A free DuckDNS-style
+# name works here too.
+#
+# After editing:  sudo systemctl reload caddy   (validate first: caddy validate --config /etc/caddy/Caddyfile)
+
+play.yourdomain.de {
+	# The built client (npm run build → dist/), copied to /srv/oathbound/dist.
+	root * /srv/oathbound/dist
+	encode gzip
+	file_server
+
+	# The Node game server (systemd, on 127.0.0.1) — proxy only the WebSocket path.
+	@ws path /ws
+	reverse_proxy @ws 127.0.0.1:8080
+
+	# SPA fallback: unknown non-file routes serve index.html so deep links work.
+	@notFound {
+		not path /ws*
+		file {
+			try_files {path} /index.html
+		}
+	}
+	rewrite @notFound {http.matchers.file.relative}
+
+	log {
+		output file /var/log/caddy/oathbound.log
+		format console
+	}
+}

@@ -66,10 +66,21 @@ async function main(): Promise<void> {
   await loadRequestedMap();
   // Online mode: ?server=<ws-url|host> connects to a running Oathbound server (M1). Without it,
   // the game runs the local single-player experience exactly as before.
-  const server = new URLSearchParams(location.search).get('server');
+  const params = new URLSearchParams(location.search);
+  const server = params.get('server');
   if (server) {
     const { bootOnline } = await import('./game/online');
-    bootOnline({ url: resolveServerUrl(server), name: new URLSearchParams(location.search).get('name') ?? undefined });
+    const cls = params.get('class');
+    const charParam = params.get('char');
+    const online = bootOnline({
+      url: resolveServerUrl(server),
+      user: params.get('user') ?? undefined,
+      pass: params.get('pass') ?? undefined,
+      char: charParam != null && charParam !== '' ? Number(charParam) : undefined,
+      className: cls === 'hunter' || cls === 'priest' || cls === 'warrior' ? cls : undefined,
+    });
+    // Keep the teardown handle reachable (e.g. for a future reload-free logout / hot-reload).
+    (window as unknown as { __oathboundOnline?: { stop(): void } }).__oathboundOnline = online;
     return;
   }
   runApp();

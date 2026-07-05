@@ -1,9 +1,9 @@
 {
   "name": "oathbound",
   "private": true,
-  "version": "0.7.2-INDEV",
+  "version": "0.8.0-ONLINE.7",
   "type": "module",
-  "description": "A solo-friendly 3D browser MMORPG (planning + early scaffold). See /docs.",
+  "description": "A solo-friendly 3D browser MMORPG — playable solo, or online with friends on a self-hosted server. See /docs.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -15,15 +15,19 @@
     "test:e2e": "playwright test",
     "server:dev": "tsx watch server/main.ts",
     "server:build": "esbuild server/main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist-server/server.mjs --packages=external",
-    "server:start": "node dist-server/server.mjs"
+    "server:start": "node dist-server/server.mjs",
+    "server:test": "tsx server/test/persistence.test.ts",
+    "server:loadtest": "tsx server/test/load.ts"
   },
   "dependencies": {
+    "better-sqlite3": "^12.11.1",
     "three": "^0.185.0",
     "ws": "^8.18.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.10.0",
     "@types/three": "^0.185.0",
     "@types/ws": "^8.5.13",

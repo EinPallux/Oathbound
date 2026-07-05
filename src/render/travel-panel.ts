@@ -62,7 +62,7 @@ export class TravelPanel {
     const cs = world.get<CombatState>(player, C.CombatState);
     if (!pt || !inv) return;
 
-    const dests = activatedOathstones(world);
+    const dests = activatedOathstones(world, player);
     const inCombat = cs?.inCombat ?? false;
     const gold = inv.gold;
 

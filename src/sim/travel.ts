@@ -10,6 +10,7 @@ import {
   type Inventory,
   type CombatState,
   type Respawn,
+  type WaypointUnlocks,
 } from '../core/ecs/components';
 import type { Heightfield } from '../world/heightfield';
 import { CombatEvent, type FastTraveledEvent } from './combat/events';
@@ -28,12 +29,14 @@ export interface TravelDestination {
   z: number;
 }
 
-/** All activated Oathstones (the discovered fast-travel network). */
-export function activatedOathstones(world: World): TravelDestination[] {
+/** The Oathstones THIS player has activated (their own discovered fast-travel network). */
+export function activatedOathstones(world: World, player: Entity): TravelDestination[] {
+  const unlocked = world.get<WaypointUnlocks>(player, C.WaypointUnlocks)?.ids;
+  if (!unlocked || unlocked.length === 0) return [];
   const out: TravelDestination[] = [];
   for (const e of world.query(C.Oathstone, C.Transform)) {
     const os = world.get<Oathstone>(e, C.Oathstone)!;
-    if (!os.activated) continue;
+    if (!unlocked.includes(os.id)) continue;
     const t = world.get<Transform>(e, C.Transform)!;
     out.push({ entity: e, id: os.id, name: os.name, x: t.x, z: t.z });
   }
@@ -53,7 +56,9 @@ export function fastTravel(
 ): TravelResult {
   const os = world.get<Oathstone>(destEntity, C.Oathstone);
   const dt = world.get<Transform>(destEntity, C.Transform);
-  if (!os || !os.activated || !dt) return { ok: false, reason: 'invalid' };
+  // The destination must be in THIS player's own unlocked set (not merely lit by someone else).
+  const unlocked = world.get<WaypointUnlocks>(player, C.WaypointUnlocks)?.ids;
+  if (!os || !dt || !unlocked || !unlocked.includes(os.id)) return { ok: false, reason: 'invalid' };
 
   const cs = world.get<CombatState>(player, C.CombatState);
   if (cs?.inCombat) return { ok: false, reason: 'combat' };

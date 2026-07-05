@@ -13,13 +13,68 @@ import { z } from 'zod';
 /** Bumped on any breaking change to the message shapes. Client & server must agree. */
 export const PROTOCOL_VERSION = 1;
 
+/** The three playable classes. */
+export const ClassIdSchema = z.enum(['warrior', 'hunter', 'priest']);
+
 // ── Client → Server ────────────────────────────────────────────────────────────────────────
 
-/** First message a client sends: announce protocol version + optional display name. */
-export const HelloMessage = z.object({
-  t: z.literal('hello'),
+/** Create a new account. `joinPassword` is required only if the server is locked (friends-only). */
+export const RegisterMessage = z.object({
+  t: z.literal('register'),
   protocol: z.number().int(),
-  name: z.string().min(1).max(24).optional(),
+  username: z.string().min(3).max(24),
+  password: z.string().min(6).max(200),
+  joinPassword: z.string().optional(),
+});
+
+/** Log in to an existing account. */
+export const LoginMessage = z.object({
+  t: z.literal('login'),
+  protocol: z.number().int(),
+  username: z.string().min(1).max(24),
+  password: z.string().min(1).max(200),
+});
+
+/** Resume a session with a previously-issued token (reconnect without re-entering the password). */
+export const ResumeMessage = z.object({
+  t: z.literal('resume'),
+  protocol: z.number().int(),
+  token: z.string().min(1).max(200),
+});
+
+/** Create a fresh character in a slot and enter the world as it. */
+export const CreateCharMessage = z.object({
+  t: z.literal('createChar'),
+  slot: z.number().int().min(0).max(2),
+  name: z.string().min(2).max(20),
+  classId: ClassIdSchema,
+});
+
+/** Enter the world as an existing character. */
+export const SelectCharMessage = z.object({
+  t: z.literal('selectChar'),
+  slot: z.number().int().min(0).max(2),
+});
+
+/** Delete a character slot. */
+export const DeleteCharMessage = z.object({
+  t: z.literal('deleteChar'),
+  slot: z.number().int().min(0).max(2),
+});
+
+/** One-time import of an offline (IndexedDB) save into a slot, then enter the world as it. */
+export const ImportCharMessage = z.object({
+  t: z.literal('importChar'),
+  slot: z.number().int().min(0).max(2),
+  name: z.string().min(2).max(20),
+  /** The offline SaveData JSON — structurally validated server-side before applying. */
+  save: z.unknown(),
+});
+
+/** A chat line from the client. `/who`, `/me …` etc. are handled server-side. */
+export const ChatMessage = z.object({
+  t: z.literal('chat'),
+  text: z.string().min(1).max(200),
 });
 
 /** Latency probe: `time` is the client's clock (ms) and is echoed back untouched. */
@@ -36,15 +91,15 @@ export const PingMessage = z.object({
  */
 export const InputMessage = z.object({
   t: z.literal('input'),
-  seq: z.number().int(),
+  seq: z.number().int().nonnegative(),
   forward: z.boolean(),
   back: z.boolean(),
   left: z.boolean(),
   right: z.boolean(),
-  yaw: z.number(),
+  yaw: z.number().finite(), // reject NaN/±Infinity — would poison the movement integration
   jump: z.boolean(),
-  /** Queued ability slot (0-based) this tick, or null/absent. (M2: fight over the wire.) */
-  ability: z.number().int().nullable().optional(),
+  /** Queued ability slot (0-based) this tick, or null/absent. Bounded to a sane hotbar range. */
+  ability: z.number().int().min(0).max(9).nullable().optional(),
   /** Interact pressed (F) — server-side loot pickup / vendor. */
   interact: z.boolean().optional(),
   /** Cycle target pressed (Tab). */
@@ -53,7 +108,18 @@ export const InputMessage = z.object({
 
 export type InputMessage = z.infer<typeof InputMessage>;
 
-export const ClientMessage = z.discriminatedUnion('t', [HelloMessage, PingMessage, InputMessage]);
+export const ClientMessage = z.discriminatedUnion('t', [
+  RegisterMessage,
+  LoginMessage,
+  ResumeMessage,
+  CreateCharMessage,
+  SelectCharMessage,
+  DeleteCharMessage,
+  ImportCharMessage,
+  ChatMessage,
+  PingMessage,
+  InputMessage,
+]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 
 // ── Server → Client ──────────────────────────────────────────────────────────────────────
@@ -75,6 +141,42 @@ export const PongMessage = z.object({
   t: z.literal('pong'),
   time: z.number(),
   serverTick: z.number().int(),
+});
+
+/** Authentication succeeded: a resumable session token + the account's username. */
+export const AuthOkMessage = z.object({
+  t: z.literal('authOk'),
+  token: z.string(),
+  username: z.string(),
+});
+
+/** A character roster entry. */
+export const CharSummary = z.object({
+  slot: z.number().int(),
+  name: z.string(),
+  classId: z.string(),
+  level: z.number().int(),
+});
+export type CharSummary = z.infer<typeof CharSummary>;
+
+/** The account's characters (sent after auth and after any create/delete). */
+export const CharListMessage = z.object({
+  t: z.literal('charList'),
+  chars: z.array(CharSummary),
+});
+
+/** A chat line to display: `from` is the sender's character name; `me` marks a /me emote. */
+export const ChatLineMessage = z.object({
+  t: z.literal('chatLine'),
+  from: z.string(),
+  text: z.string(),
+  me: z.boolean().optional(),
+});
+
+/** A server/system line (joins, leaves, level-ups, boss kills, MOTD, /who results). */
+export const SystemMessage = z.object({
+  t: z.literal('system'),
+  text: z.string(),
 });
 
 /** Reject/inform: a coded error (e.g. bad protocol version, malformed message). */
@@ -120,6 +222,10 @@ export const ServerMessage = z.discriminatedUnion('t', [
   PongMessage,
   ErrorMessage,
   SnapshotMessage,
+  AuthOkMessage,
+  CharListMessage,
+  ChatLineMessage,
+  SystemMessage,
 ]);
 export type ServerMessage = z.infer<typeof ServerMessage>;
 

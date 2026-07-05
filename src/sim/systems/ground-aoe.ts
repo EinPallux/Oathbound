@@ -2,7 +2,7 @@
 // enemy inside its radius on a fixed cadence, then expires. Pure simulation. The same
 // shape could later host friendly zones (e.g. a healing Consecration). See COMBAT_DESIGN.
 
-import type { System, World, Entity } from '../../core/ecs/world';
+import type { System, World } from '../../core/ecs/world';
 import {
   C,
   type GroundAoe,
@@ -55,25 +55,22 @@ function tickEnemies(world: World, g: GroundAoe, gt: Transform, rng: Rng): void 
   }
 }
 
-/** Boss heavy attack: a single telegraphed hit to the player if they didn't step out. */
+/** Boss heavy attack: a telegraphed hit to EVERY player still inside the radius (each player
+ *  who didn't step out of the telegraph takes it — multiplayer-correct; solo → the one player). */
 function tickPlayer(world: World, g: GroundAoe, gt: Transform, rng: Rng): void {
-  let player: Entity | null = null;
-  for (const p of world.query(C.PlayerControlled, C.Transform, C.Health)) {
-    player = p;
-    break;
+  for (const player of world.query(C.PlayerControlled, C.Transform, C.Health)) {
+    const h = world.get<Health>(player, C.Health)!;
+    if (h.current <= 0) continue;
+    const pt = world.get<Transform>(player, C.Transform)!;
+    if (Math.hypot(pt.x - gt.x, pt.z - gt.z) > g.radius) continue; // dodged the telegraph
+    const r = applyDamage(
+      world,
+      g.source,
+      player,
+      { base: g.base, coeff: g.coeff, damageType: g.damageType },
+      rng,
+      0,
+    );
+    if (r.killed) world.events.emit<PlayerDiedEvent>(CombatEvent.PlayerDied, { entity: player });
   }
-  if (player == null) return;
-  const h = world.get<Health>(player, C.Health)!;
-  if (h.current <= 0) return;
-  const pt = world.get<Transform>(player, C.Transform)!;
-  if (Math.hypot(pt.x - gt.x, pt.z - gt.z) > g.radius) return; // dodged the telegraph
-  const r = applyDamage(
-    world,
-    g.source,
-    player,
-    { base: g.base, coeff: g.coeff, damageType: g.damageType },
-    rng,
-    0,
-  );
-  if (r.killed) world.events.emit<PlayerDiedEvent>(CombatEvent.PlayerDied, { entity: player });
 }

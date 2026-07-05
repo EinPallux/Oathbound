@@ -41,6 +41,8 @@ export class TrapView {
     for (const [e, m] of this.rings) {
       if (seen.has(e)) continue;
       this.scene.remove(m);
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
       this.rings.delete(e);
     }
   }

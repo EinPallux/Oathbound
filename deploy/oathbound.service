@@ -1,0 +1,42 @@
+# Oathbound game server — systemd unit.
+# Install:  sudo cp deploy/oathbound.service /etc/systemd/system/oathbound.service
+#           sudo systemctl daemon-reload && sudo systemctl enable --now oathbound
+# Logs:     journalctl -u oathbound -f
+#
+# Config lives in /etc/oathbound/server.env (see deploy/server.env.example). The
+# server flushes every in-world character to SQLite on SIGTERM, so a normal
+# `systemctl restart/stop` never loses progress — TimeoutStopSec gives it room.
+
+[Unit]
+Description=Oathbound game server
+Documentation=https://github.com/EinPallux/Oathbound
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=oathbound
+Group=oathbound
+WorkingDirectory=/srv/oathbound
+EnvironmentFile=/etc/oathbound/server.env
+ExecStart=/usr/bin/node dist-server/server.mjs
+Restart=always
+RestartSec=3
+# Graceful shutdown: give the write-behind flush time to finish before SIGKILL.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# --- Hardening (safe for a single Node process that only needs its own dirs) ---
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# The only paths the service may write to: the DB dir and (optionally) backups.
+ReadWritePaths=/var/lib/oathbound /var/backups/oathbound
+# Keep the working tree read-only to the service; deploys run as the deploy user.
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

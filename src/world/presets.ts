@@ -58,7 +58,7 @@ const IRON = 0x24242a;
 const MUG_AMBER = 0xd9a441, MUG_FOAM = 0xf2ead2, MUG_HANDLE = 0xb07a2a;
 const BARREL = 0x7a5230, BARREL_HOOP = 0x4a3420, CRATE = 0x8a5a32, CRATE_DK = 0x5a3a1e;
 const LEAF = 0x4f7a34;
-// City buildings voxelised from public/new_assets reference art (Tudor: stone base, half-timber
+// City buildings voxelised from docs/assets/reference art (Tudor: stone base, half-timber
 // upper, warm terracotta tiled roofs, leaded glass, stone chimneys).
 const TILE = 0xa5513a, TILE_DK = 0x7f3b2b;      // terracotta roof tiles + ridge/shadow
 const TIMBER = 0x6a4630, TIMBER_DK = 0x47301f;  // half-timber frame
@@ -662,7 +662,7 @@ export const PRESET_ASSETS: AssetDef[] = [
     ...[4.0, 6.0, 8.0].map((y) => box(0x1a1712, 0.24, 1.2, 0.14, 0, y, 2.9)),
   ], 3.4),
 
-  // ── City buildings (voxelised from public/new_assets reference art) ──────────
+  // ── City buildings (voxelised from docs/assets/reference art) ──────────
   // Half-timbered Tudor houses, an inn, a church, a stable, a bathhouse, grand manors and a
   // stone fountain — stone ground floors, jettied timber upper storeys, warm terracotta roofs.
   def('city-house-1', 'Timbered House', 'structure', [

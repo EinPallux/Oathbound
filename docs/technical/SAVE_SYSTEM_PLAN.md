@@ -1,5 +1,7 @@
 # Save System Plan
 
+> **⚠️ Partially superseded by the MMO track (ADR-013).** The browser/offline save (this doc's subject) still stands. But "no remote database before the post-beta horizon" no longer holds: online play uses a **server-side SQLite** store as the durable authority (`server/db.ts`), through the same `serialize()`/`applySave()` boundary (`src/sim/save.ts`) as the offline path. See [VPS_HOSTING_GUIDE](./VPS_HOSTING_GUIDE.md) and [MMO_ARCHITECTURE](./MMO_ARCHITECTURE.md).
+
 The local beta must have **reliable persistence** with versioning, migration, and corruption recovery. Storage choice rationale: [ADR-005](../decisions/DECISION_RECORDS.md#adr-005-save-storage). No remote database before the [post-beta horizon](../production/POST_BETA_MMO_HORIZON.md).
 
 ## Storage

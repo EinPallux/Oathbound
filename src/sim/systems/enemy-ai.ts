@@ -20,6 +20,7 @@ import { resolveCircleVsCylinders } from '../collision';
 import { segmentBlockedByCylinders } from '../combat/targeting';
 import { applyDamage } from '../combat/apply';
 import { applyHeal } from '../combat/heal';
+import { topThreatPlayer, clearThreat } from '../combat/threat';
 import { addStatus, hasStatus, Status } from '../combat/statuses';
 import { CombatEvent, type PlayerDiedEvent, type RespawnEvent } from '../combat/events';
 import type { SpatialGrid } from '../spatial-grid';
@@ -71,6 +72,8 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
         });
       }
       if (players.length === 0) return;
+      const aliveSet = new Set<Entity>();
+      for (const pl of players) if (pl.alive) aliveSet.add(pl.e);
 
       enemies.length = 0;
       for (const e of world.query(C.Enemy, C.Transform, C.Velocity, C.Health)) enemies.push(e);
@@ -103,6 +106,18 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
             playerE = pl.e;
             pt = pl.t;
             playerAlive = false;
+          }
+        }
+
+        // Once players have built threat, target the highest-threat living one (multiplayer);
+        // before any threat exists (the pull), the nearest player above stands. Solo → unchanged.
+        const tp = topThreatPlayer(world, e, aliveSet);
+        if (tp != null) {
+          const tpt = world.get<Transform>(tp, C.Transform);
+          if (tpt) {
+            playerE = tp;
+            pt = tpt;
+            playerAlive = true;
           }
         }
 
@@ -213,11 +228,12 @@ export function createEnemyAiSystem(deps: EnemyAiDeps): System {
           const dhx = en.homeX - tr.x;
           const dhz = en.homeZ - tr.z;
           if (distHome <= 0.6) {
-            // Reached home: reset + heal to full.
+            // Reached home: reset + heal to full, and drop all aggro (fresh pull next time).
             en.state = 'idle';
             en.windupTimer = -1;
             en.invulnTimer = 0.5;
             h.current = h.max;
+            clearThreat(world, e);
             const ss = world.get<Statuses>(e, C.Statuses);
             if (ss) ss.list.length = 0;
           } else if (distHome > 1e-3) {
@@ -400,6 +416,7 @@ function respawn(
   h: Health,
   field: Heightfield,
 ): void {
+  clearThreat(world, e);
   en.state = 'idle';
   en.deadFor = 0;
   en.windupTimer = -1;

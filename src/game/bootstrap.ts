@@ -205,7 +205,9 @@ export function boot(options: BootOptions = {}): Game {
   const renderer = new Renderer(canvas);
   const keybinds = loadKeybinds();
   const input = new InputController(canvas, keybinds);
-  const overlay = new PerfOverlay(uiRoot);
+  // Dev-only devtool — kept out of production bundles' visible UI (still present in the dev server
+  // the e2e suite runs against).
+  const overlay = import.meta.env.DEV ? new PerfOverlay(uiRoot) : null;
   const sfx = new Sfx();
   const music = new Music();
 
@@ -415,10 +417,10 @@ export function boot(options: BootOptions = {}): Game {
   }
   const playerView = new PlayerView(renderer.scene);
   const ambientLife = new AmbientLife(renderer.scene);
-  // Buildings join the camera's occlusion obstacles so the chase camera springs off walls.
-  // (The voxel cube mesh is the terrain obstacle — raycast the mesh, not its wrapper group.)
-  const cameraObstacles: THREE.Object3D[] = [voxelTerrain.mesh, props, ...(village ? [village.buildings] : [])];
-  const cameraRig = new CameraRig(renderer.camera, input, cameraObstacles);
+  // Buildings/props are the camera's occlusion obstacles so the chase camera springs off walls.
+  // Terrain is handled analytically by the rig (heightfield sampling), not raycast — see CameraRig.
+  const cameraObstacles: THREE.Object3D[] = [props, ...(village ? [village.buildings] : [])];
+  const cameraRig = new CameraRig(renderer.camera, input, cameraObstacles, field);
   const enemyView = new EnemyView(renderer.scene);
   const lootView = new LootView(renderer.scene);
   const projectileView = new ProjectileView(renderer.scene, projectiles);
@@ -818,7 +820,7 @@ export function boot(options: BootOptions = {}): Game {
         `Lv ${prog.level}  HP ${Math.ceil(h.current)}/${h.max}  [${state}]\n` +
         `kills ${tel.kills}  ttk ${tel.avgTtk.toFixed(1)}s  ` +
         `down ${tel.avgDowntime.toFixed(1)}s  deaths ${tel.deaths}`;
-      overlay.update(frameMs, renderer.drawCalls, world.entityCount, steps, extra);
+      overlay?.update(frameMs, renderer.drawCalls, world.entityCount, steps, extra);
     },
   });
   loop.start();
@@ -886,7 +888,11 @@ export function boot(options: BootOptions = {}): Game {
       const primary = cls.primaryStatId === 'VIT' ? 'STR' : cls.primaryStatId;
       addItem(world, player, generateItem(rng, { ilvl: prog.level, slot: 'weapon', rarity, primaryStat: primary }));
     },
-    save: () => writeSave(serialize(world, player)),
+    save: () => {
+      const data = serialize(world, player);
+      data.quests = questLog.toSave(); // keep quest progress (serialize() doesn't capture it)
+      return writeSave(data);
+    },
     stop: () => {
       loop.stop();
       input.dispose();

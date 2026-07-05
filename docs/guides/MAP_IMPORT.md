@@ -37,7 +37,7 @@ Copy the downloaded file into this folder:
 Oathbound/
 └─ public/
    └─ maps/
-      ├─ sample.oathbound-map.json        ← the bundled demo
+      ├─ talar.oathbound-map.json        ← the bundled map (Talar)
       └─ my-world.oathbound-map.json      ← your map goes here
 ```
 
@@ -52,19 +52,20 @@ part. (Typing the full `…oathbound-map.json` or `.json` suffix also works — 
 | File in `public/maps/` | URL to load it |
 |---|---|
 | `my-world.oathbound-map.json` | `…/?map=my-world` |
-| `sample.oathbound-map.json` | `…/?map=sample` |
+| `talar.oathbound-map.json` | `…/?map=talar` |
 
 - **Local dev:** run `npm run dev`, then open `http://localhost:5173/?map=my-world`.
   (Vite serves `public/` live — just add the file and refresh, no restart needed.)
-- **Deployed (Vercel):** `https://your-game.vercel.app/?map=my-world` — but the file must be
-  **committed to the repo** first (see *Shipping a map* below), because `public/` is bundled at build time.
+- **Deployed:** `https://your-host/?map=my-world` — but the file must be **committed to the repo**
+  first (see *Shipping a map* below), because `public/` is bundled at build time. (Applies to both
+  the static/solo build and the online VPS build, where Caddy serves the built `dist/`.)
 
 > **Console says “Unexpected token '<' … is not valid JSON”?** That means the game fetched a
 > **web page (HTML), not your map** — i.e. the file isn’t at `public/maps/<name>.oathbound-map.json`.
 > Check the file is in `public/maps/` (and, when deployed, committed + redeployed) and that the
 > `?map=` name matches the filename. The loader now prints exactly which path it tried.
 
-Try the included demo right now: **`?map=sample`**.
+Try the included demo right now: **`?map=talar`**.
 
 ---
 

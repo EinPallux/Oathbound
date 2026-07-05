@@ -1,0 +1,17 @@
+# Oneshot backup job, triggered by oathbound-backup.timer. Runs the online
+# SQLite backup as the service user. Install alongside the .timer:
+#   sudo cp deploy/oathbound-backup.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now oathbound-backup.timer
+# Logs:  journalctl -u oathbound-backup
+
+[Unit]
+Description=Oathbound nightly SQLite backup
+After=oathbound.service
+
+[Service]
+Type=oneshot
+User=oathbound
+Group=oathbound
+WorkingDirectory=/srv/oathbound
+EnvironmentFile=-/etc/oathbound/server.env
+ExecStart=/srv/oathbound/deploy/backup.sh

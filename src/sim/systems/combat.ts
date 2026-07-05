@@ -90,6 +90,13 @@ export function createCombatSystem(deps: CombatDeps): System {
         // Per-player intent: each player fires abilities / targets via its own PlayerInput.
         const input = world.get<ControlState>(e, C.PlayerInput) ?? defaultInput;
         if (!input) continue;
+        // Dead players can't act — drain queued edge-triggers so nothing fires on respawn.
+        const ph = world.get<Health>(e, C.Health);
+        if (ph && ph.current <= 0) {
+          input.consumeAbility();
+          input.consumeTargetCycle();
+          continue;
+        }
         const t = world.get<Transform>(e, C.Transform)!;
         const off = world.get<Offense>(e, C.Offense)!;
         const ab = world.get<AbilityState>(e, C.AbilityState)!;

@@ -82,6 +82,14 @@ export function createRecoverySystem(deps: RecoveryDeps): System {
           if (shield.remaining <= 0) shield.amount = 0;
         }
       }
+
+      // Prune timers for entities destroyed while dead (e.g. the server reaped a disconnected
+      // player mid-respawn) so the map can't accumulate stale keys over a long uptime.
+      if (deadTimers.size > 0) {
+        for (const e of deadTimers.keys()) {
+          if (world.get<Health>(e, C.Health) === undefined) deadTimers.delete(e);
+        }
+      }
     },
   };
 }

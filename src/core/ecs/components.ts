@@ -39,6 +39,10 @@ export const C = {
   Boss: 'boss',
   RelicMods: 'relicMods',
   RelicCollection: 'relicCollection',
+  /** Per-enemy multiplayer threat table (which players it has aggro on, and how much). */
+  Threat: 'threat',
+  /** Per-player set of activated Oathstone ids (the player's own fast-travel network). */
+  WaypointUnlocks: 'waypointUnlocks',
 } as const;
 
 /**
@@ -240,6 +244,15 @@ export interface Boss {
   heavyBase: number;
   heavyCoeff: number;
   heavyType: DamageType;
+  /** Unscaled max HP (captured on first sight); the base a solo pull uses. */
+  baseMaxHp?: number;
+  /** Player count this pull was scaled for (0 = not yet scaled / reset). */
+  scaledForPlayers?: number;
+}
+
+/** Multiplayer threat: how much aggro each player (by entity id) has built on this enemy. */
+export interface Threat {
+  table: Map<number, number>;
 }
 
 // ── Progression ─────────────────────────────────────────────────────────────
@@ -278,11 +291,18 @@ export interface PlayerClass {
   choices?: Record<string, number>;
 }
 
-/** A waypoint shrine: activates on first visit, then serves as a respawn + fast-travel node. */
+/** A waypoint shrine. `activated` is a purely cosmetic "has anyone lit this" flag for the world
+ *  view (obelisk glow, minimap); who may actually respawn/fast-travel here is per-player, tracked
+ *  by the `WaypointUnlocks` component so unlocks never leak between characters in a shared world. */
 export interface Oathstone {
   id: string;
   name: string;
   activated: boolean;
+}
+
+/** A player's own set of activated Oathstone ids — their personal fast-travel network. */
+export interface WaypointUnlocks {
+  ids: string[];
 }
 
 /** A vendor you can sell to (interact with F). */

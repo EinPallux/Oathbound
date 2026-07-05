@@ -25,6 +25,7 @@ import {
   type Vendor,
   type LootLuck,
   type RelicCollection,
+  type WaypointUnlocks,
 } from '../core/ecs/components';
 import type { Heightfield } from '../world/heightfield';
 import { getClass, kitLength } from './classes';
@@ -97,6 +98,7 @@ export function createPlayer(
   world.set<Respawn>(e, C.Respawn, { x, z });
   world.set<LootLuck>(e, C.LootLuck, { pity: 0 });
   world.set<RelicCollection>(e, C.RelicCollection, { discovered: [] });
+  world.set<WaypointUnlocks>(e, C.WaypointUnlocks, { ids: [] });
 
   recomputeDerived(world, e);
   const h = world.get<Health>(e, C.Health)!;
@@ -135,10 +137,6 @@ export function createBloomhusk(world: World, field: Heightfield, x: number, z: 
 
 export function createReaver(world: World, field: Heightfield, x: number, z: number, level = 1): Entity {
   return spawnEnemy(world, field, 'reaver', x, z, { level });
-}
-
-export function createWisp(world: World, field: Heightfield, x: number, z: number, level = 1): Entity {
-  return spawnEnemy(world, field, 'wisp', x, z, { level });
 }
 
 // ── World props ──────────────────────────────────────────────────────────────

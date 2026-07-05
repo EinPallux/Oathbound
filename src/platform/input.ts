@@ -127,6 +127,13 @@ export class InputController implements ControlState {
   private readonly onWheel = (e: WheelEvent): void => {
     this.dist = clamp(this.dist + Math.sign(e.deltaY) * 1, 4, 22);
   };
+  // Losing keyboard focus (Alt-Tab, OS focus steal, switching tabs) eats the matching keyup, so
+  // a held movement key would stay "down" and auto-run the character forever. Clear all held
+  // state whenever we lose focus / become hidden.
+  private readonly onBlur = (): void => this.clearHeld();
+  private readonly onVisibility = (): void => {
+    if (document.hidden) this.clearHeld();
+  };
 
   constructor(private readonly el: HTMLElement, keybinds: Keybinds = DEFAULT_KEYBINDS) {
     this.setKeybinds(keybinds);
@@ -144,6 +151,15 @@ export class InputController implements ControlState {
     document.addEventListener('pointerlockchange', this.onPointerLockChange);
     document.addEventListener('pointerlockerror', this.onPointerLockError);
     el.addEventListener('wheel', this.onWheel, { passive: true });
+    window.addEventListener('blur', this.onBlur);
+    document.addEventListener('visibilitychange', this.onVisibility);
+  }
+
+  /** Drop all held movement + the active drag (called on focus loss so nothing sticks "down"). */
+  private clearHeld(): void {
+    this.forward = this.back = this.left = this.right = false;
+    this.dragging = false;
+    this.el.style.cursor = '';
   }
 
   /** Ask the browser to pin the cursor for camera-look. No-op / silent if unsupported. */
@@ -343,6 +359,8 @@ export class InputController implements ControlState {
     document.removeEventListener('pointerlockchange', this.onPointerLockChange);
     document.removeEventListener('pointerlockerror', this.onPointerLockError);
     this.el.removeEventListener('wheel', this.onWheel);
+    window.removeEventListener('blur', this.onBlur);
+    document.removeEventListener('visibilitychange', this.onVisibility);
     if (document.pointerLockElement === this.el) document.exitPointerLock();
     this.el.style.cursor = '';
   }

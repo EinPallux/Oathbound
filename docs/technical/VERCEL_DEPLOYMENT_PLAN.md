@@ -1,5 +1,7 @@
 # Vercel Deployment Plan
 
+> **⚠️ Applies to the SOLO/offline build only (superseded for online by ADR-013).** The static Vercel path here still works for the solo game. Online play is **not** static/serverless — it runs an authoritative Node server + SQLite on a Linux VPS (Caddy serves the client and proxies the WebSocket). See [VPS_HOSTING_GUIDE](./VPS_HOSTING_GUIDE.md) and the [`deploy/`](../../deploy/README.md) kit.
+
 Oathbound ships as a **static single-page app** built by Vite and served from Vercel's CDN. **No backend, serverless functions, database, or accounts** for 1.0-BETA (per the brief and [DEFERRED_FEATURES](../production/DEFERRED_FEATURES.md)).
 
 ## Build & output

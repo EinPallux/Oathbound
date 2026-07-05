@@ -1,8 +1,8 @@
 // Performance overlay devtool: a DOM panel showing FPS, frame time, draw calls,
 // entity count, sim steps, and an optional extra line. Planned devtool per
-// docs/qa/TEST_STRATEGY.md. Excluded from production builds in a later phase.
+// docs/qa/TEST_STRATEGY.md. Created only in dev builds (gated in bootstrap by import.meta.env.DEV).
 
-const VERSION = '0.7.2-INDEV';
+const VERSION = '0.8.0-ONLINE.7';
 
 export class PerfOverlay {
   private readonly el: HTMLDivElement;
