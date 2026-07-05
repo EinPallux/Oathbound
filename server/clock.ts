@@ -13,6 +13,10 @@ export class ServerClock {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private nextTickAt = 0;
   private tickCount = 0;
+  // Step-duration stats since the last takeStats() (for the heartbeat / load test).
+  private sumStepMs = 0;
+  private stepSamples = 0;
+  private maxStepMs = 0;
 
   constructor(
     private readonly step: StepFn,
@@ -22,6 +26,16 @@ export class ServerClock {
   /** Total ticks advanced since start (also the authoritative server tick number). */
   get ticks(): number {
     return this.tickCount;
+  }
+
+  /** Average + peak sim-step time (ms) since the last call, then reset. */
+  takeStats(): { avgMs: number; maxMs: number; samples: number } {
+    const avgMs = this.stepSamples > 0 ? this.sumStepMs / this.stepSamples : 0;
+    const stats = { avgMs, maxMs: this.maxStepMs, samples: this.stepSamples };
+    this.sumStepMs = 0;
+    this.stepSamples = 0;
+    this.maxStepMs = 0;
+    return stats;
   }
 
   start(): void {
@@ -47,7 +61,12 @@ export class ServerClock {
 
     let ran = 0;
     while (now >= this.nextTickAt && ran < maxCatchUp) {
+      const t0 = performance.now();
       this.step(DT);
+      const stepMs = performance.now() - t0;
+      this.sumStepMs += stepMs;
+      this.stepSamples++;
+      if (stepMs > this.maxStepMs) this.maxStepMs = stepMs;
       this.tickCount++;
       this.nextTickAt += period;
       ran++;

@@ -37,7 +37,11 @@ function main(): void {
     const now = performance.now();
     const elapsed = (now - lastAt) / 1000;
     const rate = (game.tick - lastTicks) / elapsed;
-    console.log(`[oathbound] tick ${game.tick} · ${rate.toFixed(1)} Hz · clients ${game.playerCount}`);
+    const s = clock.takeStats();
+    console.log(
+      `[oathbound] tick ${game.tick} · ${rate.toFixed(1)} Hz · clients ${game.playerCount}` +
+        ` · step avg ${s.avgMs.toFixed(2)}ms max ${s.maxMs.toFixed(2)}ms (budget ${(1000 / config.tickHz).toFixed(0)}ms)`,
+    );
     lastTicks = game.tick;
     lastAt = now;
   }, 5000);
@@ -61,6 +65,8 @@ function main(): void {
   };
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
+  // `/admin shutdown [s]` schedules a graceful exit after the warning window.
+  game.onShutdown = (seconds) => setTimeout(() => shutdown('admin shutdown'), seconds * 1000);
 }
 
 main();

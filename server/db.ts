@@ -13,6 +13,7 @@ export interface AccountRow {
   pass_hash: Buffer;
   pass_salt: Buffer;
   is_admin: number;
+  is_banned: number;
 }
 
 export interface CharacterSummary {
@@ -83,6 +84,10 @@ const MIGRATIONS: { name: string; sql: string }[] = [
       );
     `,
   },
+  {
+    name: '002_bans',
+    sql: `ALTER TABLE accounts ADD COLUMN is_banned INTEGER NOT NULL DEFAULT 0;`,
+  },
 ];
 
 export class Db {
@@ -123,18 +128,26 @@ export class Db {
 
   findAccountByUsername(username: string): AccountRow | undefined {
     return this.db
-      .prepare('SELECT id, username, pass_hash, pass_salt, is_admin FROM accounts WHERE username = ?')
+      .prepare('SELECT id, username, pass_hash, pass_salt, is_admin, is_banned FROM accounts WHERE username = ?')
       .get(username) as AccountRow | undefined;
   }
 
   getAccount(id: number): AccountRow | undefined {
     return this.db
-      .prepare('SELECT id, username, pass_hash, pass_salt, is_admin FROM accounts WHERE id = ?')
+      .prepare('SELECT id, username, pass_hash, pass_salt, is_admin, is_banned FROM accounts WHERE id = ?')
       .get(id) as AccountRow | undefined;
   }
 
   touchLogin(accountId: number): void {
     this.db.prepare('UPDATE accounts SET last_login_at = ? WHERE id = ?').run(Date.now(), accountId);
+  }
+
+  setAdmin(accountId: number, admin: boolean): void {
+    this.db.prepare('UPDATE accounts SET is_admin = ? WHERE id = ?').run(admin ? 1 : 0, accountId);
+  }
+
+  setBanned(accountId: number, banned: boolean): void {
+    this.db.prepare('UPDATE accounts SET is_banned = ? WHERE id = ?').run(banned ? 1 : 0, accountId);
   }
 
   // ── Sessions ──

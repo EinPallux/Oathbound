@@ -1,0 +1,15 @@
+# Fires the nightly Oathbound backup at 04:00 local time (with a randomized delay
+# and catch-up if the box was asleep). See oathbound-backup.service.
+#   sudo systemctl enable --now oathbound-backup.timer
+#   systemctl list-timers oathbound-backup.timer
+
+[Unit]
+Description=Nightly Oathbound SQLite backup timer
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

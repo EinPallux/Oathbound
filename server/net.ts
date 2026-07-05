@@ -19,8 +19,6 @@ const RL_CAPACITY = 60;
 const RL_REFILL_PER_SEC = 45;
 /** Drop this many over-rate messages from one connection, then disconnect the flooder. */
 const RL_MAX_DROPPED = 200;
-/** Max simultaneous connections from a single IP. */
-const MAX_CONN_PER_IP = 8;
 
 function send(ws: WebSocket, msg: ServerMessage): void {
   if (ws.readyState === WebSocket.OPEN) ws.send(encode(msg));
@@ -31,7 +29,7 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     const ip = req.socket.remoteAddress ?? 'unknown';
-    if ((ipCounts.get(ip) ?? 0) >= MAX_CONN_PER_IP) {
+    if ((ipCounts.get(ip) ?? 0) >= game.maxConnPerIp) {
       ws.close(1008, 'too many connections');
       return;
     }

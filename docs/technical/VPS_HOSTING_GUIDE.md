@@ -1,6 +1,6 @@
 # VPS Hosting Guide — what to buy and how to run the server
 
-Everything the owner needs to pick a VPS, set it up, and run the Oathbound server for friends. Architecture context: [MMO_ARCHITECTURE](./MMO_ARCHITECTURE.md); the ops phase that finalizes the scripts referenced here is [M7](../production/MMO_ROADMAP.md#m7--ops--hardening-the-vps-is-a-product-now).
+Everything the owner needs to pick a VPS, set it up, and run the Oathbound server for friends. Architecture context: [MMO_ARCHITECTURE](./MMO_ARCHITECTURE.md); the ops phase that finalized the scripts referenced here is [M7](../production/MMO_ROADMAP.md#m7--ops--hardening-the-vps-is-a-product-now). **All the scripts and config files below ship in [`deploy/`](../../deploy/README.md)** — this guide is the narrative; that directory is the copy-pasteable source of truth.
 
 ## 1. Why the requirements are small
 
@@ -47,78 +47,44 @@ One box serves both the game client (no Vercel needed for online play; Vercel ca
 
 ## 4. Initial setup (once, ~30 minutes)
 
+The whole provisioning below is automated by **[`deploy/setup.sh`](../../deploy/setup.sh)** — one idempotent script that installs Node 22 + Caddy, creates the non-root `oathbound` service user, lays out `/var/lib/oathbound` + `/var/backups/oathbound`, opens the firewall, and installs the systemd units + nightly backup timer:
+
 ```bash
-# as root on the fresh Ubuntu 24.04 VPS
-adduser oathbound && usermod -aG sudo oathbound        # non-root admin user; put your SSH key in place
-apt update && apt -y upgrade
-apt -y install ufw git build-essential python3          # build-essential/python3: better-sqlite3 native build
-ufw allow OpenSSH && ufw allow 80/tcp && ufw allow 443/tcp && ufw enable
-
-# Node 22 LTS (NodeSource)
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt -y install nodejs
-
-# Caddy (auto-HTTPS reverse proxy) — official apt repo, see caddyserver.com/docs/install
-apt -y install debian-keyring debian-archive-keyring apt-transport-https curl
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
-apt update && apt -y install caddy
+# as root on a fresh Ubuntu 24.04 VPS, with the repo cloned to /srv/oathbound
+# (point your domain's DNS A record at the VPS IP first, so Caddy can get a cert)
+git clone https://github.com/EinPallux/Oathbound /srv/oathbound
+sudo bash /srv/oathbound/deploy/setup.sh play.yourdomain.de
 ```
 
-`/etc/caddy/Caddyfile` (replace the domain):
+What it installs, and the files it copies into place (edit these, then `sudo systemctl reload caddy`):
 
-```
-play.yourdomain.de {
-    root * /srv/oathbound/dist
-    file_server
-    @ws path /ws
-    reverse_proxy @ws 127.0.0.1:8080
-    encode gzip
-}
-```
+- **[`deploy/Caddyfile`](../../deploy/Caddyfile)** → `/etc/caddy/Caddyfile` — auto-TLS, serves `dist/`, proxies `/ws` → `127.0.0.1:8080` (the domain arg to `setup.sh` is substituted in).
+- **[`deploy/oathbound.service`](../../deploy/oathbound.service)** → `/etc/systemd/system/` — the game server (auto-restart, graceful SIGTERM flush, `ReadWritePaths` sandboxing).
+- **[`deploy/server.env.example`](../../deploy/server.env.example)** → `/etc/oathbound/server.env` — all config knobs (port, map, join password, admins, autosave, seed).
+- **[`deploy/oathbound-backup.{service,timer}`](../../deploy/)** → `/etc/systemd/system/` — the nightly backup job.
 
-`/etc/systemd/system/oathbound.service`:
-
-```ini
-[Unit]
-Description=Oathbound game server
-After=network-online.target
-
-[Service]
-User=oathbound
-WorkingDirectory=/srv/oathbound
-ExecStart=/usr/bin/node dist-server/server.mjs
-Environment=OATHBOUND_DB=/var/lib/oathbound/oathbound.db
-Restart=always
-RestartSec=3
-# graceful shutdown: server flushes all characters to SQLite on SIGTERM
-TimeoutStopSec=30
-
-[Install]
-WantedBy=multi-user.target
-```
+If you'd rather do it by hand, the script is short and readable — follow it step by step.
 
 ## 5. Deploying the game (every update)
 
-M7 ships this as `scripts/deploy.sh`; conceptually:
+M7 ships this as **[`deploy/deploy.sh`](../../deploy/deploy.sh)** — run it from the checkout on the box:
 
 ```bash
-git pull                     # on the VPS, /srv/oathbound checkout of the repo
-npm ci
-npm run build                # client → dist/
-npm run server:build         # server → dist-server/
-sudo systemctl restart oathbound   # runs DB migrations at boot, then serves
+cd /srv/oathbound && git pull && deploy/deploy.sh
 ```
+
+It runs `npm ci` → `npm run build` (client → `dist/`) → `npm run server:build` (server → `dist-server/`) → `sudo systemctl restart oathbound`. DB migrations run automatically at server boot; the restart is graceful (every in-world character is flushed to SQLite on SIGTERM first).
 
 (Alternative the guide also supports: build locally / in CI and `rsync` the two dist folders — no toolchain on the box.)
 
 ## 6. Server configuration
 
-`server.toml` (or env vars): port, map name (`talar` or any AdminTools-built map placed in `dist/maps/`), max players, join password (friends-only lock), admin usernames, autosave interval, RNG seed. Documented defaults ship in the repo.
+Config is env-based, read by the systemd unit from `/etc/oathbound/server.env` (copied from **[`deploy/server.env.example`](../../deploy/server.env.example)**): port, map name (`talar` or any AdminTools-built map placed in `public/maps/`), join password (friends-only lock), admin usernames, autosave interval, snapshot rate, RNG seed. Every value has a sensible default (see `server/config.ts`) — uncomment only what you want to change.
 
 ## 7. Backups
 
-- **Nightly cron** (installed by M7): `sqlite3 /var/lib/oathbound/oathbound.db ".backup /var/backups/oathbound/$(date +%F).db"` + gzip + rotate (keep 7 daily / 4 weekly). WAL mode makes online backups safe while the server runs.
-- Restore drill (tested in M7): stop service → copy backup over the DB path → start service.
+- **Nightly systemd timer** (installed by `setup.sh`): **[`deploy/backup.sh`](../../deploy/backup.sh)** runs a WAL-safe online SQLite backup → gzip → rotate (keep 7 daily). It uses the better-sqlite3 driver the server already bundles, so no extra `sqlite3` package is required (it will use the `sqlite3` CLI if one is present). WAL mode makes the backup safe while the server runs — nothing is stopped. Run one on demand with `sudo -u oathbound /srv/oathbound/deploy/backup.sh`; check the schedule with `systemctl list-timers oathbound-backup.timer`.
+- **Restore drill** (tested in M7, and re-run in the M7 verify): **[`deploy/restore.sh`](../../deploy/restore.sh)** stops the service, validates the archive is a real SQLite DB, keeps the current DB as `oathbound.db.pre-restore`, swaps in the backup (dropping stale WAL/SHM), and restarts — `sudo /srv/oathbound/deploy/restore.sh` restores the newest backup, or pass a specific `*.db.gz`. The drill was verified end-to-end: an online backup taken against a live (WAL-hot) DB, a subsequent write, then a restore that correctly rolled back to the backup's state.
 - Optional belt-and-braces: provider snapshots (tick the box at purchase) and/or Litestream replication to any S3-compatible bucket.
 
 ## 8. Operating checklist
@@ -127,10 +93,20 @@ sudo systemctl restart oathbound   # runs DB migrations at boot, then serves
 |---|---|
 | Status / logs | `systemctl status oathbound` · `journalctl -u oathbound -f` |
 | Who's online | `/who` in-game, or the admin command channel |
-| Update game | `scripts/deploy.sh` (section 5) |
+| Update game | `deploy/deploy.sh` (section 5) |
+| Backup now / restore | `deploy/backup.sh` · `deploy/restore.sh` (section 7) |
 | OS patches | `apt upgrade` monthly; `unattended-upgrades` is fine to enable |
 | Disk/RAM glance | `df -h`, `free -h` — the game should never be the problem at this scale |
 
 ## 9. Capacity honesty
 
-The 2 vCPU/4 GB box is validated by the M7 bot soak (20 simulated players; tick time must stay ≤ ~16 ms of the 33 ms budget). If the friend group ever outgrows it, the levers are, in order: interest-radius snapshots → delta encoding → a bigger single box (the sim is single-core-bound, so prefer faster cores over more cores). Multi-process sharding is deliberately out of scope.
+The 2 vCPU/4 GB box is validated by the M7 bot soak (`npm run server:loadtest`, 20 simulated players moving + fighting). **Measured result** (20/20 bots connected, on a shared dev container — a real VPS core is faster):
+
+| Metric | Measured | Budget / note |
+|---|---|---|
+| Sim step time | **avg ~0.6 ms · max ~1.85 ms** | 33 ms budget → ~2% used, comfortably under the ≤16 ms gate |
+| Downstream per player | **~280 kbit/s** | higher than the sparse ~15–40 kbit/s estimate because snapshots currently carry **all** entities (no interest management yet) |
+| Aggregate downstream (20) | **~5.6 Mbit/s** | a rounding error on a 1 Gbps port |
+| Snapshot rate per player | ~15/s | matches `OATHBOUND_SNAPSHOT_HZ=15` |
+
+The honest finding: **CPU is a non-issue at friends scale** (the sim barely registers), and **bandwidth is the first thing that would grow** — it scales with players × entities because every player currently gets the whole world each snapshot. It's still trivial here, but that's the lever that moves first. So if the friend group ever outgrows this box, the order is: **interest-radius snapshots** (only send nearby entities — the big win) → delta encoding → a bigger single box (the sim is single-core-bound, so prefer faster cores over more cores). Multi-process sharding is deliberately out of scope.

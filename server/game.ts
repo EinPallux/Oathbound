@@ -34,6 +34,8 @@ interface ConnectedPlayer {
   slot: number;
   /** Character display name (for chat + presence). */
   name: string;
+  /** Whether this account may use /admin commands. */
+  isAdmin: boolean;
   /** Per-player chat throttle (5 lines, ~1/s sustained) to curb spam. */
   chatLimiter: RateLimiter;
 }
@@ -96,6 +98,9 @@ export class GameServer {
   get needsJoinPassword(): boolean {
     return this.config.joinPassword !== '';
   }
+  get maxConnPerIp(): number {
+    return this.config.maxConnPerIp;
+  }
 
   // ── Accounts / auth ──────────────────────────────────────────────────────────────────────
 
@@ -116,6 +121,7 @@ export class GameServer {
     if (!acc || !verifyPassword(password, acc.pass_hash, acc.pass_salt)) {
       return { ok: false, code: 'bad_credentials', message: 'wrong username or password' };
     }
+    if (acc.is_banned) return { ok: false, code: 'banned', message: 'this account is banned' };
     this.db.touchLogin(acc.id);
     return this.issueSession(acc.id, acc.username);
   }
@@ -124,11 +130,13 @@ export class GameServer {
     const accountId = this.db.findSessionAccount(hashToken(token));
     if (accountId == null) return null;
     const acc = this.db.getAccount(accountId);
-    if (!acc) return null;
+    if (!acc || acc.is_banned) return null;
     return { accountId, username: acc.username };
   }
 
   private issueSession(accountId: number, username: string): AuthResult {
+    // Auto-promote configured admins (OATHBOUND_ADMINS) on each login.
+    if (this.config.admins.includes(username.toLowerCase())) this.db.setAdmin(accountId, true);
     const { token, tokenHash } = newSessionToken();
     this.db.createSession(accountId, tokenHash, Date.now() + SESSION_TTL_MS);
     return { ok: true, token, username, accountId };
@@ -231,8 +239,12 @@ export class GameServer {
   }
 
   private makeClient(entity: Entity, input: NetworkControlState, accountId: number, slot: number, name: string): ConnectedPlayer {
-    return { entity, input, accountId, slot, name, chatLimiter: new RateLimiter(5, 1, Date.now()) };
+    const isAdmin = (this.db.getAccount(accountId)?.is_admin ?? 0) === 1;
+    return { entity, input, accountId, slot, name, isAdmin, chatLimiter: new RateLimiter(5, 1, Date.now()) };
   }
+
+  /** Set by main so `/admin shutdown` can trigger a graceful exit. */
+  onShutdown?: (seconds: number) => void;
 
   // ── In-world tick / input / persistence ──────────────────────────────────────────────────
 
@@ -375,9 +387,83 @@ export class GameServer {
       this.sendTo(ws, { t: 'system', text: `Online (${names.length}): ${names.join(', ')}` });
     } else if (cmd === 'me' && arg) {
       this.sendAll({ t: 'chatLine', from: p.name, text: arg, me: true });
+    } else if (cmd === 'admin') {
+      if (!p.isAdmin) {
+        this.sendTo(ws, { t: 'system', text: 'You are not an admin.' });
+        return;
+      }
+      this.adminCommand(ws, arg);
     } else {
       this.sendTo(ws, { t: 'system', text: `Unknown command: /${cmd}` });
     }
+  }
+
+  private adminCommand(ws: WebSocket, arg: string): void {
+    const sp = arg.indexOf(' ');
+    const sub = (sp === -1 ? arg : arg.slice(0, sp)).toLowerCase();
+    const rest = sp === -1 ? '' : arg.slice(sp + 1).trim();
+    switch (sub) {
+      case 'broadcast':
+        if (rest) this.sendAll({ t: 'system', text: `[Broadcast] ${rest}` });
+        break;
+      case 'kick':
+        this.adminKick(ws, rest);
+        break;
+      case 'ban':
+        this.adminBan(ws, rest);
+        break;
+      case 'save':
+        this.flushAll();
+        this.sendTo(ws, { t: 'system', text: 'All characters saved.' });
+        break;
+      case 'shutdown': {
+        const seconds = Math.max(0, Math.min(3600, parseInt(rest, 10) || 30));
+        this.sendAll({ t: 'system', text: `Server shutting down in ${seconds}s. Please log out safely.` });
+        this.onShutdown?.(seconds);
+        break;
+      }
+      case 'who': {
+        const rows = [...this.clients.values()].map((c) => `${c.name}${c.isAdmin ? '*' : ''} (acct ${c.accountId})`);
+        this.sendTo(ws, { t: 'system', text: `Admin who (${rows.length}): ${rows.join(', ')}` });
+        break;
+      }
+      default:
+        this.sendTo(ws, {
+          t: 'system',
+          text: 'Admin: /admin broadcast <msg> | kick <name> | ban <name> | save | shutdown [s] | who',
+        });
+    }
+  }
+
+  private findByName(name: string): WebSocket | null {
+    const lower = name.toLowerCase();
+    for (const [ws, c] of this.clients) if (c.name.toLowerCase() === lower) return ws;
+    return null;
+  }
+
+  private adminKick(admin: WebSocket, name: string): void {
+    const target = this.findByName(name);
+    if (!target) {
+      this.sendTo(admin, { t: 'system', text: `No player named "${name}" is online.` });
+      return;
+    }
+    this.sendTo(target, { t: 'system', text: 'You have been kicked by an admin.' });
+    const who = this.clients.get(target)?.name ?? name;
+    target.close(1000, 'kicked');
+    this.broadcastSystem(`${who} was kicked.`);
+  }
+
+  private adminBan(admin: WebSocket, name: string): void {
+    const target = this.findByName(name);
+    if (!target) {
+      this.sendTo(admin, { t: 'system', text: `No player named "${name}" is online.` });
+      return;
+    }
+    const c = this.clients.get(target)!;
+    this.db.setBanned(c.accountId, true);
+    this.sendTo(target, { t: 'system', text: 'You have been banned.' });
+    target.close(1000, 'banned');
+    this.broadcastSystem(`${c.name} was banned.`);
   }
 
   private nameOf(entity: Entity): string | undefined {

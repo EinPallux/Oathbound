@@ -30,6 +30,10 @@ export interface ServerConfig {
   saveIntervalS: number;
   /** Message of the day, sent to each player as they enter the world. */
   motd: string;
+  /** Usernames (lower-cased) auto-promoted to admin on login (from OATHBOUND_ADMINS, comma-sep). */
+  admins: string[];
+  /** Max simultaneous connections from one IP (raise for a local load test). */
+  maxConnPerIp: number;
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -57,5 +61,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     joinPassword: env.OATHBOUND_JOIN_PASSWORD ?? '',
     saveIntervalS: intEnv(env.OATHBOUND_SAVE_INTERVAL_S, 30),
     motd: env.OATHBOUND_MOTD ?? 'Welcome to Oathbound Online — be excellent to each other.',
+    admins: (env.OATHBOUND_ADMINS ?? '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => s !== ''),
+    maxConnPerIp: intEnv(env.OATHBOUND_MAX_CONN_PER_IP, 8),
   };
 }
