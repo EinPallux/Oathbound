@@ -5,6 +5,20 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Online Feature Parity (pre-VPS) — the online client becomes a real MMO client
+**Goal:** close the biggest gap before friends play — the online client was a bare renderer (positions + chat + a health bar). It now runs the **entire offline HUD** and modern-MMO furniture, without reimplementing any of it. Done in four verified phases.
+
+- **1/4 — richer wire state:** snapshot entities gained a `name`; snapshots gained a per-client **`self`** block (class + talent choices, hp/resource/xp/level, gcd + per-ability cooldowns, buffs, shield, gold, active cast, mount channel, resolved target-frame data) and an **`fx`** channel (damage/heal combat text routed to the client(s) each event involves).
+- **2/4 — client shadow world** (`src/net/shadow-world.ts`): a data-only ECS read-model. The local player is a real `createPlayer` entity synced from `self`; other entities are lightweight stand-ins carrying just the components the UI reads. No systems run on it → isomorphic + unit-tested.
+- **3/4 — reuse the offline UI:** the online client points the **actual** `Hud` / `TargetFrame` / `Minimap` / `DamageNumbers` at the shadow world each frame — so online now has the unit-frame (HP/resource/XP, level+class, combat state), the class **ability hotbar with live cooldowns + cast bar + level-gated slots**, buffs, a **target frame**, the **minimap** (region label, shaded relief, enemy/vendor/oathstone markers, player arrow), and **floating damage numbers**. `M` toggles the big map.
+- **4/4 — nameplates + UX polish:** floating **name + HP-bar nameplates** over other players and living enemies (`src/render/nameplates.ts`, world→screen projected, pooled, nearest-first); a **polished branded login** (gradient backdrop + card, title/tagline, styled inputs/buttons with hover/focus).
+
+**Deferred (noted):** online fast-travel / inventory / vendor panels and per-player oathstone-activation replication (the minimap shows oathstones dim for now); interest-managed snapshots (still whole-world at friends scale).
+
+**Verified (each phase):** client + server `typecheck` ✓ · **368/368** unit (+ shadow-world) ✓ · `server:test` ✓ · `build` + `server:build` ✓ · e2e at the **9-pass baseline** ✓. **Live headless-browser smokes** (game server + Vite + Chromium): the reused HUD/hotbar/minimap mount and update every frame with **zero console errors**; a second connected player shows a **nameplate**; the polished login renders — screenshots captured.
+
+---
+
 ## QA Hardening Pass (pre-VPS) — fixes from the July 2026 audit
 **Goal:** fix everything the full-codebase QA audit ([docs/qa/QA_AUDIT_2026-07.md](./docs/qa/QA_AUDIT_2026-07.md)) turned up before the game is stood up on a VPS. Done in four severity phases; each phase verified + committed separately.
 
