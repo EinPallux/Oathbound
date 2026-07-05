@@ -39,6 +39,8 @@ export const C = {
   Boss: 'boss',
   RelicMods: 'relicMods',
   RelicCollection: 'relicCollection',
+  /** Per-enemy multiplayer threat table (which players it has aggro on, and how much). */
+  Threat: 'threat',
 } as const;
 
 /**
@@ -240,6 +242,15 @@ export interface Boss {
   heavyBase: number;
   heavyCoeff: number;
   heavyType: DamageType;
+  /** Unscaled max HP (captured on first sight); the base a solo pull uses. */
+  baseMaxHp?: number;
+  /** Player count this pull was scaled for (0 = not yet scaled / reset). */
+  scaledForPlayers?: number;
+}
+
+/** Multiplayer threat: how much aggro each player (by entity id) has built on this enemy. */
+export interface Threat {
+  table: Map<number, number>;
 }
 
 // ── Progression ─────────────────────────────────────────────────────────────

@@ -15,7 +15,13 @@ import {
   type GroundAoe,
 } from '../../core/ecs/components';
 import type { Heightfield } from '../../world/heightfield';
+import { topThreatPlayer } from '../combat/threat';
 import { CombatEvent, type BossPhaseEvent } from '../combat/events';
+
+/** Each extra player engaged in a boss fight adds this fraction of its base HP (v1 tuning). */
+const BOSS_HP_PER_PLAYER = 0.6;
+/** Players within this distance of the boss count as "in the fight" for HP scaling. */
+const BOSS_ENGAGE_RANGE = 34;
 
 export interface BossAiDeps {
   field: Heightfield;
@@ -23,28 +29,34 @@ export interface BossAiDeps {
 
 export function createBossAiSystem(deps: BossAiDeps): System {
   const { field } = deps;
-  const players: { t: Transform; alive: boolean }[] = [];
+  const players: { e: Entity; t: Transform; alive: boolean }[] = [];
   return {
     name: 'boss-ai',
     update(world: World, dt: number): void {
-      // All players in the slice; each boss targets the nearest living one (M2).
+      // All players in the slice; each boss targets the highest-threat living one (M5).
       players.length = 0;
       for (const p of world.query(C.PlayerControlled, C.Transform, C.Health)) {
         players.push({
+          e: p,
           t: world.get<Transform>(p, C.Transform)!,
           alive: (world.get<Health>(p, C.Health)?.current ?? 0) > 0,
         });
       }
+      const aliveSet = new Set<Entity>();
+      for (const pl of players) if (pl.alive) aliveSet.add(pl.e);
 
       for (const e of world.query(C.Boss, C.Enemy, C.Health)) {
         const boss = world.get<Boss>(e, C.Boss)!;
         const en = world.get<Enemy>(e, C.Enemy)!;
         const h = world.get<Health>(e, C.Health)!;
+        if (boss.baseMaxHp == null) boss.baseMaxHp = h.max; // capture the unscaled base once
 
-        // Dead → reset the escalation state for the next pull (HP refills on respawn).
+        // Dead → reset escalation + restore base HP for the next (possibly solo) pull.
         if (h.current <= 0) {
           boss.phase = 0;
           boss.heavyTimer = boss.heavyCadence[0] * 0.6;
+          if (boss.baseMaxHp != null) h.max = boss.baseMaxHp;
+          boss.scaledForPlayers = 0;
           continue;
         }
 
@@ -63,7 +75,8 @@ export function createBossAiSystem(deps: BossAiDeps): System {
           });
         }
 
-        // Nearest living player to this boss — its telegraphed heavy targets them.
+        // Target the highest-threat living player (its heavy lands on them); fall back to the
+        // nearest before any threat exists. With one player this is unchanged.
         const bt = world.get<Transform>(e, C.Transform);
         let pt: Transform | undefined;
         let best = Infinity;
@@ -76,11 +89,33 @@ export function createBossAiSystem(deps: BossAiDeps): System {
               pt = pl.t;
             }
           }
+          const tp = topThreatPlayer(world, e, aliveSet);
+          if (tp != null) {
+            const tpt = world.get<Transform>(tp, C.Transform);
+            if (tpt) pt = tpt;
+          }
         }
 
         // Only telegraph heavies while actively fighting a living player; otherwise keep
         // the timer primed so a fresh pull doesn't open with an instant slam.
         const fighting = en.state === 'engage' || en.state === 'attack';
+
+        // On the first engaged tick, scale the boss's HP by how many players are in the fight
+        // (solo → base; each extra player +60%). Reset to base on death (above).
+        if (fighting && (boss.scaledForPlayers ?? 0) === 0 && bt) {
+          let n = 0;
+          for (const pl of players) {
+            if (pl.alive && (pl.t.x - bt.x) ** 2 + (pl.t.z - bt.z) ** 2 <= BOSS_ENGAGE_RANGE ** 2) n++;
+          }
+          n = Math.max(1, n);
+          boss.scaledForPlayers = n;
+          if (n > 1 && boss.baseMaxHp != null) {
+            const scaled = Math.round(boss.baseMaxHp * (1 + (n - 1) * BOSS_HP_PER_PLAYER));
+            h.max = scaled;
+            h.current = scaled;
+          }
+        }
+
         if (!fighting || pt == null) {
           boss.heavyTimer = boss.heavyCadence[0] * 0.6;
           continue;

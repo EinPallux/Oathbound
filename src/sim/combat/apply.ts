@@ -18,6 +18,7 @@ import {
 import type { Rng } from '../../core/rng';
 import { computeDamage, rollDamage, type AbilityHit } from './damage';
 import { Status, statusMagnitude } from './statuses';
+import { addThreat } from './threat';
 import { CombatEvent, type DamageEvent, type HealEvent } from './events';
 
 export interface ApplyResult {
@@ -93,6 +94,12 @@ export function applyDamage(
   // Taking a hit pulls an idle enemy into the fight (so ranged attacks aggro too).
   const en = world.get<Enemy>(target, C.Enemy);
   if (en && en.state === 'idle' && !killed) en.state = 'engage';
+
+  // Multiplayer threat: a player hitting an enemy builds aggro on it (drives target selection +
+  // marks them a kill participant for shared XP/loot). Solo → the one player, unchanged.
+  if (en && amount > 0 && world.get(source, C.PlayerControlled) !== undefined) {
+    addThreat(world, target, source, amount);
+  }
 
   const tr = world.get<Transform>(target, C.Transform)!;
   world.events.emit<DamageEvent>(CombatEvent.Damage, {
