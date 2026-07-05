@@ -1,5 +1,7 @@
 # Future Multiplayer Boundaries
 
+> **⚠️ Historical (realised by the MMO track, ADR-013).** This doc's premise — keep the multiplayer *option* open without building networking — is now history: the seam it prescribed is exactly what let the MMO track (M0–M7) land the authoritative server cleanly. Kept for context. Current online architecture: [MMO_ARCHITECTURE](./MMO_ARCHITECTURE.md).
+
 How we keep the **option** of real multiplayer open **without implementing or overengineering** any networking for the beta. The rule: a clean **simulation/render seam** and **command/event shapes** that a server could later own — nothing more. Full (non-committed) sequencing lives in [POST_BETA_MMO_HORIZON](../production/POST_BETA_MMO_HORIZON.md).
 
 > **The local game must run with zero networking layer.** Combat and progression logic simply must not be *inseparably embedded in rendering*. We are honest: converting a local Three.js RPG into an MMO is a **major project**, not a feature flag.

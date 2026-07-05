@@ -1,9 +1,9 @@
 {
   "name": "oathbound",
   "private": true,
-  "version": "0.7.2-INDEV",
+  "version": "0.8.0-ONLINE.7",
   "type": "module",
-  "description": "A solo-friendly 3D browser MMORPG (planning + early scaffold). See /docs.",
+  "description": "A solo-friendly 3D browser MMORPG — playable solo, or online with friends on a self-hosted server. See /docs.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

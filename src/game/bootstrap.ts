@@ -415,10 +415,10 @@ export function boot(options: BootOptions = {}): Game {
   }
   const playerView = new PlayerView(renderer.scene);
   const ambientLife = new AmbientLife(renderer.scene);
-  // Buildings join the camera's occlusion obstacles so the chase camera springs off walls.
-  // (The voxel cube mesh is the terrain obstacle — raycast the mesh, not its wrapper group.)
-  const cameraObstacles: THREE.Object3D[] = [voxelTerrain.mesh, props, ...(village ? [village.buildings] : [])];
-  const cameraRig = new CameraRig(renderer.camera, input, cameraObstacles);
+  // Buildings/props are the camera's occlusion obstacles so the chase camera springs off walls.
+  // Terrain is handled analytically by the rig (heightfield sampling), not raycast — see CameraRig.
+  const cameraObstacles: THREE.Object3D[] = [props, ...(village ? [village.buildings] : [])];
+  const cameraRig = new CameraRig(renderer.camera, input, cameraObstacles, field);
   const enemyView = new EnemyView(renderer.scene);
   const lootView = new LootView(renderer.scene);
   const projectileView = new ProjectileView(renderer.scene, projectiles);

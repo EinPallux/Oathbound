@@ -115,6 +115,10 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
   let started = false;
   let stopping = false;
   let world: { stop(): void } | null = null;
+  /** Teardown callbacks registered by resource-creating sites, run by stop(). */
+  const cleanups: Array<() => void> = [];
+  /** The pending "reconnect via reload" timer, so stop() can cancel it. */
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, css: string, text?: string): HTMLElementTagNameMap[K] => {
     const n = document.createElement(tag);
@@ -223,6 +227,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     const renderer = new Renderer(canvas);
     const keybinds = loadKeybinds();
     const input = new InputController(canvas, keybinds);
+    cleanups.push(() => input.dispose(), () => renderer.dispose());
     new Sky(renderer.scene);
 
     // Build the SAME field + colliders the server used (deterministic) so client-side prediction
@@ -246,7 +251,8 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     const terrain = buildTerrainMesh(field);
     renderer.scene.add(terrain);
     renderer.setFogRange(60, 340);
-    const cameraRig = new CameraRig(renderer.camera, input, [terrain]);
+    // Terrain collision is analytic (heightfield); no mesh raycast, no prop obstacles online yet.
+    const cameraRig = new CameraRig(renderer.camera, input, [], field);
 
     const cap = (r: number, h: number): THREE.CapsuleGeometry => new THREE.CapsuleGeometry(r, h, 4, 10);
     const mat = (hex: number): THREE.Material => new THREE.MeshLambertMaterial({ color: hex });
@@ -302,6 +308,25 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     let camZ = 0;
     let camY = field.sample(0, 0) + PLAYER_HALF;
 
+    // Minimal HUD: a local health bar driven from the snapshot, so a player can see they're taking
+    // damage / dying instead of guessing. (Resource/hotbar/target/minimap parity is a later item.)
+    const hpBar = document.createElement('div');
+    hpBar.style.cssText =
+      'position:fixed;left:12px;top:12px;width:220px;height:18px;z-index:9;border:1px solid #33445a;' +
+      'border-radius:6px;background:rgba(15,21,29,.8);overflow:hidden;font:12px/18px system-ui,sans-serif';
+    const hpFill = document.createElement('div');
+    hpFill.style.cssText = 'height:100%;width:100%;background:linear-gradient(#e5484d,#b02a2f);transition:width .12s';
+    const hpText = document.createElement('div');
+    hpText.style.cssText = 'position:absolute;left:0;top:0;width:220px;text-align:center;color:#fff;text-shadow:0 1px 2px #000';
+    hpBar.append(hpFill, hpText);
+    document.body.appendChild(hpBar);
+    cleanups.push(() => hpBar.remove());
+    const setHp = (hp: number, mhp: number): void => {
+      const frac = mhp > 0 ? Math.max(0, Math.min(1, hp / mhp)) : 0;
+      hpFill.style.width = `${(frac * 100).toFixed(1)}%`;
+      hpText.textContent = `${Math.round(hp)} / ${Math.round(mhp)}`;
+    };
+
     const applySnapshot = (ents: SnapshotEntity[], ack: number): void => {
       snapIndex++;
       const now = performance.now();
@@ -309,6 +334,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
       // first snapshot that includes us).
       const self = ents.find((e) => e.id === selfId);
       if (self) {
+        if (self.hp != null && self.mhp != null) setHp(self.hp, self.mhp);
         if (!pred) pred = new PredictedPlayer(field, colliders, boxes, { x: self.x, z: self.z });
         else pred.reconcile(self.x, self.z, self.yaw, ack);
       }
@@ -323,10 +349,12 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         r.samples.push({ t: now, x: e.x, z: e.z, yaw: e.yaw });
         if (r.samples.length > 6) r.samples.shift();
         r.seen = snapIndex;
-        r.mesh.visible = !(e.k === 'enemy' && e.st === 'dead');
+        r.mesh.visible = !((e.k === 'enemy' || e.k === 'boss') && e.st === 'dead');
       }
       for (const [id, r] of replicas) {
-        if (r.seen !== snapIndex) {
+        // Never prune our own mesh just because one snapshot omitted us (death / interest cull /
+        // grace-window quirk) — that would make the local player vanish. It's cleaned up on stop().
+        if (r.seen !== snapIndex && id !== selfId) {
           renderer.scene.remove(r.mesh);
           replicas.delete(id);
         }
@@ -376,19 +404,21 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
       if (e.key === 'Enter') {
         const text = chatInput.value.trim();
         chatInput.value = '';
-        if (text) ws.send(encode({ t: 'chat', text }));
+        if (text) send({ t: 'chat', text }); // guarded (readyState) so a drop can't throw
         chatInput.blur();
       } else if (e.key === 'Escape') {
         chatInput.value = '';
         chatInput.blur();
       }
     });
-    window.addEventListener('keydown', (e) => {
+    const onEnterChat = (e: KeyboardEvent): void => {
       if (e.key === 'Enter' && !chatFocused) {
         e.preventDefault();
         chatInput.focus();
       }
-    });
+    };
+    window.addEventListener('keydown', onEnterChat);
+    cleanups.push(() => window.removeEventListener('keydown', onEnterChat), () => chatWrap.remove());
 
     const sendInput = (): void => {
       if (ws.readyState !== WebSocket.OPEN) return;
@@ -489,7 +519,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         // Dropped mid-session: reload to re-enter. The server keeps our entity alive for a short
         // grace window, so re-selecting the same character resumes it in place (M4 reconnect).
         setStatus('connection lost — reconnecting…');
-        setTimeout(() => location.reload(), 800);
+        reconnectTimer = setTimeout(() => location.reload(), 800);
       } else {
         setStatus('disconnected');
       }
@@ -536,7 +566,16 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
   return {
     stop(): void {
       stopping = true;
+      if (reconnectTimer != null) clearTimeout(reconnectTimer); // don't reload after an intentional stop
       world?.stop();
+      for (const c of cleanups) {
+        try {
+          c();
+        } catch {
+          /* best-effort teardown */
+        }
+      }
+      cleanups.length = 0;
       ws.close();
     },
   };

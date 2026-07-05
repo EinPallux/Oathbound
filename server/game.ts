@@ -21,12 +21,17 @@ import { C, type ClassId, type EnemyInfo } from '../src/core/ecs/components';
 import type { ControlState } from '../src/platform/input';
 import { bootServerWorld, type ServerWorld } from './world-boot';
 import { Db, type CharacterSummary, type CharacterFlush } from './db';
+import { randomBytes } from 'node:crypto';
 import { hashPassword, verifyPassword, newSessionToken, hashToken } from './auth';
 import type { ServerConfig } from './config';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 /** How long a disconnected player's entity lingers so a quick reconnect resumes it in place. */
 const RECONNECT_GRACE_MS = 20_000;
+/** A throwaway hash+salt to verify against when a username doesn't exist, so a failed login for an
+ *  unknown user takes the same time as one for a known user (no username-enumeration timing leak). */
+const DUMMY_SALT = randomBytes(16);
+const DUMMY_HASH = randomBytes(32);
 
 interface ConnectedPlayer {
   entity: Entity;
@@ -68,6 +73,7 @@ export class GameServer {
 
   constructor(private readonly config: ServerConfig) {
     this.db = new Db(config.dbPath);
+    this.db.purgeExpiredSessions(); // clear any sessions that expired while we were down
     this.world = bootServerWorld(config);
     this.snapshotEvery = Math.max(1, Math.round(config.tickHz / config.snapshotHz));
 
@@ -123,7 +129,12 @@ export class GameServer {
 
   async login(username: string, password: string): Promise<AuthResult> {
     const acc = this.db.findAccountByUsername(username);
-    if (!acc || !(await verifyPassword(password, acc.pass_hash, acc.pass_salt))) {
+    // Hash even when the account is unknown (against a fixed dummy) so login latency doesn't leak
+    // which usernames exist. Both branches do exactly one scrypt.
+    const ok = acc
+      ? await verifyPassword(password, acc.pass_hash, acc.pass_salt)
+      : (await verifyPassword(password, DUMMY_HASH, DUMMY_SALT), false);
+    if (!acc || !ok) {
       return { ok: false, code: 'bad_credentials', message: 'wrong username or password' };
     }
     if (acc.is_banned) return { ok: false, code: 'banned', message: 'this account is banned' };
@@ -142,6 +153,7 @@ export class GameServer {
   private issueSession(accountId: number, username: string): AuthResult {
     // Auto-promote configured admins (OATHBOUND_ADMINS) on each login.
     if (this.config.admins.includes(username.toLowerCase())) this.db.setAdmin(accountId, true);
+    this.db.purgeExpiredSessions(); // opportunistic cleanup on login activity
     const { token, tokenHash } = newSessionToken();
     this.db.createSession(accountId, tokenHash, Date.now() + SESSION_TTL_MS);
     return { ok: true, token, username, accountId };
@@ -221,15 +233,15 @@ export class GameServer {
     }
     const save = validateSave(raw);
     if (!save) return { ok: false, code: 'bad_save', message: 'the imported save is not valid' };
-    const res = this.spawn(ws, accountId, slot, save, save.classId, name);
-    if (res.ok) {
-      try {
-        this.db.createCharacter(accountId, slot, name, save.classId, this.flushFrom(save));
-      } catch {
-        this.leave(ws);
-        return { ok: false, code: 'name_taken', message: 'that character name is taken' };
-      }
+    // Write the DB row FIRST (like enterNew) so a name/slot collision fails before we ever spawn —
+    // otherwise a rejected import left a phantom orphan visible to others for the grace window.
+    try {
+      this.db.createCharacter(accountId, slot, name, save.classId, this.flushFrom(save));
+    } catch {
+      return { ok: false, code: 'name_taken', message: 'that character name is taken' };
     }
+    const res = this.spawn(ws, accountId, slot, save, save.classId, name);
+    if (!res.ok) this.db.deleteCharacter(accountId, slot); // roll back the row if the spawn failed
     return res;
   }
 

@@ -166,6 +166,12 @@ export class Db {
     return row.account_id;
   }
 
+  /** Delete every expired session row. Called at boot + on login so the table can't grow forever. */
+  purgeExpiredSessions(): number {
+    const info = this.db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
+    return info.changes;
+  }
+
   // ── Characters ──
   listCharacters(accountId: number): CharacterSummary[] {
     return this.db

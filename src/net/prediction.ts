@@ -79,6 +79,9 @@ class ReplayControl implements ControlState {
   }
 }
 
+/** Cap on un-acked buffered inputs (~10 s at 30 Hz) so a silent server can't grow it forever. */
+const MAX_PENDING = 300;
+
 export class PredictedPlayer {
   private readonly world: World;
   private readonly entity: Entity;
@@ -104,6 +107,9 @@ export class PredictedPlayer {
   /** Predict one tick forward from a fresh local input (also buffered for reconciliation). */
   predict(msg: InputMessage): void {
     this.pending.push(msg);
+    // Bound the buffer: if the server goes silent (no snapshots → no reconcile drains this), it
+    // must not grow without limit. A few seconds of unacked input at 30 Hz is ample headroom.
+    if (this.pending.length > MAX_PENDING) this.pending.splice(0, this.pending.length - MAX_PENDING);
     this.control.set(msg);
     this.world.update(DT);
   }

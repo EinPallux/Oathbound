@@ -1,38 +1,52 @@
 # Oathbound
 
-A planned **3D browser-based, solo-friendly fantasy MMORPG** built with TypeScript + Three.js, deployable to Vercel with no account, no backend, and no database required for its first public milestone (**1.0-BETA**).
+A **3D browser-based, solo-friendly fantasy MMORPG** built with TypeScript + Three.js. Play solo offline, or host a small **authoritative server** and play online with friends on a Linux VPS.
 
-> **Status: early scaffold (`0.0.2-INDEV`).** The full game blueprint lives in [`/docs`](./docs/README.md). Implementation is proceeding **one phase at a time** (see [`CHANGELOG.md`](./CHANGELOG.md) and the [Version Roadmap](./docs/production/VERSION_ROADMAP.md)); each phase is an independently testable build.
+> **Status: `0.8.0-ONLINE.7`.** The full 1–30 solo game is playable, and the online track (accounts, an authoritative Node server, SQLite persistence, chat, VPS deploy) is built through **M7 "Ops & Hardening"** — see [`CHANGELOG.md`](./CHANGELOG.md) and the live status in [`AGENTS.md`](./AGENTS.md). Development proceeds **one phase at a time**; each phase is an independently testable build. The full blueprint lives in [`/docs`](./docs/README.md).
 
 ## What is Oathbound?
 
-You take up a broken **Oath** to protect the region of **Aldermere**. Choose one of three classes — **Warrior**, **Hunter**, or **Priest** — explore a compact open world, grind monsters, grow stronger, find increasingly exciting equipment, develop a build, reach **level 30**, and keep hunting for valuable gear.
+You take up a broken **Oath** to protect the region of **Aldermere**. Choose one of three classes — **Warrior**, **Hunter**, or **Priest** — explore a compact open world, grind monsters, grow stronger, find increasingly exciting equipment, develop a build, reach **level 30**, fight world bosses, and keep hunting for valuable gear.
 
-It is intentionally a **chill, solo-first** experience that *feels* like a small but genuine MMORPG world, while honestly remaining a **local single-player** game for the 1.0-BETA milestone. Real multiplayer is a clearly-scoped post-beta horizon, not a hidden simulation.
+It stays a **chill, solo-first** experience: all power and progression are fully solo-viable. The online mode adds shared PvE (threat, shared XP, instanced loot, boss HP scaling that respects solo balance) without turning it into a grind-with-others.
+
+## Two ways to play
+
+- **Solo / offline** — a static build (works on Vercel or any static host). Saves live in the browser (IndexedDB). No account, no server.
+- **Online with friends** — an authoritative Node server (WebSocket, isomorphic sim) with SQLite-backed accounts and characters, self-hosted on a small Linux VPS. See the [VPS Hosting Guide](./docs/technical/VPS_HOSTING_GUIDE.md) and the ops kit in [`deploy/`](./deploy/README.md).
+
+The gameplay simulation (`src/sim`, `src/core`, `src/world`, `src/net`) is **isomorphic** — the exact same code runs in the browser and on the server; only rendering (`src/render`, three.js/DOM) and the Node server (`server/`) are environment-specific.
 
 ## Start here
 
 👉 **[docs/README.md](./docs/README.md)** — the documentation index and reading order.
+👉 **[AGENTS.md](./AGENTS.md)** — current build status, workflow, repo map, and conventions (read this before contributing).
 
 ## Development
 
 ```bash
-npm install        # install dependencies
-npm run dev        # start the dev server (http://localhost:5173)
-npm test           # unit tests (Vitest)
-npm run test:e2e   # browser smoke test (Playwright)
-npm run build      # typecheck + production build (outputs dist/)
+npm install            # install dependencies
+npm run dev            # solo dev server (http://localhost:5173)
+npm test               # unit tests (Vitest)
+npm run test:e2e       # browser smoke tests (Playwright)
+npm run build          # typecheck + production client build (→ dist/)
+
+# Online server
+npm run server:dev     # run the authoritative server locally (port 8080)
+npm run typecheck:server
+npm run server:test    # persistence + auth regression
+npm run server:build   # bundle the server (→ dist-server/)
+npm run server:loadtest # headless bot soak against a running server
 ```
 
-**Current build (`0.0.3-INDEV`):** walk a character around a greyboxed hilly world.
-WASD movement (camera-relative), a third-person chase camera with mouselook/zoom and
-collision (it won't clip terrain), gravity + jump, terrain ground-snap, and collision
-against rock props — all on the fixed-timestep ECS with a live performance overlay.
-This reaches the **Core Movement Gate**; combat arrives next (`0.0.4`).
+To play online locally: run `npm run server:dev`, then open the client with `?server=ws://127.0.0.1:8080/ws`.
 
-## Guardrails (read before any coding session)
+## Conventions (non-negotiable)
 
-- Do **not** copy Hordes.io content, assets, names, lore, classes (beyond common archetypes), maps, balancing, or code. It is a *design reference only*.
-- Do **not** implement raids, dungeons, accounts, networking, or any deferred MMO system before the level 1–30 solo loop is polished. See [Deferred Features](./docs/production/DEFERRED_FEATURES.md).
-- All player power and progression must remain **fully solo-viable**.
-- Keep it **deployable to Vercel** as a static build; no server, account, or database before the post-beta MMO horizon.
+- Keep gameplay logic (`src/sim`, `src/core`, `src/world`, `src/net`) free of `three`/DOM **and** Node-only APIs — it must run in both the browser and Node. Rendering only reads sim state; server-only code lives in `server/`.
+- All player power and progression must remain **fully solo-viable** (see [Solo Balance Rules](./docs/design/SOLO_BALANCE_RULES.md)).
+- Do **not** copy Hordes.io content, assets, names, lore, maps, balancing, or code — it is a *design reference only*.
+
+## License / credits
+
+See [`CREDITS.md`](./CREDITS.md).
