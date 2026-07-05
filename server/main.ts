@@ -16,7 +16,7 @@ function main(): void {
 
   console.log(`[oathbound] booting world from ${config.mapPath} …`);
   const game = new GameServer(config);
-  console.log(`[oathbound] map "${game.mapName}" ready — player entity ${game.playerEntity}`);
+  console.log(`[oathbound] map "${game.mapName}" ready — players join per connection`);
 
   // Tick the authoritative simulation (each tick also broadcasts a snapshot on cadence).
   const clock = new ServerClock((dt) => game.step(dt), config.tickHz);

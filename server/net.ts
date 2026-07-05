@@ -18,9 +18,13 @@ function send(ws: WebSocket, msg: ServerMessage): void {
 
 export function attachNet(wss: WebSocketServer, game: GameServer): void {
   wss.on('connection', (ws: WebSocket) => {
-    game.addClient(ws);
-    ws.on('close', () => game.removeClient(ws));
-    ws.on('error', () => game.removeClient(ws));
+    let joined = false;
+    ws.on('close', () => {
+      if (joined) game.leave(ws);
+    });
+    ws.on('error', () => {
+      if (joined) game.leave(ws);
+    });
 
     ws.on('message', (data: RawData) => {
       const raw = typeof data === 'string' ? data : data.toString();
@@ -34,7 +38,7 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
         case 'ping':
           send(ws, { t: 'pong', time: msg.time, serverTick: game.tick });
           break;
-        case 'hello':
+        case 'hello': {
           if (msg.protocol !== PROTOCOL_VERSION) {
             send(ws, {
               t: 'error',
@@ -43,11 +47,14 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
             });
             return;
           }
-          // M1: one shared world player; every client is told about it and drives it via input.
+          if (joined) return; // already joined; ignore a duplicate hello
+          // M2: each connection gets its own player entity to drive.
+          const entity = game.join(ws);
+          joined = true;
           send(ws, {
             t: 'welcome',
             protocol: PROTOCOL_VERSION,
-            entityId: game.playerEntity,
+            entityId: entity,
             map: game.mapName,
             tick: game.tick,
             tickHz: game.tickHz,
@@ -56,8 +63,9 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
           });
           game.sendSnapshotTo(ws); // seed the client with the current world immediately
           break;
+        }
         case 'input':
-          game.onInput(msg);
+          game.onInput(ws, msg);
           break;
       }
     });

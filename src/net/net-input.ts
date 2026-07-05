@@ -17,6 +17,9 @@ export class NetworkControlState implements ControlState {
   dist = 10;
 
   private jumpQueued = false;
+  private abilityQueued: number | null = null;
+  private interactQueued = false;
+  private cycleQueued = false;
   private appliedSeq = 0;
 
   /** The last input sequence number folded in — echoed to the client as snapshot `ack`. */
@@ -33,7 +36,11 @@ export class NetworkControlState implements ControlState {
     this.left = msg.left;
     this.right = msg.right;
     this.yaw = msg.yaw;
+    // Edge-triggered intents buffer until consumed (a packet with the intent set queues it).
     if (msg.jump) this.jumpQueued = true;
+    if (msg.ability != null) this.abilityQueued = msg.ability;
+    if (msg.interact) this.interactQueued = true;
+    if (msg.cycle) this.cycleQueued = true;
   }
 
   consumeJump(): boolean {
@@ -42,14 +49,26 @@ export class NetworkControlState implements ControlState {
     return j;
   }
 
-  // M1 is movement-only: every other intent is inert until later phases wire it over the wire.
-  consumeMount(): boolean {
-    return false;
-  }
   consumeAbility(): number | null {
-    return null;
+    const a = this.abilityQueued;
+    this.abilityQueued = null;
+    return a;
   }
+
   consumeTargetCycle(): boolean {
+    const c = this.cycleQueued;
+    this.cycleQueued = false;
+    return c;
+  }
+
+  consumeInteract(): boolean {
+    const i = this.interactQueued;
+    this.interactQueued = false;
+    return i;
+  }
+
+  // Mount (Shift) isn't wired over the wire yet.
+  consumeMount(): boolean {
     return false;
   }
   consumeEscape(): boolean {
@@ -57,9 +76,6 @@ export class NetworkControlState implements ControlState {
   }
   consumeClick(): { ndcX: number; ndcY: number } | null {
     return null;
-  }
-  consumeInteract(): boolean {
-    return false;
   }
   consumeToggleInventory(): boolean {
     return false;

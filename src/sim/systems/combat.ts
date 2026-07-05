@@ -56,7 +56,9 @@ const PLAYER_RADIUS = 0.4;
 const ATONEMENT_LEECH = 0.3;
 
 export interface CombatDeps {
-  input: ControlState;
+  /** Default control for players without a per-entity PlayerInput (focused unit tests). Real
+   *  players (offline + networked) each carry their own PlayerInput component. */
+  input?: ControlState;
   rng: Rng;
   colliders: readonly CylinderCollider[];
   field: Heightfield;
@@ -65,7 +67,7 @@ export interface CombatDeps {
 }
 
 export function createCombatSystem(deps: CombatDeps): System {
-  const { input, rng, colliders, field, projectiles, grid } = deps;
+  const { input: defaultInput, rng, colliders, field, projectiles, grid } = deps;
   const bound = field.size / 2 - 1;
   const idScratch: Entity[] = [];
   const candidates: Candidate[] = [];
@@ -85,6 +87,9 @@ export function createCombatSystem(deps: CombatDeps): System {
         C.Target,
         C.Resource,
       )) {
+        // Per-player intent: each player fires abilities / targets via its own PlayerInput.
+        const input = world.get<ControlState>(e, C.PlayerInput) ?? defaultInput;
+        if (!input) continue;
         const t = world.get<Transform>(e, C.Transform)!;
         const off = world.get<Offense>(e, C.Offense)!;
         const ab = world.get<AbilityState>(e, C.AbilityState)!;

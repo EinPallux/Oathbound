@@ -337,7 +337,7 @@ export function boot(options: BootOptions = {}): Game {
   const vendorPos = customMap && customMap.village == null
     ? { x: playerStart.x + 3, z: playerStart.z - 3 }
     : { x: 3, z: -3 };
-  const { world, player, rng, projectiles, telemetry } = createSimWorld({
+  const sim = createSimWorld({
     field,
     colliders,
     boxes: movementBoxes,
@@ -348,6 +348,11 @@ export function boot(options: BootOptions = {}): Game {
     vendor: { name: 'Quartermaster', x: vendorPos.x, z: vendorPos.z },
     input,
   });
+  const { world, rng, projectiles, telemetry } = sim;
+  // Offline always provides an input, so a primary player always exists. Narrow the property
+  // first so `player` is declared as a non-null Entity (visible to the closures below).
+  if (sim.player == null) throw new Error('Oathbound: local world must have a player');
+  const player = sim.player;
 
   // Render / UI.
   const sky = new Sky(renderer.scene);
@@ -710,7 +715,7 @@ export function boot(options: BootOptions = {}): Game {
           dialogPanel.close();
         } else if (vendorPanel.isOpen) {
           vendorPanel.close();
-        } else if (!pickUpNearest(world) && nearestVendor(world, player) != null) {
+        } else if (!pickUpNearest(world, player) && nearestVendor(world, player) != null) {
           invPanel.close();
           charPanel.close();
           travelPanel.close();

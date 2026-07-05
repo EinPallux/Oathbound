@@ -29,7 +29,7 @@ import type { BoxCollider } from '../collision';
 import type { ControlState } from '../../platform/input';
 import type { Spawn } from '../content/spawns';
 import type { BossId } from '../content/bosses';
-import type { ClassId } from '../../core/ecs/components';
+import { C, type ClassId } from '../../core/ecs/components';
 
 /** A waypoint to place (stable id + display name + position). */
 export interface OathstonePlacement {
@@ -59,8 +59,12 @@ export interface SimWorldInput {
   bosses: readonly BossPlacement[];
   oathstones: readonly OathstonePlacement[];
   vendor: { name: string; x: number; z: number };
-  /** The player's per-tick intent source (keyboard client, network packet, or null input). */
-  input: ControlState;
+  /**
+   * The primary player's intent source (keyboard client, network packet, or null input). When
+   * provided, a primary player is created at `playerStart`. Omit it for a multi-player server,
+   * which creates a player per connection with {@link addPlayer} instead.
+   */
+  input?: ControlState;
   /** Gameplay RNG seed. Defaults to the historical client seed so rolls match. */
   seed?: number;
   /** Starting class; bootstrap overrides from the save / new-character choice afterward. */
@@ -69,7 +73,8 @@ export interface SimWorldInput {
 
 export interface SimWorld {
   world: World;
-  player: Entity;
+  /** The primary player, or null when the world was built without one (server: per-connection). */
+  player: Entity | null;
   rng: Rng;
   grid: SpatialGrid;
   projectiles: Projectiles;
@@ -78,6 +83,22 @@ export interface SimWorld {
 
 /** The gameplay RNG seed shared by every world (the historical bootstrap value). */
 export const DEFAULT_SIM_SEED = 0xc0ffee;
+
+/**
+ * Create a player entity and attach its per-tick intent source as a PlayerInput component, so
+ * the movement/combat systems drive it independently of any other player. Used for the primary
+ * player (offline/tests) and for each networked connection on the server.
+ */
+export function addPlayer(
+  world: World,
+  field: Heightfield,
+  input: ControlState,
+  opts: { x: number; z: number; classId?: ClassId },
+): Entity {
+  const e = createPlayer(world, field, opts.x, opts.z, opts.classId);
+  world.set<ControlState>(e, C.PlayerInput, input);
+  return e;
+}
 
 /**
  * Build the ECS, spawn the standard entity set, and register the fixed system pipeline.
@@ -94,21 +115,24 @@ export function createSimWorld(opts: SimWorldInput): SimWorld {
   const projectiles = new Projectiles();
   const telemetry = new Telemetry();
 
-  // Entities (fixed creation order → deterministic ids).
-  const player = createPlayer(world, field, playerStart.x, playerStart.z, opts.playerClass);
+  // Entities (fixed creation order → deterministic ids). The primary player is created first
+  // (offline/tests → id 1) only when an input is given; a server omits it and adds a player per
+  // connection with addPlayer(). Players drive themselves via their own PlayerInput component,
+  // so the movement/combat systems no longer take a single shared input.
+  const player = input ? addPlayer(world, field, input, { x: playerStart.x, z: playerStart.z, classId: opts.playerClass }) : null;
   for (const s of spawns) {
     spawnEnemy(world, field, s.id, s.x, s.z, { level: s.level, tier: s.tier, name: s.name });
   }
   for (const b of bosses) spawnBoss(world, field, b.id, b.x, b.z);
   for (const o of oathstones) createOathstone(world, field, o.id, o.name, o.x, o.z);
   createVendor(world, field, vendor.name, vendor.x, vendor.z);
-  telemetry.attach(world, player);
+  if (player != null) telemetry.attach(world, player);
 
   // Systems (canonical order; waypoint after movement so it sees the updated position, and
   // before recovery so respawn binds to the stone just visited).
   world.addSystem(createSpatialSystem(grid));
-  world.addSystem(createMovementSystem({ input, field, colliders, boxes }));
-  world.addSystem(createCombatSystem({ input, rng, colliders, field, projectiles, grid }));
+  world.addSystem(createMovementSystem({ field, colliders, boxes }));
+  world.addSystem(createCombatSystem({ rng, colliders, field, projectiles, grid }));
   world.addSystem(createEnemyAiSystem({ field, colliders, rng, grid, projectiles }));
   world.addSystem(createBossAiSystem({ field }));
   world.addSystem(createProjectileSystem(projectiles, rng));

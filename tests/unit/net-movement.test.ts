@@ -33,7 +33,7 @@ function makeWorld() {
 }
 
 const pos = (sim: ReturnType<typeof makeWorld>['sim']) => {
-  const t = sim.world.get<Transform>(sim.player, C.Transform)!;
+  const t = sim.world.get<Transform>(sim.player!, C.Transform)!;
   return { x: t.x, z: t.z };
 };
 

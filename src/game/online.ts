@@ -209,6 +209,10 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         right: input.right,
         yaw: input.yaw,
         jump: input.consumeJump(),
+        // M2: fight + loot over the wire. Abilities auto-acquire a target in the facing cone.
+        ability: input.consumeAbility(),
+        interact: input.consumeInteract(),
+        cycle: input.consumeTargetCycle(),
       }),
     );
   }

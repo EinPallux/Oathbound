@@ -23,7 +23,9 @@ export const MOUNT_CAST_TIME = 2;
 export const MOUNT_SPEED_MULT = 1.6;
 
 export interface MovementDeps {
-  input: ControlState;
+  /** Default control for players that don't carry a per-entity PlayerInput (focused unit
+   *  tests). Real players (offline + networked) each carry their own PlayerInput component. */
+  input?: ControlState;
   field: Heightfield;
   colliders: readonly CylinderCollider[];
   /** Solid building footprints (the starting village). Resolved after the cylinders. */
@@ -31,13 +33,16 @@ export interface MovementDeps {
 }
 
 export function createMovementSystem(deps: MovementDeps): System {
-  const { input, field, colliders, boxes } = deps;
+  const { input: defaultInput, field, colliders, boxes } = deps;
   const bound = field.size / 2 - 1;
 
   return {
     name: 'movement',
     update(world, dt) {
       for (const e of world.query(C.PlayerControlled, C.Transform, C.Velocity, C.Character)) {
+        // Per-player intent: each player drives its own entity via its PlayerInput.
+        const input = world.get<ControlState>(e, C.PlayerInput) ?? defaultInput;
+        if (!input) continue;
         const t = world.get<Transform>(e, C.Transform)!;
         const v = world.get<Velocity>(e, C.Velocity)!;
         const ch = world.get<Character>(e, C.Character)!;

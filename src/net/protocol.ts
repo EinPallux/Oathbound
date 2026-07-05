@@ -43,6 +43,12 @@ export const InputMessage = z.object({
   right: z.boolean(),
   yaw: z.number(),
   jump: z.boolean(),
+  /** Queued ability slot (0-based) this tick, or null/absent. (M2: fight over the wire.) */
+  ability: z.number().int().nullable().optional(),
+  /** Interact pressed (F) — server-side loot pickup / vendor. */
+  interact: z.boolean().optional(),
+  /** Cycle target pressed (Tab). */
+  cycle: z.boolean().optional(),
 });
 
 export type InputMessage = z.infer<typeof InputMessage>;
