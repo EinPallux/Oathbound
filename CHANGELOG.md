@@ -5,6 +5,17 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Online World Parity — the online client *looks* like the solo game
+**Goal:** the online client rendered a bare world (flat smooth terrain, capsule/cylinder stand-ins for every entity, no buildings) — so joining online looked nothing like solo. It now renders the **exact same world** the offline game does, reusing the solo render modules verbatim (no forked art path):
+- **Terrain → Cube World voxels:** swapped the smooth `buildTerrainMesh` for the player-centred `VoxelTerrain` bubble (fog-hidden edge, per-cube paved-stone/grass/rock/grit tops), the same collision-matched cubes as solo. Biome colours/materials come from the loaded map (custom) or the procedural field.
+- **Scenery/buildings:** the online client now builds the real 3D props — `buildCustomScenery` for authored maps (village + medieval city buildings, walls, trees, roads/rivers) or `buildScenery` for the procedural world — with the smooth authoring-res paving hidden in favour of the per-cube tops.
+- **Real entity models:** players are the class **voxel humanoid** (`PlayerView`, one per player) with the overhead name+level plate; enemies/bosses are the per-family creature models with HP bars + nameplates (`EnemyView`); Oathstones/vendors are obelisks/posts (`InteractableView`) and loot shows rarity beams (`LootView`) — all driven off the client shadow world, positioned from the interpolation buffer and ground-snapped to the cube tops.
+- **Additive wire change:** `SnapshotEntity` gained optional `cls` (player class), `lvl` (player/enemy level) and `fam`/`arch`/`tier` (enemy family/archetype/tier) so the client can pick the right models — populated in the shared `buildSnapshot`, consumed by the shadow world. Old fields untouched; the local player's class/level still come from the `self` block.
+
+**Verified:** client + server `typecheck` ✓ · **368/368** unit ✓ · `build` + `server:build` ✓ · a **live headless-browser online smoke** (game server + Vite preview + Chromium, auto-enter) — the world renders voxel terrain, a medieval building, the Warrior humanoid with nameplate, a vendor post, the minimap + full HUD, with **zero runtime errors** (screenshot captured).
+
+---
+
 ## Online Feature Parity (pre-VPS) — the online client becomes a real MMO client
 **Goal:** close the biggest gap before friends play — the online client was a bare renderer (positions + chat + a health bar). It now runs the **entire offline HUD** and modern-MMO furniture, without reimplementing any of it. Done in four verified phases.
 

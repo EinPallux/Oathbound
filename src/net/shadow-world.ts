@@ -154,10 +154,17 @@ export class ShadowWorld {
     switch (e.k) {
       case 'enemy':
       case 'boss':
-        // Minimal Enemy stand-in — only its existence + Health are read (minimap). Cast is safe:
-        // no system runs on this world, and no UI reads the other Enemy fields.
-        this.world.set<Enemy>(le, C.Enemy, { state: e.st ?? 'idle' } as Enemy);
-        this.world.set<EnemyInfo>(le, C.EnemyInfo, { name: e.name ?? 'Enemy', level: 0 });
+        // Enemy stand-in carrying the visual identity the render layer reads (family + archetype →
+        // model, tier → scale, state → telegraph, level → nameplate). `windupTimer < 0` = not casting.
+        // Cast is safe: no system runs on this world, so the unset combat fields are never touched.
+        this.world.set<Enemy>(le, C.Enemy, {
+          state: e.st ?? 'idle',
+          family: e.fam ?? '',
+          archetype: (e.arch as Enemy['archetype']) ?? 'melee_bruiser',
+          tier: (e.tier as Enemy['tier']) ?? (e.k === 'boss' ? 'boss' : 'standard'),
+          windupTimer: -1,
+        } as Enemy);
+        this.world.set<EnemyInfo>(le, C.EnemyInfo, { name: e.name ?? 'Enemy', level: e.lvl ?? 0 });
         break;
       case 'player':
         this.world.set(le, C.PlayerControlled, true);
@@ -170,7 +177,11 @@ export class ShadowWorld {
         this.world.set<Oathstone>(le, C.Oathstone, { id: String(e.id), name: e.name ?? 'Oathstone', activated: false });
         break;
       case 'loot':
-        this.world.set<LootDrop>(le, C.LootDrop, { item: e.name ? ({ name: e.name } as LootDrop['item']) : null, gold: 0, owner: 0, ttl: 0 });
+        // `rarity` isn't replicated → default it so the loot-beam colour is valid (neutral white).
+        this.world.set<LootDrop>(le, C.LootDrop, {
+          item: e.name ? ({ name: e.name, rarity: 'common' } as LootDrop['item']) : null,
+          gold: 0, owner: 0, ttl: 0,
+        });
         break;
     }
     return le;

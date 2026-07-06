@@ -11,7 +11,14 @@ import * as THREE from 'three';
 import { Renderer } from '../render/renderer';
 import { CameraRig } from '../render/camera-rig';
 import { Sky } from '../render/sky';
-import { buildTerrainMesh } from '../render/terrain-mesh';
+import { terrainColorRGB, VOXEL_VIEW } from '../render/terrain-mesh';
+import { VoxelTerrain } from '../render/voxel-terrain';
+import { buildCustomScenery, colorForBiome } from '../render/custom-map-view';
+import { buildScenery } from '../render/scenery-view';
+import { PlayerView } from '../render/player-view';
+import { EnemyView } from '../render/enemy-view';
+import { InteractableView } from '../render/interactable-view';
+import { LootView } from '../render/loot-view';
 import { GameLoop } from '../core/loop';
 import { lerpAngle } from '../core/math';
 import { InputController } from '../platform/input';
@@ -20,17 +27,17 @@ import { loadSave } from '../platform/save-store';
 import { generateHeightfield, type Heightfield, type CylinderCollider } from '../world/heightfield';
 import { WORLD_SIZE, WORLD_RES, VOXEL_CUBE, VOXEL_STEP } from '../world/layout';
 import { getActiveMap } from '../world/active-map';
-import { buildCustomWorldData } from '../world/custom-map';
+import { buildCustomWorldData, customSceneryForMinimap, biomeIndexAt } from '../world/custom-map';
+import { dominantBiome } from '../world/biomes';
 import type { BoxCollider } from '../sim/collision';
 import { PLAYER_HALF } from '../sim/factory';
 import { PredictedPlayer } from '../net/prediction';
 import { ShadowWorld } from '../net/shadow-world';
+import { C, type Transform, type Target, type PlayerClass, type Progression } from '../core/ecs/components';
 import { Hud } from '../render/hud';
 import { TargetFrame } from '../render/target-frame';
 import { Minimap } from '../render/minimap';
 import { DamageNumbers } from '../render/damage-numbers';
-import { Nameplates, type NameplateEntry } from '../render/nameplates';
-import { customSceneryForMinimap } from '../world/custom-map';
 import { generateScenery, type Scenery } from '../world/scenery';
 import {
   PROTOCOL_VERSION,
@@ -79,14 +86,20 @@ export interface OnlineOptions {
 
 interface Replica {
   kind: string;
-  mesh: THREE.Object3D;
   /** Recent authoritative samples (for interpolation-delay rendering of remote entities). */
   samples: Sample[];
   seen: number;
   name?: string;
   hp?: number;
   mhp?: number;
+  /** Player class (players only) → picks the humanoid model. */
+  cls?: ClassId;
+  /** Level shown on the overhead nameplate (players + enemies). */
+  lvl?: number;
 }
+
+/** Feet-to-centre offset for enemy transforms (mirrors EnemyView's ENEMY_FEET / the sim's ENEMY_HALF). */
+const ENEMY_HALF = 0.9;
 
 function statusBar(): (text: string) => void {
   const el = document.createElement('div');
@@ -273,65 +286,62 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
       colliders = [];
       boxes = [];
     }
-    const terrain = buildTerrainMesh(field);
-    renderer.scene.add(terrain);
-    renderer.setFogRange(60, 340);
-    // Terrain collision is analytic (heightfield); no mesh raycast, no prop obstacles online yet.
+    // ── World render: identical to the offline (solo) game ──────────────────────────────────
+    // Terrain is the "Cube World" voxel bubble that follows the player (fog hides its edge);
+    // collision is snapped to the cube tops via field.voxelCube/Step (already set above), so what
+    // you see is what you stand on. Colours/materials come from the map's biomes exactly as solo.
+    const _terrCol = new THREE.Color();
+    const cm = map; // non-null capture for the colour closures
+    const voxelColorAt: (x: number, z: number, h: number, out: [number, number, number]) => void = cm
+      ? (x, z, h, out) => {
+          colorForBiome(biomeIndexAt(cm, x, z), h, x, z, _terrCol);
+          out[0] = _terrCol.r; out[1] = _terrCol.g; out[2] = _terrCol.b;
+        }
+      : terrainColorRGB;
+    // Ground code per position → each cube top's detail texture (grass/rock/grit/paved), as solo.
+    const groundAt: (x: number, z: number) => number = cm
+      ? (x, z) => biomeIndexAt(cm, x, z)
+      : (x, z) => { const b = dominantBiome(x, z); return b === 'ember' || b === 'riven' || b === 'gravereach' ? 20 : 0; };
+    const start = map ? map.playerSpawn : { x: 0, z: 0 };
+    const voxelTerrain = new VoxelTerrain(field, voxelColorAt, VOXEL_CUBE, VOXEL_VIEW, groundAt);
+    voxelTerrain.rebuildAt(start.x, start.z);
+    renderer.scene.add(voxelTerrain.group);
+    renderer.setFogRange(60, VOXEL_VIEW);
+
+    // Scenery: the real 3D props/buildings (custom maps) or procedural nature — same as solo. The
+    // smooth authoring-res paving overlay is hidden; the voxel bubble draws per-cube stone tops.
+    const scenery: Scenery = map ? customSceneryForMinimap(map) : generateScenery(WORLD_SIZE, { seed: 7777 });
+    if (map) {
+      const sceneryGroup = buildCustomScenery(map, field);
+      const smoothPaving = sceneryGroup.getObjectByName('paving');
+      if (smoothPaving) smoothPaving.visible = false;
+      renderer.scene.add(sceneryGroup);
+    } else {
+      renderer.scene.add(buildScenery(scenery, field));
+    }
+    // Terrain collision is analytic (heightfield); the chase camera samples it too (no mesh raycast).
     const cameraRig = new CameraRig(renderer.camera, input, [], field);
 
-    const cap = (r: number, h: number): THREE.CapsuleGeometry => new THREE.CapsuleGeometry(r, h, 4, 10);
-    const mat = (hex: number): THREE.Material => new THREE.MeshLambertMaterial({ color: hex });
-    const GEO = {
-      player: cap(0.4, 1.0),
-      enemy: cap(0.45, 0.7),
-      boss: cap(1.1, 1.6),
-      marker: new THREE.CylinderGeometry(0.35, 0.35, 2.4, 8),
-      box: new THREE.BoxGeometry(0.9, 1.4, 0.9),
-      loot: new THREE.BoxGeometry(0.4, 0.4, 0.4),
-      nose: new THREE.ConeGeometry(0.16, 0.5, 8),
-    };
-    const MAT = {
-      self: mat(0x4aa3ff),
-      other: mat(0x5fd18b),
-      enemy: mat(0xc0392b),
-      boss: mat(0x7a1f1f),
-      vendor: mat(0xf1c40f),
-      oathstone: mat(0x39c3d6),
-      loot: mat(0xf5c542),
-      nose: mat(0xf0f4ff),
-    };
-    const buildMesh = (kind: string, isSelf: boolean): THREE.Object3D => {
-      switch (kind) {
-        case 'player': {
-          const g = new THREE.Group();
-          g.add(new THREE.Mesh(GEO.player, isSelf ? MAT.self : MAT.other));
-          const nose = new THREE.Mesh(GEO.nose, MAT.nose);
-          nose.rotation.x = Math.PI / 2;
-          nose.position.set(0, 0.2, 0.55);
-          g.add(nose);
-          return g;
-        }
-        case 'enemy':
-          return new THREE.Mesh(GEO.enemy, MAT.enemy);
-        case 'boss':
-          return new THREE.Mesh(GEO.boss, MAT.boss);
-        case 'vendor':
-          return new THREE.Mesh(GEO.box, MAT.vendor);
-        case 'oathstone':
-          return new THREE.Mesh(GEO.marker, MAT.oathstone);
-        default:
-          return new THREE.Mesh(GEO.loot, MAT.loot);
-      }
-    };
+    // Entity visuals reuse the offline views verbatim: a voxel humanoid per player (PlayerView),
+    // real per-family creature models with HP bars + nameplates (EnemyView), Oathstone obelisks +
+    // vendor posts (InteractableView) and rarity-coloured loot beams (LootView). The world-driven
+    // views read the client shadow world; PlayerViews are driven directly (local from prediction,
+    // remotes from the interpolation buffer).
+    const playerViews = new Map<number, PlayerView>();
+    const pvPrev = new Map<number, { x: number; z: number }>(); // last position → derive walk speed
+    const enemyView = new EnemyView(renderer.scene);
+    const interactableView = new InteractableView(renderer.scene);
+    const lootView = new LootView(renderer.scene);
+    cleanups.push(() => { for (const pv of playerViews.values()) pv.dispose(); });
 
     const replicas = new Map<number, Replica>();
     let snapIndex = 0;
     let seq = 0;
     let pred: PredictedPlayer | null = null;
     const INTERP_DELAY_MS = 100; // render remote entities this far in the past → smooth motion
-    let camX = 0;
-    let camZ = 0;
-    let camY = field.sample(0, 0) + PLAYER_HALF;
+    let camX = start.x;
+    let camZ = start.z;
+    let camY = field.sample(start.x, start.z) + PLAYER_HALF;
 
     // Full HUD: reuse the entire offline UI (unit frames, ability hotbar with cooldowns, cast bar,
     // buffs, target frame, minimap, floating damage numbers), driven by a client-side shadow ECS
@@ -343,9 +353,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     const hud = new Hud(hudRoot);
     const targetFrame = new TargetFrame(hudRoot);
     const dmgNumbers = new DamageNumbers(hudRoot);
-    const scenery: Scenery = map ? customSceneryForMinimap(map) : generateScenery(WORLD_SIZE, { seed: 7777 });
     const minimap = new Minimap(hudRoot, field.size, field, scenery);
-    const nameplates = new Nameplates(hudRoot);
     let shadow: ShadowWorld | null = null;
 
     const applySnapshot = (msg: SnapshotMessage): void => {
@@ -379,12 +387,13 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
       }
       // Floating combat text.
       if (msg.fx) for (const f of msg.fx) dmgNumbers.spawn(f.x, f.y + 1.2, f.z, f.amount, f.crit, f.heal);
+      // Track each entity's interpolation samples + latest identity. Enemies/props/loot are drawn
+      // by the world-driven views (off the shadow world); players by their PlayerView. So this map
+      // holds no meshes — just the sample buffer + fields the render loop reads.
       for (const e of ents) {
         let r = replicas.get(e.id);
         if (!r) {
-          const mesh = buildMesh(e.k, e.id === selfId);
-          renderer.scene.add(mesh);
-          r = { kind: e.k, mesh, samples: [], seen: snapIndex };
+          r = { kind: e.k, samples: [], seen: snapIndex };
           replicas.set(e.id, r);
         }
         r.samples.push({ t: now, x: e.x, z: e.z, yaw: e.yaw });
@@ -393,13 +402,15 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         if (e.name) r.name = e.name;
         r.hp = e.hp;
         r.mhp = e.mhp;
-        r.mesh.visible = !((e.k === 'enemy' || e.k === 'boss') && e.st === 'dead');
+        if (e.cls) r.cls = e.cls;
+        if (e.lvl != null) r.lvl = e.lvl;
       }
       for (const [id, r] of replicas) {
-        // Never prune our own mesh just because one snapshot omitted us (death / interest cull /
+        // Never prune our own entry just because one snapshot omitted us (death / interest cull /
         // grace-window quirk) — that would make the local player vanish. It's cleaned up on stop().
         if (r.seen !== snapIndex && id !== selfId) {
-          renderer.scene.remove(r.mesh);
+          const pv = playerViews.get(id);
+          if (pv) { pv.dispose(); playerViews.delete(id); pvPrev.delete(id); }
           replicas.delete(id);
         }
       }
@@ -508,48 +519,79 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
       ws.send(encode(msg));
     };
 
+    // Draw one voxel humanoid per player (created + labelled on demand). Speed comes from the
+    // per-frame position delta so the walk cycle animates for local + remote players alike.
+    const drawPlayer = (
+      id: number, x: number, y: number, z: number, yaw: number, dt: number,
+      name: string, cls: ClassId, level: number,
+    ): void => {
+      let pv = playerViews.get(id);
+      if (!pv) { pv = new PlayerView(renderer.scene); playerViews.set(id, pv); }
+      const prev = pvPrev.get(id);
+      const speed = prev ? Math.hypot(x - prev.x, z - prev.z) / Math.max(1e-3, dt) : 0;
+      pvPrev.set(id, { x, z });
+      pv.setLabel(name, level);
+      pv.update(x, y, z, yaw, dt, speed, cls, false);
+    };
+
+    let lastRender = performance.now();
     const renderFrame = (alpha: number): void => {
-      // Remote entities: render at a fixed delay from their sample buffer (smooth under jitter).
-      const renderT = performance.now() - INTERP_DELAY_MS;
-      for (const [id, r] of replicas) {
-        if (id === selfId) continue; // the local player is drawn from prediction, below
-        const [x, z, yaw] = sampleAt(r.samples, renderT);
-        r.mesh.position.set(x, field.sample(x, z) + (r.kind === 'player' ? PLAYER_HALF : 0.4), z);
-        r.mesh.rotation.y = yaw;
-      }
+      const now = performance.now();
+      const rdt = Math.min(0.1, (now - lastRender) / 1000);
+      lastRender = now;
+      const renderT = now - INTERP_DELAY_MS; // render remote entities this far in the past (smooth)
+
       // Local player: predicted, sub-tick-interpolated between the last two ticks by alpha.
-      const meMesh = replicas.get(selfId)?.mesh;
-      if (pred && meMesh) {
+      let selfYaw = 0;
+      if (pred) {
         const tr = pred.transform;
-        const x = tr.prevX + (tr.x - tr.prevX) * alpha;
-        const z = tr.prevZ + (tr.z - tr.prevZ) * alpha;
-        camX = x;
-        camZ = z;
-        camY = field.sample(x, z) + PLAYER_HALF;
-        meMesh.position.set(x, camY, z);
-        meMesh.rotation.y = lerpAngle(tr.prevYaw, tr.yaw, alpha);
+        camX = tr.prevX + (tr.x - tr.prevX) * alpha;
+        camZ = tr.prevZ + (tr.z - tr.prevZ) * alpha;
+        camY = field.sample(camX, camZ) + PLAYER_HALF;
+        selfYaw = lerpAngle(tr.prevYaw, tr.yaw, alpha);
       }
+      // Keep the cube bubble + chase camera centred on the player.
+      voxelTerrain.update(camX, camZ);
       cameraRig.update(camX, camY, camZ);
-      // Reused offline HUD + minimap, driven off the shadow world (local player position from
-      // prediction); floating damage numbers project through the now-positioned camera.
+
+      // World-driven views (enemies, oathstones/vendors, loot) render off the shadow world. Feed each
+      // replica's transform from the interpolation buffer (smooth), snapped to the ground with the
+      // per-kind offset the offline factory uses, then let the offline views draw them verbatim.
       if (shadow) {
-        shadow.setLocalTransform(camX, camY, camZ, pred ? pred.transform.yaw : 0);
+        for (const [id, r] of replicas) {
+          if (id === selfId || r.kind === 'player') continue;
+          const le = shadow.replicaFor(id);
+          if (le === undefined) continue;
+          const t = shadow.world.get<Transform>(le, C.Transform);
+          if (!t) continue;
+          const [x, z, yaw] = sampleAt(r.samples, renderT);
+          const half = r.kind === 'enemy' || r.kind === 'boss' ? ENEMY_HALF : r.kind === 'vendor' ? PLAYER_HALF : 0;
+          const gy = field.sample(x, z) + half;
+          t.x = t.prevX = x; t.z = t.prevZ = z; t.yaw = t.prevYaw = yaw; t.y = t.prevY = gy;
+        }
+        shadow.setLocalTransform(camX, camY, camZ, selfYaw);
+        const target = shadow.world.get<Target>(shadow.localPlayer, C.Target)?.entity ?? null;
+        enemyView.update(shadow.world, renderer.camera, alpha, rdt, target);
+        interactableView.update(shadow.world);
+        lootView.update(shadow.world);
         hud.update(shadow.world, shadow.localPlayer);
         minimap.update(shadow.world, shadow.localPlayer);
       }
-      // Nameplates over other players + living enemies (nearest first, headroom above the mesh).
-      const plates: Array<{ e: NameplateEntry; d: number }> = [];
-      for (const [id, r] of replicas) {
-        if (id === selfId || !r.name || !r.mesh.visible) continue;
-        if (r.kind !== 'player' && r.kind !== 'enemy' && r.kind !== 'boss') continue;
-        if ((r.kind === 'enemy' || r.kind === 'boss') && r.hp != null && r.hp <= 0) continue;
-        const pos = r.mesh.position;
-        const head = pos.y + (r.kind === 'boss' ? 2.6 : r.kind === 'player' ? 1.5 : 1.1);
-        const d = (pos.x - camX) ** 2 + (pos.z - camZ) ** 2;
-        plates.push({ e: { x: pos.x, y: head, z: pos.z, name: r.name, hp: r.hp ?? 1, mhp: r.mhp ?? 1, kind: r.kind }, d });
+
+      // Players: the local one from prediction (class/level from the shadow self block); remotes
+      // from the interpolation buffer (class/level carried in the snapshot, default warrior/Lv1).
+      if (pred && shadow) {
+        const cls = shadow.world.get<PlayerClass>(shadow.localPlayer, C.PlayerClass)?.id ?? 'warrior';
+        const level = shadow.world.get<Progression>(shadow.localPlayer, C.Progression)?.level ?? 1;
+        drawPlayer(selfId, camX, camY, camZ, selfYaw, rdt, replicas.get(selfId)?.name ?? 'Adventurer', cls, level);
       }
-      plates.sort((a, b) => a.d - b.d);
-      nameplates.render(renderer.camera, window.innerWidth, window.innerHeight, plates.map((p) => p.e));
+      for (const [id, r] of replicas) {
+        if (id === selfId || r.kind !== 'player') continue;
+        const [x, z, yaw] = sampleAt(r.samples, renderT);
+        const y = field.sample(x, z) + PLAYER_HALF;
+        drawPlayer(id, x, y, z, yaw, rdt, r.name ?? 'Adventurer', r.cls ?? 'warrior', r.lvl ?? 1);
+      }
+
       dmgNumbers.update(renderer.camera, window.innerWidth, window.innerHeight);
       renderer.render();
     };
