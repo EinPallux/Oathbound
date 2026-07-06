@@ -75,7 +75,20 @@ export function buildSnapshot(world: World, tick: number, ack: number, opts: Sna
       ent.mhp = q(hp.max);
     }
     const en = world.get<Enemy>(e, C.Enemy);
-    if (en) ent.st = en.state;
+    if (en) {
+      // Enemy visual identity so the client renders the real creature model (family+archetype),
+      // scaled by tier, with the correct level on its nameplate — matching the offline game.
+      ent.st = en.state;
+      ent.fam = en.family;
+      ent.arch = en.archetype;
+      ent.tier = en.tier;
+      ent.lvl = world.get<EnemyInfo>(e, C.EnemyInfo)?.level;
+    }
+    if (kind === 'player') {
+      // Player class + level, so remote players show the right humanoid + nameplate.
+      ent.cls = world.get<PlayerClass>(e, C.PlayerClass)?.id;
+      ent.lvl = world.get<Progression>(e, C.Progression)?.level;
+    }
     const name = nameOf(world, e, kind, opts.names);
     if (name) ent.name = name;
     ents.push(ent);

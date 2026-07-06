@@ -819,6 +819,18 @@ export class PlayerView {
         this.mountLegs[i].rotation.x = Math.sin(gp + legPhase[i]) * legAmp;
     }
   }
+
+  /** Remove the figure + overhead plate from the scene and free their GPU resources. Used online,
+   *  where a PlayerView exists per player and is torn down when that player leaves. */
+  dispose(): void {
+    this.scene.remove(this.group);
+    disposeTree(this.group);
+    if (this.nameplate) {
+      this.scene.remove(this.nameplate);
+      (this.nameplate.material as THREE.SpriteMaterial).dispose();
+    }
+    this.npTexture?.dispose();
+  }
 }
 
 function easeOut(p: number): number {

@@ -202,6 +202,14 @@ export const SnapshotEntity = z.object({
   st: z.string().optional(),
   /** Display name (players → character name; enemies/bosses/vendors/oathstones → their name). */
   name: z.string().optional(),
+  /** Visual identity, so the client can render the SAME models as the offline game (not stand-ins).
+   *  Players: `cls` (class) picks the humanoid; enemies/bosses: `fam`+`arch` pick the creature model
+   *  and `tier` scales it. `lvl` is the level shown on the overhead nameplate (players + enemies). */
+  cls: ClassIdSchema.optional(),
+  lvl: z.number().int().optional(),
+  fam: z.string().optional(),
+  arch: z.string().optional(),
+  tier: z.string().optional(),
 });
 export type SnapshotEntity = z.infer<typeof SnapshotEntity>;
 
