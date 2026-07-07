@@ -10,8 +10,7 @@
 import * as THREE from 'three';
 import { Renderer } from '../render/renderer';
 import { CameraRig } from '../render/camera-rig';
-import { Sky } from '../render/sky';
-import { buildTerrainMesh } from '../render/terrain-mesh';
+import { buildWorldScene } from '../render/world-scene';
 import { GameLoop } from '../core/loop';
 import { lerpAngle } from '../core/math';
 import { InputController } from '../platform/input';
@@ -253,7 +252,6 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     const keybinds = loadKeybinds();
     const input = new InputController(canvas, keybinds);
     cleanups.push(() => input.dispose(), () => renderer.dispose());
-    new Sky(renderer.scene);
 
     // Build the SAME field + colliders the server used (deterministic) so client-side prediction
     // resolves collision identically. Custom map (Talar) → full world data; else procedural.
@@ -273,9 +271,15 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
       colliders = [];
       boxes = [];
     }
-    const terrain = buildTerrainMesh(field);
-    renderer.scene.add(terrain);
-    renderer.setFogRange(60, 340);
+    // The full visual world (Cube-World voxel terrain, scenery, village, NPCs/critters, ambient
+    // life, sky) — identical to the offline game, built from the same map/heightfield.
+    const worldScene = buildWorldScene(
+      renderer.scene,
+      field,
+      map,
+      (n, f) => renderer.setFogRange(n, f),
+      map ? map.playerSpawn : { x: 0, z: 0 },
+    );
     // Terrain collision is analytic (heightfield); no mesh raycast, no prop obstacles online yet.
     const cameraRig = new CameraRig(renderer.camera, input, [], field);
 
@@ -508,9 +512,13 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
       ws.send(encode(msg));
     };
 
+    let lastFrameMs = performance.now();
     const renderFrame = (alpha: number): void => {
+      const nowMs = performance.now();
+      const rdt = Math.min(0.1, (nowMs - lastFrameMs) / 1000);
+      lastFrameMs = nowMs;
       // Remote entities: render at a fixed delay from their sample buffer (smooth under jitter).
-      const renderT = performance.now() - INTERP_DELAY_MS;
+      const renderT = nowMs - INTERP_DELAY_MS;
       for (const [id, r] of replicas) {
         if (id === selfId) continue; // the local player is drawn from prediction, below
         const [x, z, yaw] = sampleAt(r.samples, renderT);
@@ -530,6 +538,8 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         meMesh.rotation.y = lerpAngle(tr.prevYaw, tr.yaw, alpha);
       }
       cameraRig.update(camX, camY, camZ);
+      // Roam the Cube-World voxel bubble + animate scenery/village/NPCs/ambient life + sky.
+      worldScene.update(rdt, renderer.camera, camX, camZ, field);
       // Reused offline HUD + minimap, driven off the shadow world (local player position from
       // prediction); floating damage numbers project through the now-positioned camera.
       if (shadow) {
