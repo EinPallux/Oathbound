@@ -18,6 +18,7 @@ import {
   type CombatState,
   type Shield,
   type Inventory,
+  type Equipment,
   type Character,
   type CastState,
   type Target,
@@ -27,6 +28,8 @@ import {
   type Vendor,
   type Oathstone,
   type LootDrop,
+  type Item,
+  type EquipSlot,
 } from '../core/ecs/components';
 import { createPlayer } from '../sim/factory';
 import type { Heightfield } from '../world/heightfield';
@@ -121,6 +124,19 @@ export class ShadowWorld {
     // Target: map the server target id to a local replica (null if not present locally yet).
     const tgt = w.get<Target>(p, C.Target);
     if (tgt) tgt.entity = s.tgt ? (this.replicas.get(s.tgt.id) ?? null) : null;
+  }
+
+  /** Populate the local player's bag + equipped gear from the server (for the inventory panel). */
+  applyInventory(items: Item[], equipment: Partial<Record<EquipSlot, Item>>, gold: number, materials: number, capacity: number): void {
+    const inv = this.world.get<Inventory>(this.localPlayer, C.Inventory);
+    if (inv) {
+      inv.items = items;
+      inv.gold = gold;
+      inv.materials = materials;
+      inv.capacity = capacity;
+    }
+    const eq = this.world.get<Equipment>(this.localPlayer, C.Equipment);
+    if (eq) eq.slots = equipment;
   }
 
   /** Reconcile replicas against the latest snapshot (create/update/remove). */

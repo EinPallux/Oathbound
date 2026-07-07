@@ -31,6 +31,9 @@ import { TargetFrame } from '../render/target-frame';
 import { Minimap } from '../render/minimap';
 import { DamageNumbers } from '../render/damage-numbers';
 import { Nameplates, type NameplateEntry } from '../render/nameplates';
+import { InventoryPanel } from '../render/inventory-panel';
+import { ItemTooltip } from '../render/item-tooltip';
+import type { Item, EquipSlot } from '../core/ecs/components';
 import { customSceneryForMinimap } from '../world/custom-map';
 import { generateScenery, type Scenery } from '../world/scenery';
 import {
@@ -351,7 +354,17 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     const scenery: Scenery = map ? customSceneryForMinimap(map) : generateScenery(WORLD_SIZE, { seed: 7777 });
     const minimap = new Minimap(hudRoot, field.size, field, scenery);
     const nameplates = new Nameplates(hudRoot);
+    // Inventory bag (B) + item tooltips. Equip/salvage go to the server as commands; the resulting
+    // bag change comes back as an `inventory` message.
+    const tooltip = new ItemTooltip(hudRoot);
+    const invPanel = new InventoryPanel(hudRoot, tooltip);
+    invPanel.onEquip = (item) => send({ t: 'equip', uid: item.uid });
+    invPanel.onSalvage = (item) => send({ t: 'salvage', uid: item.uid });
+    invPanel.onSalvageCommons = () => send({ t: 'salvageCommons' });
     let shadow: ShadowWorld | null = null;
+    onInventory = (items, equipment, gold, materials, capacity): void => {
+      shadow?.applyInventory(items, equipment, gold, materials, capacity);
+    };
 
     const applySnapshot = (msg: SnapshotMessage): void => {
       const ents = msg.ents;
@@ -488,6 +501,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     const sendInput = (): void => {
       if (ws.readyState !== WebSocket.OPEN) return;
       if (input.consumeToggleMap()) minimap.toggleMap(); // M toggles the big map (client-only UI)
+      if (input.consumeToggleInventory()) invPanel.toggle(); // B toggles the bag
       if (chatFocused) {
         // While typing in chat, don't drive the player — drain edge-triggers so nothing fires on
         // blur, and send a neutral (idle) input this tick.
@@ -572,6 +586,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         shadow.setLocalTransform(camX, camY, camZ, pred ? pred.transform.yaw : 0);
         hud.update(shadow.world, shadow.localPlayer);
         minimap.update(shadow.world, shadow.localPlayer);
+        invPanel.update(shadow.world, shadow.localPlayer);
       }
       // Nameplates (name + HP bar) over living enemies/bosses; players carry their own overhead
       // name/level plate via PlayerView. Nearest first, headroom above the model.
@@ -599,6 +614,10 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
 
   // Snapshot handler is set once the world scene exists.
   let onSnapshot: ((msg: SnapshotMessage) => void) | null = null;
+  // Inventory handler (bag + equipped gear), set once the world scene exists.
+  let onInventory:
+    | ((items: Item[], equipment: Partial<Record<EquipSlot, Item>>, gold: number, materials: number, capacity: number) => void)
+    | null = null;
   // Chat overlay hooks (wired once the world scene exists).
   let pushChat: ((text: string, system: boolean) => void) | null = null;
   let chatFocused = false;
@@ -644,6 +663,15 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
           break;
         case 'snapshot':
           onSnapshot?.(m);
+          break;
+        case 'inventory':
+          onInventory?.(
+            m.items as Item[],
+            m.equipment as Partial<Record<EquipSlot, Item>>,
+            m.gold,
+            m.materials,
+            m.capacity,
+          );
           break;
         case 'chatLine':
           pushChat?.(m.me ? `• ${m.from} ${m.text}` : `${m.from}: ${m.text}`, false);

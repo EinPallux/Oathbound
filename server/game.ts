@@ -12,6 +12,9 @@ import { RateLimiter } from '../src/net/rate-limit';
 import { addPlayer } from '../src/sim/boot/sim-world';
 import { createNullControlState } from '../src/platform/null-input';
 import { pickUpNearest } from '../src/sim/systems/loot';
+import { equipItem } from '../src/sim/inventory';
+import { salvageItem, salvageAllBelow } from '../src/sim/salvage';
+import type { Inventory, Equipment, Item } from '../src/core/ecs/components';
 import { serialize, applySave, SCHEMA_VERSION, type SaveData } from '../src/sim/save';
 import { LEVEL_CAP } from '../src/sim/stats';
 import { CombatEvent, type LevelUpEvent, type DeathEvent, type DamageEvent, type HealEvent } from '../src/sim/combat/events';
@@ -304,15 +307,64 @@ export class GameServer {
 
   step(dt: number = DT): void {
     this.world.sim.world.update(dt);
-    for (const p of this.clients.values()) {
-      if (p.input.consumeInteract()) pickUpNearest(this.world.sim.world, p.entity);
+    for (const [ws, p] of this.clients) {
+      if (p.input.consumeInteract() && pickUpNearest(this.world.sim.world, p.entity)) this.invDirty.add(ws);
     }
     this.reap();
+    // Push any changed bags to their owners (loot pickup / level-up rewards).
+    if (this.invDirty.size > 0) {
+      for (const ws of this.invDirty) this.sendInventory(ws);
+      this.invDirty.clear();
+    }
     this.tickCount++;
     if (++this.sinceSnapshot >= this.snapshotEvery) {
       this.sinceSnapshot = 0;
       this.broadcast();
     }
+  }
+
+  /** Connections whose bag changed this tick and need a fresh `inventory` message. */
+  private readonly invDirty = new Set<WebSocket>();
+
+  /** Send the player's current bag + equipped gear (called on enter + after any change). */
+  sendInventory(ws: WebSocket): void {
+    const p = this.clients.get(ws);
+    if (!p) return;
+    const inv = this.world.sim.world.get<Inventory>(p.entity, C.Inventory);
+    const eq = this.world.sim.world.get<Equipment>(p.entity, C.Equipment);
+    if (!inv || !eq) return;
+    this.sendTo(ws, {
+      t: 'inventory',
+      items: inv.items,
+      equipment: eq.slots,
+      gold: inv.gold,
+      materials: inv.materials,
+      capacity: inv.capacity,
+    });
+  }
+
+  /** Equip an inventory item by uid (server-authoritative). */
+  equip(ws: WebSocket, uid: string): void {
+    const p = this.clients.get(ws);
+    if (!p) return;
+    const inv = this.world.sim.world.get<Inventory>(p.entity, C.Inventory);
+    const item = inv?.items.find((i: Item) => i.uid === uid);
+    if (item) {
+      equipItem(this.world.sim.world, p.entity, item);
+      this.invDirty.add(ws);
+    }
+  }
+
+  /** Salvage one inventory item by uid. */
+  salvage(ws: WebSocket, uid: string): void {
+    const p = this.clients.get(ws);
+    if (p && salvageItem(this.world.sim.world, p.entity, uid)) this.invDirty.add(ws);
+  }
+
+  /** Salvage every Common item in the bag. */
+  salvageCommons(ws: WebSocket): void {
+    const p = this.clients.get(ws);
+    if (p && salvageAllBelow(this.world.sim.world, p.entity, 'common') > 0) this.invDirty.add(ws);
   }
 
   /** Destroy orphaned (disconnected past the grace window) player entities. */

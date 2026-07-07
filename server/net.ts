@@ -128,6 +128,7 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
         players: game.playerCount,
       });
       game.sendSnapshotTo(ws);
+      game.sendInventory(ws); // the bag + equipped gear, so the inventory panel populates on entry
       game.announceJoin(ws); // MOTD to us + "joined" to everyone else
     };
 
@@ -212,6 +213,16 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
 
         case 'chat':
           if (inWorld) game.chat(ws, msg.text);
+          return;
+
+        case 'equip':
+          if (inWorld) game.equip(ws, msg.uid);
+          return;
+        case 'salvage':
+          if (inWorld) game.salvage(ws, msg.uid);
+          return;
+        case 'salvageCommons':
+          if (inWorld) game.salvageCommons(ws);
           return;
       }
     });

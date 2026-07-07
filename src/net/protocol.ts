@@ -77,6 +77,13 @@ export const ChatMessage = z.object({
   text: z.string().min(1).max(200),
 });
 
+/** Equip an inventory item (by uid) — server validates ownership + applies. */
+export const EquipMessage = z.object({ t: z.literal('equip'), uid: z.string().min(1).max(64) });
+/** Salvage one inventory item (by uid). */
+export const SalvageMessage = z.object({ t: z.literal('salvage'), uid: z.string().min(1).max(64) });
+/** Salvage all Common items in the bag. */
+export const SalvageCommonsMessage = z.object({ t: z.literal('salvageCommons') });
+
 /** Latency probe: `time` is the client's clock (ms) and is echoed back untouched. */
 export const PingMessage = z.object({
   t: z.literal('ping'),
@@ -119,6 +126,9 @@ export const ClientMessage = z.discriminatedUnion('t', [
   ChatMessage,
   PingMessage,
   InputMessage,
+  EquipMessage,
+  SalvageMessage,
+  SalvageCommonsMessage,
 ]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 
@@ -177,6 +187,17 @@ export const ChatLineMessage = z.object({
 export const SystemMessage = z.object({
   t: z.literal('system'),
   text: z.string(),
+});
+
+/** The local player's bag + equipped gear (sent on enter + whenever they change). Items are
+ *  passed through as-is — the client only displays them (the server is authoritative). */
+export const InventoryMessage = z.object({
+  t: z.literal('inventory'),
+  items: z.array(z.unknown()),
+  equipment: z.record(z.string(), z.unknown()),
+  gold: z.number(),
+  materials: z.number(),
+  capacity: z.number(),
 });
 
 /** Reject/inform: a coded error (e.g. bad protocol version, malformed message). */
@@ -284,6 +305,7 @@ export const ServerMessage = z.discriminatedUnion('t', [
   CharListMessage,
   ChatLineMessage,
   SystemMessage,
+  InventoryMessage,
 ]);
 export type ServerMessage = z.infer<typeof ServerMessage>;
 
