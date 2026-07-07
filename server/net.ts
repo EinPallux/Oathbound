@@ -224,6 +224,18 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
         case 'salvageCommons':
           if (inWorld) game.salvageCommons(ws);
           return;
+        case 'sell':
+          if (inWorld) game.sell(ws, msg.uid);
+          return;
+        case 'sellCommons':
+          if (inWorld) game.sellCommons(ws);
+          return;
+        case 'reinforce':
+          if (inWorld) game.reinforce(ws, msg.uid);
+          return;
+        case 'talent':
+          if (inWorld) game.talent(ws, msg.nodeId, msg.option);
+          return;
       }
     });
   });

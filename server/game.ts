@@ -14,7 +14,10 @@ import { createNullControlState } from '../src/platform/null-input';
 import { pickUpNearest } from '../src/sim/systems/loot';
 import { equipItem } from '../src/sim/inventory';
 import { salvageItem, salvageAllBelow } from '../src/sim/salvage';
-import type { Inventory, Equipment, Item } from '../src/core/ecs/components';
+import { sellItem, sellAllBelow, nearestVendor } from '../src/sim/vendor';
+import { reinforceItem } from '../src/sim/reinforce';
+import { getClass } from '../src/sim/classes';
+import type { Inventory, Equipment, Item, PlayerClass, AbilityState } from '../src/core/ecs/components';
 import { serialize, applySave, SCHEMA_VERSION, type SaveData } from '../src/sim/save';
 import { LEVEL_CAP } from '../src/sim/stats';
 import { CombatEvent, type LevelUpEvent, type DeathEvent, type DamageEvent, type HealEvent } from '../src/sim/combat/events';
@@ -365,6 +368,43 @@ export class GameServer {
   salvageCommons(ws: WebSocket): void {
     const p = this.clients.get(ws);
     if (p && salvageAllBelow(this.world.sim.world, p.entity, 'common') > 0) this.invDirty.add(ws);
+  }
+
+  /** Sell one item to the vendor — only when actually standing near it (server-validated). */
+  sell(ws: WebSocket, uid: string): void {
+    const p = this.clients.get(ws);
+    if (!p || nearestVendor(this.world.sim.world, p.entity) == null) return;
+    if (sellItem(this.world.sim.world, p.entity, uid)) this.invDirty.add(ws);
+  }
+
+  /** Sell all Common items to the vendor (near it). */
+  sellCommons(ws: WebSocket): void {
+    const p = this.clients.get(ws);
+    if (!p || nearestVendor(this.world.sim.world, p.entity) == null) return;
+    if (sellAllBelow(this.world.sim.world, p.entity, 'common') > 0) this.invDirty.add(ws);
+  }
+
+  /** Reinforce one item by uid (spends gold + whetstones). */
+  reinforce(ws: WebSocket, uid: string): void {
+    const p = this.clients.get(ws);
+    if (p && reinforceItem(this.world.sim.world, p.entity, uid)) this.invDirty.add(ws);
+  }
+
+  /** Pick a talent-node build option; also readies the swapped ability slot. */
+  talent(ws: WebSocket, nodeId: string, option: number): void {
+    const p = this.clients.get(ws);
+    if (!p) return;
+    const w = this.world.sim.world;
+    const pc = w.get<PlayerClass>(p.entity, C.PlayerClass);
+    if (!pc) return;
+    const cls = getClass(pc.id);
+    if (!cls.choiceNodes.some((n) => n.id === nodeId) || option < 0 || option > 1) return; // validate
+    if (!pc.choices) pc.choices = {};
+    pc.choices[nodeId] = option;
+    const nodeIdx = cls.choiceNodes.findIndex((n) => n.id === nodeId);
+    const ab = w.get<AbilityState>(p.entity, C.AbilityState);
+    if (nodeIdx >= 0 && ab) ab.cooldowns[cls.abilities.length + nodeIdx] = 0;
+    // The change flows to the client via the next snapshot's self block (choices + cooldowns).
   }
 
   /** Destroy orphaned (disconnected past the grace window) player entities. */

@@ -33,6 +33,9 @@ import { DamageNumbers } from '../render/damage-numbers';
 import { Nameplates, type NameplateEntry } from '../render/nameplates';
 import { InventoryPanel } from '../render/inventory-panel';
 import { ItemTooltip } from '../render/item-tooltip';
+import { VendorPanel } from '../render/vendor-panel';
+import { CharacterPanel } from '../render/character-panel';
+import { nearestVendor } from '../sim/vendor';
 import type { Item, EquipSlot } from '../core/ecs/components';
 import { customSceneryForMinimap } from '../world/custom-map';
 import { generateScenery, type Scenery } from '../world/scenery';
@@ -361,6 +364,16 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     invPanel.onEquip = (item) => send({ t: 'equip', uid: item.uid });
     invPanel.onSalvage = (item) => send({ t: 'salvage', uid: item.uid });
     invPanel.onSalvageCommons = () => send({ t: 'salvageCommons' });
+    invPanel.onReinforce = (item) => send({ t: 'reinforce', uid: item.uid });
+    // Character sheet (C) — equipped gear + reinforce + talents. Vendor (F near a stall) — sell.
+    // All mutations go to the server as commands; the resulting bag/gear state comes back as an
+    // `inventory` message and the self block, which the shadow world applies.
+    const charPanel = new CharacterPanel(hudRoot, tooltip);
+    charPanel.onReinforce = (item) => send({ t: 'reinforce', uid: item.uid });
+    charPanel.onChooseTalent = (nodeId, option) => send({ t: 'talent', nodeId, option });
+    const vendorPanel = new VendorPanel(hudRoot);
+    vendorPanel.onSell = (item) => send({ t: 'sell', uid: item.uid });
+    vendorPanel.onSellCommons = () => send({ t: 'sellCommons' });
     let shadow: ShadowWorld | null = null;
     onInventory = (items, equipment, gold, materials, capacity): void => {
       shadow?.applyInventory(items, equipment, gold, materials, capacity);
@@ -500,8 +513,19 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
 
     const sendInput = (): void => {
       if (ws.readyState !== WebSocket.OPEN) return;
-      if (input.consumeToggleMap()) minimap.toggleMap(); // M toggles the big map (client-only UI)
-      if (input.consumeToggleInventory()) invPanel.toggle(); // B toggles the bag
+      // Client-only UI toggles. Centre panels (inventory / character / vendor) are mutually
+      // exclusive, mirroring the offline game.
+      if (input.consumeToggleMap()) minimap.toggleMap(); // M toggles the big map
+      if (input.consumeToggleInventory()) {
+        charPanel.close();
+        vendorPanel.close();
+        invPanel.toggle();
+      }
+      if (input.consumeToggleCharacter()) {
+        invPanel.close();
+        vendorPanel.close();
+        charPanel.toggle();
+      }
       if (chatFocused) {
         // While typing in chat, don't drive the player — drain edge-triggers so nothing fires on
         // blur, and send a neutral (idle) input this tick.
@@ -526,6 +550,25 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         ws.send(encode(idle));
         return;
       }
+      // F interact: close an open vendor panel, else open it when standing by a vendor (the same
+      // key still flows to the server for loot pickup / oathstone activation, so we don't consume
+      // it when there's no vendor interaction to handle locally).
+      let interact = input.consumeInteract();
+      if (interact && shadow) {
+        if (vendorPanel.isOpen) {
+          vendorPanel.close();
+          interact = false;
+        } else if (nearestVendor(shadow.world, shadow.localPlayer) != null) {
+          invPanel.close();
+          charPanel.close();
+          vendorPanel.open();
+          interact = false;
+        }
+      }
+      // Auto-close the vendor panel once we walk away from the stall.
+      if (vendorPanel.isOpen && shadow && nearestVendor(shadow.world, shadow.localPlayer) == null) {
+        vendorPanel.close();
+      }
       const msg = {
         t: 'input' as const,
         seq: ++seq,
@@ -536,7 +579,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         yaw: input.yaw,
         jump: input.consumeJump(),
         ability: input.consumeAbility(),
-        interact: input.consumeInteract(),
+        interact,
         cycle: input.consumeTargetCycle(),
       };
       pred?.predict(msg); // move the local player immediately (reconciled against snapshots)
@@ -587,6 +630,8 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         hud.update(shadow.world, shadow.localPlayer);
         minimap.update(shadow.world, shadow.localPlayer);
         invPanel.update(shadow.world, shadow.localPlayer);
+        charPanel.update(shadow.world, shadow.localPlayer);
+        vendorPanel.update(shadow.world, shadow.localPlayer);
       }
       // Nameplates (name + HP bar) over living enemies/bosses; players carry their own overhead
       // name/level plate via PlayerView. Nearest first, headroom above the model.

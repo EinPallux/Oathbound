@@ -83,6 +83,22 @@ export const EquipMessage = z.object({ t: z.literal('equip'), uid: z.string().mi
 export const SalvageMessage = z.object({ t: z.literal('salvage'), uid: z.string().min(1).max(64) });
 /** Salvage all Common items in the bag. */
 export const SalvageCommonsMessage = z.object({ t: z.literal('salvageCommons') });
+/** Sell one item to the vendor (must be near it). */
+export const SellMessage = z.object({ t: z.literal('sell'), uid: z.string().min(1).max(64) });
+/** Sell all Common items to the vendor. */
+export const SellCommonsMessage = z.object({ t: z.literal('sellCommons') });
+/** Reinforce one item (spends gold + whetstones). */
+export const ReinforceMessage = z.object({ t: z.literal('reinforce'), uid: z.string().min(1).max(64) });
+/** Pick a talent-node option (build choice). */
+export const TalentMessage = z.object({
+  t: z.literal('talent'),
+  nodeId: z.string().min(1).max(48),
+  option: z.number().int().min(0).max(3),
+});
+/** Fast-travel to an activated Oathstone (by its stable id). */
+export const TravelMessage = z.object({ t: z.literal('travel'), stoneId: z.string().min(1).max(48) });
+/** Accept a quest offered by an NPC (by quest id). */
+export const QuestAcceptMessage = z.object({ t: z.literal('questAccept'), id: z.string().min(1).max(48) });
 
 /** Latency probe: `time` is the client's clock (ms) and is echoed back untouched. */
 export const PingMessage = z.object({
@@ -129,6 +145,12 @@ export const ClientMessage = z.discriminatedUnion('t', [
   EquipMessage,
   SalvageMessage,
   SalvageCommonsMessage,
+  SellMessage,
+  SellCommonsMessage,
+  ReinforceMessage,
+  TalentMessage,
+  TravelMessage,
+  QuestAcceptMessage,
 ]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 
