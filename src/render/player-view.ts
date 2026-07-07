@@ -166,6 +166,20 @@ export class PlayerView {
     this.npTexture.needsUpdate = true;
   }
 
+  /** Remove the figure + nameplate from the scene and free their GPU resources. Used online,
+   *  where each remote player has its own PlayerView that despawns when they leave. */
+  dispose(): void {
+    this.scene.remove(this.group);
+    disposeTree(this.group);
+    if (this.mount) disposeTree(this.mount);
+    if (this.nameplate) {
+      this.scene.remove(this.nameplate);
+      this.npTexture?.dispose();
+      (this.nameplate.material as THREE.SpriteMaterial).dispose();
+      this.nameplate = null;
+    }
+  }
+
   /** (Re)build the voxel figure for a class — fresh body + rig + class kit. */
   private build(classId: ClassId): void {
     for (const c of [...this.group.children]) {

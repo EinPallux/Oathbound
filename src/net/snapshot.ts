@@ -75,7 +75,17 @@ export function buildSnapshot(world: World, tick: number, ack: number, opts: Sna
       ent.mhp = q(hp.max);
     }
     const en = world.get<Enemy>(e, C.Enemy);
-    if (en) ent.st = en.state;
+    if (en) {
+      ent.st = en.state;
+      ent.fam = en.family; // for the enemy model
+      ent.arch = en.archetype;
+    }
+    if (kind === 'player') {
+      const pc = world.get<PlayerClass>(e, C.PlayerClass);
+      if (pc) ent.cls = pc.id; // for the character model
+      const prog = world.get<Progression>(e, C.Progression);
+      if (prog) ent.lvl = prog.level;
+    }
     const name = nameOf(world, e, kind, opts.names);
     if (name) ent.name = name;
     ents.push(ent);

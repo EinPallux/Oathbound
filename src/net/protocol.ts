@@ -202,6 +202,13 @@ export const SnapshotEntity = z.object({
   st: z.string().optional(),
   /** Display name (players → character name; enemies/bosses/vendors/oathstones → their name). */
   name: z.string().optional(),
+  /** Player class id — picks the character model + weapon. */
+  cls: z.string().optional(),
+  /** Player level (for the overhead nameplate). */
+  lvl: z.number().int().optional(),
+  /** Enemy family + archetype — pick the low-poly enemy model. */
+  fam: z.string().optional(),
+  arch: z.string().optional(),
 });
 export type SnapshotEntity = z.infer<typeof SnapshotEntity>;
 

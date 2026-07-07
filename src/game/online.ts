@@ -11,6 +11,8 @@ import * as THREE from 'three';
 import { Renderer } from '../render/renderer';
 import { CameraRig } from '../render/camera-rig';
 import { buildWorldScene } from '../render/world-scene';
+import { PlayerView } from '../render/player-view';
+import { buildEnemyModel } from '../render/enemy-models';
 import { GameLoop } from '../core/loop';
 import { lerpAngle } from '../core/math';
 import { InputController } from '../platform/input';
@@ -78,13 +80,23 @@ export interface OnlineOptions {
 
 interface Replica {
   kind: string;
-  mesh: THREE.Object3D;
+  /** Players: the animated figure. */
+  view?: PlayerView;
+  /** Enemies/bosses (model root) + vendor/oathstone/loot (simple markers). */
+  object?: THREE.Object3D;
+  /** Model height (m) for nameplate placement. */
+  top?: number;
   /** Recent authoritative samples (for interpolation-delay rendering of remote entities). */
   samples: Sample[];
   seen: number;
   name?: string;
   hp?: number;
   mhp?: number;
+  cls?: string;
+  lvl?: number;
+  /** Last render position, for the walk-speed estimate. */
+  rx?: number;
+  rz?: number;
 }
 
 function statusBar(): (text: string) => void {
@@ -283,49 +295,38 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     // Terrain collision is analytic (heightfield); no mesh raycast, no prop obstacles online yet.
     const cameraRig = new CameraRig(renderer.camera, input, [], field);
 
-    const cap = (r: number, h: number): THREE.CapsuleGeometry => new THREE.CapsuleGeometry(r, h, 4, 10);
+    // Players use the real animated PlayerView figure; enemies/bosses use the low-poly
+    // buildEnemyModel; only the incidental markers (vendor stall, oathstone obelisk, loot) use
+    // simple meshes here.
     const mat = (hex: number): THREE.Material => new THREE.MeshLambertMaterial({ color: hex });
     const GEO = {
-      player: cap(0.4, 1.0),
-      enemy: cap(0.45, 0.7),
-      boss: cap(1.1, 1.6),
       marker: new THREE.CylinderGeometry(0.35, 0.35, 2.4, 8),
       box: new THREE.BoxGeometry(0.9, 1.4, 0.9),
       loot: new THREE.BoxGeometry(0.4, 0.4, 0.4),
-      nose: new THREE.ConeGeometry(0.16, 0.5, 8),
     };
-    const MAT = {
-      self: mat(0x4aa3ff),
-      other: mat(0x5fd18b),
-      enemy: mat(0xc0392b),
-      boss: mat(0x7a1f1f),
-      vendor: mat(0xf1c40f),
-      oathstone: mat(0x39c3d6),
-      loot: mat(0xf5c542),
-      nose: mat(0xf0f4ff),
+    const MAT = { vendor: mat(0xf1c40f), oathstone: mat(0x39c3d6), loot: mat(0xf5c542) };
+    const buildMarker = (kind: string): THREE.Object3D => {
+      if (kind === 'vendor') return new THREE.Mesh(GEO.box, MAT.vendor);
+      if (kind === 'oathstone') return new THREE.Mesh(GEO.marker, MAT.oathstone);
+      return new THREE.Mesh(GEO.loot, MAT.loot);
     };
-    const buildMesh = (kind: string, isSelf: boolean): THREE.Object3D => {
-      switch (kind) {
-        case 'player': {
-          const g = new THREE.Group();
-          g.add(new THREE.Mesh(GEO.player, isSelf ? MAT.self : MAT.other));
-          const nose = new THREE.Mesh(GEO.nose, MAT.nose);
-          nose.rotation.x = Math.PI / 2;
-          nose.position.set(0, 0.2, 0.55);
-          g.add(nose);
-          return g;
-        }
-        case 'enemy':
-          return new THREE.Mesh(GEO.enemy, MAT.enemy);
-        case 'boss':
-          return new THREE.Mesh(GEO.boss, MAT.boss);
-        case 'vendor':
-          return new THREE.Mesh(GEO.box, MAT.vendor);
-        case 'oathstone':
-          return new THREE.Mesh(GEO.marker, MAT.oathstone);
-        default:
-          return new THREE.Mesh(GEO.loot, MAT.loot);
-      }
+    /** Free a built model's geometry + materials on despawn. */
+    const disposeObject = (obj: THREE.Object3D): void => {
+      obj.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.geometry) m.geometry.dispose();
+        const mm = m.material as THREE.Material | THREE.Material[] | undefined;
+        if (Array.isArray(mm)) mm.forEach((x) => x.dispose());
+        else mm?.dispose();
+      });
+    };
+    /** Estimate a replica's move speed (m/s) from its render-position delta, for walk animation. */
+    const speedOf = (r: Replica, x: number, z: number, dt: number): number => {
+      const dx = x - (r.rx ?? x);
+      const dz = z - (r.rz ?? z);
+      r.rx = x;
+      r.rz = z;
+      return dt > 0 ? Math.hypot(dx, dz) / dt : 0;
     };
 
     const replicas = new Map<number, Replica>();
@@ -386,24 +387,40 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
       for (const e of ents) {
         let r = replicas.get(e.id);
         if (!r) {
-          const mesh = buildMesh(e.k, e.id === selfId);
-          renderer.scene.add(mesh);
-          r = { kind: e.k, mesh, samples: [], seen: snapIndex };
+          r = { kind: e.k, samples: [], seen: snapIndex };
+          if (e.k === 'player') {
+            r.view = new PlayerView(renderer.scene);
+          } else if (e.k === 'enemy' || e.k === 'boss') {
+            const m = buildEnemyModel(e.fam ?? 'Sporelings', e.arch ?? 'melee_bruiser', e.id);
+            m.root.scale.setScalar(e.k === 'boss' ? 2.0 : 1);
+            renderer.scene.add(m.root);
+            r.object = m.root;
+            r.top = m.top * (e.k === 'boss' ? 2.0 : 1);
+          } else {
+            r.object = buildMarker(e.k);
+            renderer.scene.add(r.object);
+          }
           replicas.set(e.id, r);
         }
         r.samples.push({ t: now, x: e.x, z: e.z, yaw: e.yaw });
         if (r.samples.length > 6) r.samples.shift();
         r.seen = snapIndex;
         if (e.name) r.name = e.name;
+        if (e.cls) r.cls = e.cls;
+        if (e.lvl != null) r.lvl = e.lvl;
         r.hp = e.hp;
         r.mhp = e.mhp;
-        r.mesh.visible = !((e.k === 'enemy' || e.k === 'boss') && e.st === 'dead');
+        if (r.object && (e.k === 'enemy' || e.k === 'boss')) r.object.visible = e.st !== 'dead';
       }
       for (const [id, r] of replicas) {
-        // Never prune our own mesh just because one snapshot omitted us (death / interest cull /
-        // grace-window quirk) — that would make the local player vanish. It's cleaned up on stop().
+        // Never prune ourselves just because one snapshot omitted us (death / interest cull /
+        // grace-window quirk) — that would make the local player vanish. Cleaned up on stop().
         if (r.seen !== snapIndex && id !== selfId) {
-          renderer.scene.remove(r.mesh);
+          if (r.view) r.view.dispose();
+          if (r.object) {
+            renderer.scene.remove(r.object);
+            disposeObject(r.object);
+          }
           replicas.delete(id);
         }
       }
@@ -522,20 +539,29 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
       for (const [id, r] of replicas) {
         if (id === selfId) continue; // the local player is drawn from prediction, below
         const [x, z, yaw] = sampleAt(r.samples, renderT);
-        r.mesh.position.set(x, field.sample(x, z) + (r.kind === 'player' ? PLAYER_HALF : 0.4), z);
-        r.mesh.rotation.y = yaw;
+        const gy = field.sample(x, z);
+        if (r.view) {
+          r.view.update(x, gy + PLAYER_HALF, z, yaw, rdt, speedOf(r, x, z, rdt), (r.cls as ClassId) ?? 'warrior', false);
+          r.view.setLabel(r.name ?? 'Player', r.lvl ?? 1);
+        } else if (r.object) {
+          r.object.position.set(x, gy + (r.kind === 'loot' ? 0.3 : 0.4), z);
+          r.object.rotation.y = yaw;
+        }
       }
       // Local player: predicted, sub-tick-interpolated between the last two ticks by alpha.
-      const meMesh = replicas.get(selfId)?.mesh;
-      if (pred && meMesh) {
+      const me = replicas.get(selfId);
+      if (pred && me) {
         const tr = pred.transform;
         const x = tr.prevX + (tr.x - tr.prevX) * alpha;
         const z = tr.prevZ + (tr.z - tr.prevZ) * alpha;
         camX = x;
         camZ = z;
         camY = field.sample(x, z) + PLAYER_HALF;
-        meMesh.position.set(x, camY, z);
-        meMesh.rotation.y = lerpAngle(tr.prevYaw, tr.yaw, alpha);
+        const yaw = lerpAngle(tr.prevYaw, tr.yaw, alpha);
+        if (me.view) {
+          me.view.update(x, camY, z, yaw, rdt, speedOf(me, x, z, rdt), (me.cls as ClassId) ?? 'warrior', false);
+          me.view.setLabel(me.name ?? 'Adventurer', me.lvl ?? 1);
+        }
       }
       cameraRig.update(camX, camY, camZ);
       // Roam the Cube-World voxel bubble + animate scenery/village/NPCs/ambient life + sky.
@@ -547,14 +573,15 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         hud.update(shadow.world, shadow.localPlayer);
         minimap.update(shadow.world, shadow.localPlayer);
       }
-      // Nameplates over other players + living enemies (nearest first, headroom above the mesh).
+      // Nameplates (name + HP bar) over living enemies/bosses; players carry their own overhead
+      // name/level plate via PlayerView. Nearest first, headroom above the model.
       const plates: Array<{ e: NameplateEntry; d: number }> = [];
       for (const [id, r] of replicas) {
-        if (id === selfId || !r.name || !r.mesh.visible) continue;
-        if (r.kind !== 'player' && r.kind !== 'enemy' && r.kind !== 'boss') continue;
-        if ((r.kind === 'enemy' || r.kind === 'boss') && r.hp != null && r.hp <= 0) continue;
-        const pos = r.mesh.position;
-        const head = pos.y + (r.kind === 'boss' ? 2.6 : r.kind === 'player' ? 1.5 : 1.1);
+        if (id === selfId || !r.name || !r.object || !r.object.visible) continue;
+        if (r.kind !== 'enemy' && r.kind !== 'boss') continue;
+        if (r.hp != null && r.hp <= 0) continue;
+        const pos = r.object.position;
+        const head = pos.y + (r.top ?? 1.6) + 0.5;
         const d = (pos.x - camX) ** 2 + (pos.z - camZ) ** 2;
         plates.push({ e: { x: pos.x, y: head, z: pos.z, name: r.name, hp: r.hp ?? 1, mhp: r.mhp ?? 1, kind: r.kind }, d });
       }
