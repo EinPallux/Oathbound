@@ -5,7 +5,7 @@
 // player — the GameServer adds one player per connection (each with its own input) via addPlayer.
 
 import { readFileSync } from 'node:fs';
-import { normalizeMap } from '../src/world/map-format';
+import { normalizeMap, type MapQuest } from '../src/world/map-format';
 import { buildCustomWorldData } from '../src/world/custom-map';
 import { createSimWorld, type SimWorld } from '../src/sim/boot/sim-world';
 import type { Heightfield } from '../src/world/heightfield';
@@ -20,6 +20,10 @@ export interface ServerWorld {
   field: Heightfield;
   /** Where connecting players spawn. */
   playerStart: { x: number; z: number };
+  /** The map's quests (server tracks per-player progress + grants rewards). */
+  quests: MapQuest[];
+  /** NPC id → display name, for quest-log/dialog messages. */
+  npcNames: Map<string, string>;
 }
 
 export function bootServerWorld(config: ServerConfig): ServerWorld {
@@ -27,5 +31,14 @@ export function bootServerWorld(config: ServerConfig): ServerWorld {
   const map = normalizeMap(JSON.parse(raw));
   const data = buildCustomWorldData(map);
   const sim = createSimWorld({ ...data, seed: config.seed }); // no input → no primary player
-  return { sim, mapName: config.mapName, field: data.field, playerStart: data.playerStart };
+  const npcNames = new Map<string, string>();
+  for (const n of map.npcs) if (n.id) npcNames.set(n.id, n.name);
+  return {
+    sim,
+    mapName: config.mapName,
+    field: data.field,
+    playerStart: data.playerStart,
+    quests: map.quests,
+    npcNames,
+  };
 }

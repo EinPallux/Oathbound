@@ -30,6 +30,7 @@ import {
   type LootDrop,
   type Item,
   type EquipSlot,
+  type WaypointUnlocks,
 } from '../core/ecs/components';
 import { createPlayer } from '../sim/factory';
 import type { Heightfield } from '../world/heightfield';
@@ -114,6 +115,11 @@ export class ShadowWorld {
     if (inv) inv.gold = s.gold;
     const ch = w.get<Character>(p, C.Character);
     if (ch) ch.mountCast = s.mount;
+    // Fast-travel network: this player's own unlocked Oathstones (drives the travel panel).
+    if (s.wp) {
+      const wu = w.get<WaypointUnlocks>(p, C.WaypointUnlocks);
+      if (wu) wu.ids = s.wp.slice();
+    }
 
     // Shield: present only while active.
     if (s.shield > 0) w.set<Shield>(p, C.Shield, { amount: s.shield, remaining: 999 });
@@ -182,8 +188,13 @@ export class ShadowWorld {
         this.world.set<Vendor>(le, C.Vendor, { name: e.name ?? 'Vendor' });
         break;
       case 'oathstone':
-        // `activated` is per-player and not replicated yet → shown dim; fast-travel UI is a follow-up.
-        this.world.set<Oathstone>(le, C.Oathstone, { id: String(e.id), name: e.name ?? 'Oathstone', activated: false });
+        // Use the stable string id (oid) so it matches this player's unlocked set; `activated`
+        // reflects whether THIS player has attuned it (refreshed each snapshot in updateReplica).
+        this.world.set<Oathstone>(le, C.Oathstone, {
+          id: e.oid ?? String(e.id),
+          name: e.name ?? 'Oathstone',
+          activated: this.isUnlocked(e.oid),
+        });
         break;
       case 'loot':
         this.world.set<LootDrop>(le, C.LootDrop, { item: e.name ? ({ name: e.name } as LootDrop['item']) : null, gold: 0, owner: 0, ttl: 0 });
@@ -209,5 +220,13 @@ export class ShadowWorld {
     }
     const en = this.world.get<Enemy>(le, C.Enemy);
     if (en && e.st) (en as Enemy).state = e.st as Enemy['state'];
+    const os = this.world.get<Oathstone>(le, C.Oathstone);
+    if (os && e.oid) os.activated = this.isUnlocked(e.oid);
+  }
+
+  /** True if the local player has attuned the Oathstone with this stable id. */
+  private isUnlocked(oid: string | undefined): boolean {
+    if (!oid) return false;
+    return this.world.get<WaypointUnlocks>(this.localPlayer, C.WaypointUnlocks)?.ids.includes(oid) ?? false;
   }
 }

@@ -35,8 +35,15 @@ import { InventoryPanel } from '../render/inventory-panel';
 import { ItemTooltip } from '../render/item-tooltip';
 import { VendorPanel } from '../render/vendor-panel';
 import { CharacterPanel } from '../render/character-panel';
+import { TravelPanel } from '../render/travel-panel';
+import { SettingsPanel } from '../render/settings-panel';
+import { DialogPanel } from '../render/dialog-panel';
+import { QuestTracker } from '../render/quest-tracker';
+import { QuestLog } from './quests';
+import { loadSettings, saveSettings, applySettings } from './settings';
+import { saveKeybinds } from './keybinds';
 import { nearestVendor } from '../sim/vendor';
-import type { Item, EquipSlot } from '../core/ecs/components';
+import { C, type Item, type EquipSlot, type Oathstone } from '../core/ecs/components';
 import { customSceneryForMinimap } from '../world/custom-map';
 import { generateScenery, type Scenery } from '../world/scenery';
 import {
@@ -271,6 +278,12 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     const input = new InputController(canvas, keybinds);
     cleanups.push(() => input.dispose(), () => renderer.dispose());
 
+    // Client-only display/control settings (graphics quality, UI scale, look sensitivity) — shared
+    // with the offline game's store, applied to the HUD root and the renderer.
+    const settings = loadSettings();
+    renderer.setMaxPixelRatio(settings.maxPixelRatio);
+    input.setLook(settings.mouseSensitivity, settings.invertY);
+
     // Build the SAME field + colliders the server used (deterministic) so client-side prediction
     // resolves collision identically. Custom map (Talar) → full world data; else procedural.
     const map = getActiveMap();
@@ -336,6 +349,9 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     };
 
     const replicas = new Map<number, Replica>();
+    // For click-to-talk NPC picking.
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
     let snapIndex = 0;
     let seq = 0;
     let pred: PredictedPlayer | null = null;
@@ -374,6 +390,82 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
     const vendorPanel = new VendorPanel(hudRoot);
     vendorPanel.onSell = (item) => send({ t: 'sell', uid: item.uid });
     vendorPanel.onSellCommons = () => send({ t: 'sellCommons' });
+    // Fast travel (T) — reads this player's unlocked Oathstones from the shadow world; a Travel
+    // click sends the stone's stable id to the server, which enforces the toll / out-of-combat rule.
+    const travelPanel = new TravelPanel(hudRoot);
+    travelPanel.onTravel = (stoneEntity) => {
+      const os = shadow?.world.get<Oathstone>(stoneEntity, C.Oathstone);
+      if (os) send({ t: 'travel', stoneId: os.id });
+    };
+    // Settings (O) — client-only. Persist + re-apply on change; keybinds re-bind the input layer.
+    const settingsPanel = new SettingsPanel(hudRoot, settings, keybinds);
+    settingsPanel.onChange = () => {
+      saveSettings(settings);
+      applySettings(hudRoot, settings);
+      renderer.setMaxPixelRatio(settings.maxPixelRatio);
+      input.setLook(settings.mouseSensitivity, settings.invertY);
+    };
+    settingsPanel.onKeybindsChange = () => {
+      saveKeybinds(keybinds);
+      input.setKeybinds(keybinds);
+    };
+    applySettings(hudRoot, settings);
+
+    // Quests + NPC dialog (custom maps). The server owns quest truth; the client keeps a read-only
+    // QuestLog mirror (synced from the self block) to drive the tracker, the floating "!"/"?" NPC
+    // markers, and the dialog panel. Accept / talk / turn-in are commands; rewards land server-side.
+    const mapNpcs = map?.npcs ?? [];
+    const mapQuests = map?.quests ?? [];
+    const npcName = (id: string): string => mapNpcs.find((n) => n.id === id)?.name ?? id;
+    const questLog = new QuestLog(mapQuests);
+    const questTracker = new QuestTracker(hudRoot);
+    const dialogPanel = new DialogPanel(hudRoot);
+    let openNpcIndex: number | null = null;
+    const refreshQuestMarkers = (): void => {
+      const npcs = worldScene.npcs;
+      if (npcs) mapNpcs.forEach((n, i) => npcs.setMarker(i, n.id ? questLog.markerFor(n.id) : null));
+    };
+    // Render the dialog panel for an NPC from the current (mirror) quest state — no side effects,
+    // so it's safe to call again whenever the mirror changes.
+    const renderDialog = (npcIndex: number): void => {
+      const npc = mapNpcs[npcIndex];
+      if (!npc) return;
+      dialogPanel.open(npc, {
+        quests: mapQuests,
+        questLog,
+        npcName,
+        onAccept: (qid) => send({ t: 'questAccept', id: qid }),
+        onTurnIn: (qid) => send({ t: 'questTurnIn', id: qid }),
+      });
+    };
+    // Talk to an NPC (click / F): close other panels, advance any talk objective server-side, and
+    // show the dialog. Accept / turn-in flow to the server; the mirror + panel refresh on the next
+    // snapshot (server-authoritative).
+    const talkToNpc = (npcIndex: number): void => {
+      const npc = mapNpcs[npcIndex];
+      if (!npc || !npc.id) return;
+      openNpcIndex = npcIndex;
+      invPanel.close();
+      charPanel.close();
+      vendorPanel.close();
+      travelPanel.close();
+      send({ t: 'questTalk', npcId: npc.id });
+      renderDialog(npcIndex);
+    };
+    questLog.onChange = () => {
+      questTracker.update(questLog, npcName);
+      refreshQuestMarkers();
+      // Re-render an open dialog so an Accept/Turn-in reflects once the next snapshot confirms it.
+      if (dialogPanel.isOpen && openNpcIndex != null) renderDialog(openNpcIndex);
+    };
+    let lastQuestSig = '';
+    const syncQuests = (q: { a: { id: string; p: number }[]; c: string[] } | undefined): void => {
+      const sig = q ? `${q.a.map((x) => `${x.id}:${x.p}`).join(',')}|${q.c.join(',')}` : '';
+      if (sig === lastQuestSig) return;
+      lastQuestSig = sig;
+      questLog.load(q ? { active: q.a.map((x) => ({ id: x.id, progress: x.p })), completed: q.c } : undefined);
+    };
+
     let shadow: ShadowWorld | null = null;
     onInventory = (items, equipment, gold, materials, capacity): void => {
       shadow?.applyInventory(items, equipment, gold, materials, capacity);
@@ -401,6 +493,8 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         shadow.applySnapshot(ents);
         if (msg.self) shadow.applySelf(msg.self);
       }
+      // Server-authoritative quest state → client mirror (drives tracker / markers / dialog).
+      if (msg.self) syncQuests(msg.self.q);
       // Target frame (data-driven from the self block).
       if (msg.self?.tgt) {
         const tg = msg.self.tgt;
@@ -526,6 +620,31 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         vendorPanel.close();
         charPanel.toggle();
       }
+      if (input.consumeToggleTravel()) {
+        invPanel.close();
+        charPanel.close();
+        vendorPanel.close();
+        travelPanel.toggle();
+      }
+      if (input.consumeToggleSettings()) settingsPanel.toggle(); // O
+      // Esc, layered: close the topmost panel → else nothing (no menu online yet).
+      if (input.consumeEscape()) {
+        if (dialogPanel.isOpen) { dialogPanel.close(); openNpcIndex = null; }
+        else if (settingsPanel.isOpen) settingsPanel.close();
+        else if (invPanel.isOpen) invPanel.close();
+        else if (charPanel.isOpen) charPanel.close();
+        else if (vendorPanel.isOpen) vendorPanel.close();
+        else if (travelPanel.isOpen) travelPanel.close();
+        else if (minimap.isMapOpen) minimap.closeMap();
+      }
+      // Left-click a friendly NPC → talk (opens the dialog); non-NPC clicks fall through.
+      const click = input.consumeClick();
+      if (click && worldScene.npcs) {
+        pointer.set(click.ndcX, click.ndcY);
+        raycaster.setFromCamera(pointer, renderer.camera);
+        const npcHit = worldScene.npcs.pick(raycaster);
+        if (npcHit != null) talkToNpc(npcHit);
+      }
       if (chatFocused) {
         // While typing in chat, don't drive the player — drain edge-triggers so nothing fires on
         // blur, and send a neutral (idle) input this tick.
@@ -550,12 +669,16 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         ws.send(encode(idle));
         return;
       }
-      // F interact: close an open vendor panel, else open it when standing by a vendor (the same
-      // key still flows to the server for loot pickup / oathstone activation, so we don't consume
-      // it when there's no vendor interaction to handle locally).
+      // F interact, layered (mirrors the offline game): close an open dialog/vendor → open the
+      // vendor by a stall → talk to a nearby NPC → else the key flows to the server for loot
+      // pickup / oathstone activation (so we only consume it when we handled it locally).
       let interact = input.consumeInteract();
       if (interact && shadow) {
-        if (vendorPanel.isOpen) {
+        if (dialogPanel.isOpen) {
+          dialogPanel.close();
+          openNpcIndex = null;
+          interact = false;
+        } else if (vendorPanel.isOpen) {
           vendorPanel.close();
           interact = false;
         } else if (nearestVendor(shadow.world, shadow.localPlayer) != null) {
@@ -563,6 +686,12 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
           charPanel.close();
           vendorPanel.open();
           interact = false;
+        } else {
+          const npc = worldScene.npcs?.nearest(camX, camZ, 3.6) ?? null;
+          if (npc != null) {
+            talkToNpc(npc);
+            interact = false;
+          }
         }
       }
       // Auto-close the vendor panel once we walk away from the stall.
@@ -632,6 +761,7 @@ export function bootOnline(opts: OnlineOptions): { stop(): void } {
         invPanel.update(shadow.world, shadow.localPlayer);
         charPanel.update(shadow.world, shadow.localPlayer);
         vendorPanel.update(shadow.world, shadow.localPlayer);
+        travelPanel.update(shadow.world, shadow.localPlayer);
       }
       // Nameplates (name + HP bar) over living enemies/bosses; players carry their own overhead
       // name/level plate via PlayerView. Nearest first, headroom above the model.

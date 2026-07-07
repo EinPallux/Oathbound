@@ -99,6 +99,10 @@ export const TalentMessage = z.object({
 export const TravelMessage = z.object({ t: z.literal('travel'), stoneId: z.string().min(1).max(48) });
 /** Accept a quest offered by an NPC (by quest id). */
 export const QuestAcceptMessage = z.object({ t: z.literal('questAccept'), id: z.string().min(1).max(48) });
+/** Talk to a custom-map NPC (by id) — advances talk objectives server-side. */
+export const QuestTalkMessage = z.object({ t: z.literal('questTalk'), npcId: z.string().min(1).max(48) });
+/** Turn a quest in (its objective must be met) — server grants the reward. */
+export const QuestTurnInMessage = z.object({ t: z.literal('questTurnIn'), id: z.string().min(1).max(48) });
 
 /** Latency probe: `time` is the client's clock (ms) and is echoed back untouched. */
 export const PingMessage = z.object({
@@ -151,6 +155,8 @@ export const ClientMessage = z.discriminatedUnion('t', [
   TalentMessage,
   TravelMessage,
   QuestAcceptMessage,
+  QuestTalkMessage,
+  QuestTurnInMessage,
 ]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 
@@ -252,11 +258,20 @@ export const SnapshotEntity = z.object({
   /** Enemy family + archetype — pick the low-poly enemy model. */
   fam: z.string().optional(),
   arch: z.string().optional(),
+  /** Oathstone stable string id (for the fast-travel network). */
+  oid: z.string().optional(),
 });
 export type SnapshotEntity = z.infer<typeof SnapshotEntity>;
 
 /** One active status effect on the local player (for buff/debuff display). */
 export const SelfStatus = z.object({ id: z.string(), r: z.number() });
+
+/** This player's quest state (for the tracker + dialog): active quests with objective progress,
+ *  and completed quest ids. Kept short since it rides in every snapshot's self block. */
+export const SelfQuests = z.object({
+  a: z.array(z.object({ id: z.string(), p: z.number().int() })),
+  c: z.array(z.string()),
+});
 
 /** The local player's authoritative HUD state, sent per-client inside each snapshot. Lets the
  *  online client drive the full offline HUD (bars, hotbar cooldowns, buffs, target frame) without
@@ -286,6 +301,10 @@ export const SelfState = z.object({
   mount: z.number(),
   /** The server's authoritative target for this player (frame data), or null. */
   tgt: z.object({ id: z.number().int(), name: z.string(), lvl: z.number().int(), hp: z.number(), mhp: z.number() }).nullable(),
+  /** Oathstone ids THIS player has activated (their own fast-travel network). */
+  wp: z.array(z.string()).optional(),
+  /** This player's quest progress (active + completed), for the tracker/dialog. */
+  q: SelfQuests.optional(),
 });
 export type SelfState = z.infer<typeof SelfState>;
 

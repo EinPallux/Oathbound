@@ -17,10 +17,17 @@ import { salvageItem, salvageAllBelow } from '../src/sim/salvage';
 import { sellItem, sellAllBelow, nearestVendor } from '../src/sim/vendor';
 import { reinforceItem } from '../src/sim/reinforce';
 import { getClass } from '../src/sim/classes';
-import type { Inventory, Equipment, Item, PlayerClass, AbilityState } from '../src/core/ecs/components';
+import { fastTravel } from '../src/sim/travel';
+import { grantXp } from '../src/sim/progression';
+import { addItem } from '../src/sim/inventory';
+import { generateItem } from '../src/sim/loot/items';
+import { makeRelic } from '../src/sim/loot/relics';
+import { QuestLog } from '../src/game/quests';
+import type { Inventory, Equipment, Item, PlayerClass, AbilityState, Enemy, Oathstone } from '../src/core/ecs/components';
 import { serialize, applySave, SCHEMA_VERSION, type SaveData } from '../src/sim/save';
 import { LEVEL_CAP } from '../src/sim/stats';
 import { CombatEvent, type LevelUpEvent, type DeathEvent, type DamageEvent, type HealEvent } from '../src/sim/combat/events';
+import type { SelfState } from '../src/net/protocol';
 import { DT } from '../src/core/time';
 import type { Entity } from '../src/core/ecs/world';
 import { C, type ClassId, type EnemyInfo } from '../src/core/ecs/components';
@@ -52,6 +59,8 @@ interface ConnectedPlayer {
   chatLimiter: RateLimiter;
   /** Combat text (damage/heal) involving this player, buffered until the next snapshot. */
   fx: FxEvent[];
+  /** Server-authoritative quest progress (the sim doesn't model quests). */
+  questLog: QuestLog;
 }
 
 export type AuthResult =
@@ -92,6 +101,18 @@ export class GameServer {
       if (name) this.broadcastSystem(`${name} reached level ${e.level}.`);
     });
     events.on<DeathEvent>(CombatEvent.Death, (e) => {
+      // Quest kill-objectives: the dead enemy's template id is still on the entity here. Credit
+      // the killing player (if it was a player) so their kill quests advance.
+      const tmpl = this.world.sim.world.get<Enemy>(e.entity, C.Enemy)?.template;
+      if (tmpl && e.killer != null) {
+        for (const p of this.clients.values()) {
+          if (p.entity === e.killer) {
+            p.questLog.onKill(tmpl);
+            this.syncQuestCache(p);
+            break;
+          }
+        }
+      }
       if (this.world.sim.world.get(e.entity, C.Boss) == null) return;
       const info = this.world.sim.world.get<EnemyInfo>(e.entity, C.EnemyInfo);
       const killer = this.nameOf(e.killer);
@@ -296,7 +317,22 @@ export class GameServer {
 
   private makeClient(entity: Entity, input: NetworkControlState, accountId: number, slot: number, name: string): ConnectedPlayer {
     const isAdmin = (this.db.getAccount(accountId)?.is_admin ?? 0) === 1;
-    return { entity, input, accountId, slot, name, isAdmin, chatLimiter: new RateLimiter(5, 1, Date.now()), fx: [] };
+    // Rehydrate quest progress from the cache (loaded save / reconnect-preserved), so the server
+    // resumes the exact quest state rather than starting the character over.
+    const questLog = new QuestLog(this.world.quests);
+    questLog.load(this.questCache.get(`${accountId}:${slot}`));
+    return { entity, input, accountId, slot, name, isAdmin, chatLimiter: new RateLimiter(5, 1, Date.now()), fx: [], questLog };
+  }
+
+  /** Persist a player's quest progress into the cache (so a flush/serialize round-trips it). */
+  private syncQuestCache(p: ConnectedPlayer): void {
+    this.questCache.set(`${p.accountId}:${p.slot}`, p.questLog.toSave());
+  }
+
+  /** This player's quest state for the snapshot self block. */
+  private questStateOf(p: ConnectedPlayer): SelfState['q'] {
+    const s = p.questLog.toSave();
+    return { a: s.active.map((x) => ({ id: x.id, p: x.progress })), c: s.completed };
   }
 
   /** Set by main so `/admin shutdown` can trigger a graceful exit. */
@@ -405,6 +441,72 @@ export class GameServer {
     const ab = w.get<AbilityState>(p.entity, C.AbilityState);
     if (nodeIdx >= 0 && ab) ab.cooldowns[cls.abilities.length + nodeIdx] = 0;
     // The change flows to the client via the next snapshot's self block (choices + cooldowns).
+  }
+
+  /** Fast-travel to an activated Oathstone (by its stable id) — server validates ownership + gate. */
+  travel(ws: WebSocket, stoneId: string): void {
+    const p = this.clients.get(ws);
+    if (!p) return;
+    const w = this.world.sim.world;
+    // Resolve the stone id to its entity, then let the sim enforce unlock/combat/gold/here rules.
+    let dest: Entity | null = null;
+    for (const e of w.query(C.Oathstone)) {
+      if (w.get<Oathstone>(e, C.Oathstone)?.id === stoneId) {
+        dest = e;
+        break;
+      }
+    }
+    if (dest == null) return;
+    const res = fastTravel(w, p.entity, dest, this.world.field);
+    if (res.ok) {
+      this.invDirty.add(ws); // the toll changed the wallet
+      this.sendTo(ws, { t: 'system', text: `Travelled to ${res.name} (−${res.cost} g).` });
+    }
+  }
+
+  /** Accept a quest offered to this player (validated against the giver + prerequisites). */
+  questAccept(ws: WebSocket, id: string): void {
+    const p = this.clients.get(ws);
+    if (!p) return;
+    const q = p.questLog.byId(id);
+    if (!q || p.questLog.isActive(id) || p.questLog.isCompleted(id) || !p.questLog.prereqsMet(q)) return;
+    p.questLog.accept(id);
+    this.syncQuestCache(p);
+    this.sendTo(ws, { t: 'system', text: `Quest accepted: ${q.name}` });
+  }
+
+  /** Talk to an NPC — advances any talk objective targeting it. */
+  questTalk(ws: WebSocket, npcId: string): void {
+    const p = this.clients.get(ws);
+    if (!p) return;
+    p.questLog.onTalk(npcId);
+    this.syncQuestCache(p);
+  }
+
+  /** Turn a quest in (objective must be met) and grant its reward server-side. */
+  questTurnIn(ws: WebSocket, id: string): void {
+    const p = this.clients.get(ws);
+    if (!p) return;
+    const q = p.questLog.complete(id);
+    if (!q) return; // not active / objective not met
+    this.syncQuestCache(p);
+    const w = this.world.sim.world;
+    const inv = w.get<Inventory>(p.entity, C.Inventory);
+    if (inv) inv.gold += q.reward.gold;
+    if (q.reward.xp > 0) grantXp(w, p.entity, q.reward.xp);
+    const ri = q.reward.item;
+    let itemName = '';
+    if (ri) {
+      const item =
+        ri.kind === 'relic'
+          ? makeRelic(this.world.sim.rng, ri.relicId)
+          : generateItem(this.world.sim.rng, { slot: ri.slot, rarity: ri.rarity, ilvl: ri.ilvl, primaryStat: ri.primaryStat });
+      itemName = addItem(w, p.entity, item) ? item.name : `${item.name} (bag full!)`;
+    }
+    this.invDirty.add(ws); // gold + any item changed the bag
+    const parts = [`+${q.reward.gold}g`, `+${q.reward.xp} XP`];
+    if (itemName) parts.push(itemName);
+    this.sendTo(ws, { t: 'system', text: `Quest complete: ${q.name} (${parts.join(', ')})` });
   }
 
   /** Destroy orphaned (disconnected past the grace window) player entities. */
@@ -647,6 +749,7 @@ export class GameServer {
       const snap = buildSnapshot(this.world.sim.world, this.tickCount, p?.input.seq ?? 0, {
         self: p?.entity,
         names: this.playerNames(),
+        quests: p ? this.questStateOf(p) : undefined,
       });
       ws.send(encode(snap));
       if (p) p.fx.length = 0;
@@ -658,7 +761,11 @@ export class GameServer {
     const names = this.playerNames();
     for (const [ws, p] of this.clients) {
       if (ws.readyState === WebSocket.OPEN) {
-        const snap = buildSnapshot(this.world.sim.world, this.tickCount, p.input.seq, { self: p.entity, names });
+        const snap = buildSnapshot(this.world.sim.world, this.tickCount, p.input.seq, {
+          self: p.entity,
+          names,
+          quests: this.questStateOf(p),
+        });
         if (p.fx.length > 0) snap.fx = p.fx.slice();
         ws.send(encode(snap));
       }

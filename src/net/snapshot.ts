@@ -27,6 +27,7 @@ import {
   type Target,
   type CastState,
   type Character,
+  type WaypointUnlocks,
 } from '../core/ecs/components';
 import type { SnapshotEntity, SnapshotMessage, SelfState } from './protocol';
 
@@ -60,6 +61,8 @@ export interface SnapshotOpts {
   self?: Entity;
   /** Player entity → character name, for player nameplates. */
   names?: Map<number, string>;
+  /** The receiving client's quest state (server-tracked; not in the ECS), for the self block. */
+  quests?: SelfState['q'];
 }
 
 export function buildSnapshot(world: World, tick: number, ack: number, opts: SnapshotOpts = {}): SnapshotMessage {
@@ -86,16 +89,21 @@ export function buildSnapshot(world: World, tick: number, ack: number, opts: Sna
       const prog = world.get<Progression>(e, C.Progression);
       if (prog) ent.lvl = prog.level;
     }
+    if (kind === 'oathstone') {
+      const os = world.get<Oathstone>(e, C.Oathstone);
+      if (os) ent.oid = os.id; // stable id for the client's fast-travel network
+    }
     const name = nameOf(world, e, kind, opts.names);
     if (name) ent.name = name;
     ents.push(ent);
   }
-  const self = opts.self != null ? buildSelfState(world, opts.self) : undefined;
+  const self = opts.self != null ? buildSelfState(world, opts.self, opts.quests) : undefined;
   return { t: 'snapshot', tick, ack, ents, self };
 }
 
-/** The receiving player's authoritative HUD state. */
-export function buildSelfState(world: World, player: Entity): SelfState | undefined {
+/** The receiving player's authoritative HUD state. `quests` is the server-tracked quest state
+ *  (not stored in the ECS), folded in for the tracker/dialog. */
+export function buildSelfState(world: World, player: Entity, quests?: SelfState['q']): SelfState | undefined {
   const pc = world.get<PlayerClass>(player, C.PlayerClass);
   const h = world.get<Health>(player, C.Health);
   const res = world.get<Resource>(player, C.Resource);
@@ -129,6 +137,8 @@ export function buildSelfState(world: World, player: Entity): SelfState | undefi
     cast: cast ? { idx: cast.index, remaining: q(cast.remaining) } : null,
     mount: ch && ch.mountCast > 0 ? q(ch.mountCast) : 0,
     tgt: targetOf(world, player),
+    wp: [...(world.get<WaypointUnlocks>(player, C.WaypointUnlocks)?.ids ?? [])],
+    q: quests,
   };
 }
 

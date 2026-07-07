@@ -236,6 +236,18 @@ export function attachNet(wss: WebSocketServer, game: GameServer): void {
         case 'talent':
           if (inWorld) game.talent(ws, msg.nodeId, msg.option);
           return;
+        case 'travel':
+          if (inWorld) game.travel(ws, msg.stoneId);
+          return;
+        case 'questAccept':
+          if (inWorld) game.questAccept(ws, msg.id);
+          return;
+        case 'questTalk':
+          if (inWorld) game.questTalk(ws, msg.npcId);
+          return;
+        case 'questTurnIn':
+          if (inWorld) game.questTurnIn(ws, msg.id);
+          return;
       }
     });
   });
