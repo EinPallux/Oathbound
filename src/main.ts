@@ -1,12 +1,15 @@
-// Entry point. The app shell (src/game/app.ts) runs the onboarding flow — Login →
-// Character Select → enter world — and boots the play session when a character is chosen.
+// Entry point. Oathbound is an online-only MMORPG: the client always connects to an
+// authoritative Oathbound server (src/game/online.ts drives login → character select → world).
 //
-// The game boots the authored "talar" map by default (see DEFAULT_MAP), loaded from
-// public/maps/talar.oathbound-map.json. ?map=<name> loads a different custom map authored in
-// the Admin Tools Map Builder from public/maps/<name>.oathbound-map.json (or ?map=<path|url>);
-// ?map=none (also `off` or empty) boots the old procedural world instead.
+// The client renders the same authored "talar" map the server runs (see DEFAULT_MAP), loaded
+// from public/maps/talar.oathbound-map.json so terrain/scenery match the server deterministically.
+// ?map=<name> loads a different custom map from public/maps/<name>.oathbound-map.json (or a
+// path/url); ?map=none (also `off` or empty) renders the procedural world instead.
+//
+// The server to connect to is same-origin `/ws` by default (Caddy proxies wss://host/ws → the
+// Node server in production); ?server=<ws-url|host> overrides it, and in dev it defaults to the
+// local game server on :8080 (run `npm run server:dev` alongside `npm run dev`).
 import './styles.css';
-import { runApp } from './game/app';
 import { setActiveMap } from './world/active-map';
 import { normalizeMap } from './world/map-format';
 import { resolveMapUrl, mapNameHint } from './world/map-url';
@@ -62,28 +65,32 @@ function resolveServerUrl(raw: string): string {
   }
 }
 
+/** The Oathbound server this client connects to. `?server=` overrides; otherwise same-origin
+ *  `/ws` in production (Caddy proxies it), or the local game server on :8080 in dev. */
+function defaultServerUrl(): string {
+  const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+  if (import.meta.env.DEV) return `ws://${location.hostname || '127.0.0.1'}:8080/ws`;
+  return `${scheme}://${location.host}/ws`;
+}
+
 async function main(): Promise<void> {
   await loadRequestedMap();
-  // Online mode: ?server=<ws-url|host> connects to a running Oathbound server (M1). Without it,
-  // the game runs the local single-player experience exactly as before.
+  // Online-only: always connect to an authoritative Oathbound server. ?server=<ws-url|host>
+  // overrides the target; ?user=&pass= auto-login and ?char=&class= auto-enter (dev/e2e).
   const params = new URLSearchParams(location.search);
   const server = params.get('server');
-  if (server) {
-    const { bootOnline } = await import('./game/online');
-    const cls = params.get('class');
-    const charParam = params.get('char');
-    const online = bootOnline({
-      url: resolveServerUrl(server),
-      user: params.get('user') ?? undefined,
-      pass: params.get('pass') ?? undefined,
-      char: charParam != null && charParam !== '' ? Number(charParam) : undefined,
-      className: cls === 'hunter' || cls === 'priest' || cls === 'warrior' ? cls : undefined,
-    });
-    // Keep the teardown handle reachable (e.g. for a future reload-free logout / hot-reload).
-    (window as unknown as { __oathboundOnline?: { stop(): void } }).__oathboundOnline = online;
-    return;
-  }
-  runApp();
+  const { bootOnline } = await import('./game/online');
+  const cls = params.get('class');
+  const charParam = params.get('char');
+  const online = bootOnline({
+    url: server ? resolveServerUrl(server) : defaultServerUrl(),
+    user: params.get('user') ?? undefined,
+    pass: params.get('pass') ?? undefined,
+    char: charParam != null && charParam !== '' ? Number(charParam) : undefined,
+    className: cls === 'hunter' || cls === 'priest' || cls === 'warrior' ? cls : undefined,
+  });
+  // Keep the teardown handle reachable (e.g. for a future reload-free logout / hot-reload).
+  (window as unknown as { __oathboundOnline?: { stop(): void } }).__oathboundOnline = online;
 }
 
 void main();

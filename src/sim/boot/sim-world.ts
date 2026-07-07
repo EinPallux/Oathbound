@@ -1,8 +1,8 @@
 // Assembles the pure simulation world — the ECS, its entities (player, enemies, bosses,
 // oathstones, vendor) and the fixed system pipeline — from already-built world data. This is
-// the render-free heart of the game: the browser bootstrap (src/game/bootstrap.ts) and the
-// headless multiplayer server both call it, so there is exactly ONE definition of the sim
-// wiring and the two can never drift. No three.js, no DOM, no Node APIs — it runs anywhere
+// the render-free heart of the game: the headless multiplayer server (server/world-boot.ts)
+// is the sole caller — there is exactly ONE definition of the sim wiring, so the authoritative
+// world can never drift from what the client renders. No three.js, no DOM, no Node APIs — it runs anywhere
 // the simulation runs. See docs/technical/MMO_ARCHITECTURE.md (§the M2 refactor builds on this).
 
 import { World, type Entity } from '../../core/ecs/world';

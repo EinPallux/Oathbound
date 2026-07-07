@@ -42,10 +42,20 @@ export default defineConfig({
     ...(executablePath ? { launchOptions: { executablePath } } : {}),
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-  },
+  // Oathbound is online-only, so e2e needs BOTH the Vite client and an authoritative game
+  // server. The server persists to a throwaway DB so runs don't pollute the dev database.
+  webServer: [
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:5173',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+    {
+      command: 'OATHBOUND_DB=.e2e-oathbound.db OATHBOUND_PORT=8080 npm run server:dev',
+      port: 8080,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+  ],
 });

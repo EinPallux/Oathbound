@@ -3,7 +3,7 @@
 Entry point for **any coding agent or LLM** working in this repository (Claude Code, Cursor, Copilot, etc.). Read this first; it tells you **what the project is, where it currently stands, what to build next, how to verify, and the rules to follow.**
 
 ## What this is
-**Oathbound** — a chill, solo-friendly **3D browser MMORPG** (TypeScript + Vite + **Three.js**). Playable **solo/offline** (static build, browser-saved), and — since the MMO track (M0–M7) — **online with friends** on a self-hosted authoritative Node server with **SQLite** accounts/characters (see [`server/`](./server) + [`deploy/`](./deploy)). The complete design/technical/production blueprint lives in [`/docs`](./docs/README.md) (start at [`docs/README.md`](./docs/README.md)). It is the **single source of truth** for design decisions.
+**Oathbound** — a chill, solo-friendly **3D browser MMORPG** (TypeScript + Vite + **Three.js**), now **online-only**: the browser client always connects to a self-hosted **authoritative Node server** with **SQLite** accounts/characters (see [`server/`](./server) + [`deploy/`](./deploy)). The original solo/offline single-player path was fully ported into the online client and then **removed** (see the *Online migration* status below); the sim (`src/sim`, `src/core/ecs`) it was built on is still the shared, render-free heart of the game, run headlessly by the server and the unit tests. The complete design/technical/production blueprint lives in [`/docs`](./docs/README.md) (start at [`docs/README.md`](./docs/README.md)). It is the **single source of truth** for design decisions.
 
 ## ▶ Current status — where to continue
 > **Keep this section up to date at the end of every phase.**
@@ -25,7 +25,8 @@ Entry point for **any coding agent or LLM** working in this repository (Claude C
   - **✅ M5 "Playing Together" done** (see CHANGELOG): the multiplayer game rules, all solo-neutral + in the shared sim. **Threat table** (`src/sim/combat/threat.ts`) — damage builds per-player aggro (recorded in `applyDamage`); enemy + boss AI target the **highest-threat** living player (nearest fallback for the pull); clears on leash/respawn. **Shared XP** to every participant (killer + damagers), full XP each. **Owner-instanced loot** — one drop per participant, killer first so solo is byte-identical. **World-boss HP scaling** (base × (1+0.6·(n−1)); solo = base). Verified: client+server typecheck ✓, **359/359** unit (new `multiplayer-rules`) ✓, `server:test` ✓, build ✓, e2e parity ✓. Deferred: healing/DoT threat, party system, boss mechanic scaling.
   - **✅ M6 "Chat & Presence" done** (see CHANGELOG): the social layer. Zone-wide **chat** (`chat`/`chatLine`/`system` protocol, 200-char cap) with sender character names; `/who` + `/me`; per-player **chat throttle**. **Presence** join/leave lines + sim-event system lines (`X reached level N`, `X has slain <boss>!`); configurable **MOTD**. Client **chat overlay** (Enter to focus/send, Esc to cancel; neutral input while typing). Verified: client+server typecheck ✓, 359/359 unit ✓, `server:test` ✓, build ✓, live 2-client chat (broadcast w/ names, `/who`, join line, MOTD, flood throttle) ✓, e2e parity ✓. Deferred: whisper/party channels, chat-log table, mute/moderation, keybind-configurable chat toggle.
   - **✅ M7 "Ops & Hardening" done** (see CHANGELOG): the VPS is a product. **Ops kit in [`deploy/`](./deploy/README.md)** — `setup.sh` (one-time Ubuntu 24.04: Node 22, Caddy, non-root service user, dirs, UFW, systemd units), `deploy.sh` (`npm ci` → build → `systemctl restart`), `Caddyfile` (auto-TLS + `/ws` proxy), `oathbound.service` (auto-restart, graceful SIGTERM flush, `ReadWritePaths` sandbox), `server.env.example`, `backup.sh`+`sqlite-backup.mjs` (WAL-safe online backup → gzip → rotate, no system `sqlite3` needed), `restore.sh` (validated, keeps `.pre-restore`), nightly `oathbound-backup.{service,timer}`. **Admin commands** (in-chat, admin-flag): `/admin broadcast|kick|ban|save|shutdown|who` + public `/who`; **bans** persist (`002_bans`, blocked at login+resume). **Tick-time metrics** in the heartbeat; **bot load test** (`server/test/load.ts`, `npm run server:loadtest`). Verified: client+server typecheck ✓, **359/359** unit ✓, `server:test` (w/ ban migration) ✓, build ✓, `server:build` ✓, **backup/restore drill** (WAL-hot DB, mutation rolled back) ✓, **live 2-client admin verify 12/12** (kick/ban+persist/broadcast/save/shutdown/who) ✓, **20-bot load: step avg ~0.6 ms/max ~1.85 ms vs 33 ms budget, ~280 kbit/s per bot** ✓, e2e parity ✓. Deferred: interest/delta snapshots (the bandwidth lever), Litestream, CLI admin socket, teleport/give verbs.
-  - **▶ Next: M8 "Friends Beta → Online Gate"** (the **final** phase) — real humans, real internet: playtest with friends, tune, and clear the objective **Online Gate** (3+ players complete a multi-hour session with no crash/rollback/dupe/data-loss; reconnect mid-session works; movement/combat feel acceptable at real EU latencies; a shared world-boss kill is fair + fun; backups + restart drill pass on the live box; solo/offline suite still green). Mostly owner+friends playtesting on the real VPS, not new code. Confirm with the owner before starting.
+  - **✅ M8 groundwork — Online migration (P1–P6) done** (owner-requested "abandon the local game, work fully on the online client"): the online client (`src/game/online.ts`) reached **full parity** with the old solo game and the offline path was then **removed**. **P1** world visuals (shared `src/render/world-scene.ts`: voxel terrain, scenery, village, NPCs, critters, ambient life, sky). **P2** character models (animated `PlayerView` for players, `enemy-models` for enemies/bosses, nameplates). **P3** inventory + equipment + item tooltips (server `inventory` message + equip/salvage commands). **P4** vendor (sell/sellCommons, proximity-gated), reinforce, character sheet + talents — all server commands. **P5** fast travel (Oathstone `oid` in snapshots + per-player `wp` unlock set in the self block + `travel` command), server-side **QuestLog** (per-player, kill objectives from Death events, quest state in the self block) with the reused tracker/dialog/NPC markers + accept/talk/turn-in commands and server-granted rewards, and the client-only Settings panel (O). **P6** made online the **sole entry** (`src/main.ts` always boots `bootOnline`, defaulting to same-origin `/ws` in prod, `:8080` in dev) and **deleted 17 offline-only files** (`game/bootstrap.ts`, `game/app.ts`, `game/states.ts`, `devtools/perf-overlay.ts`, `platform/audio.ts`+`music.ts`+`account-store.ts`, and the offline-only render views: `character-select`, `login-screen`, `class-select`, `micro-bar`, `enemy-view`, `loot-view`, `projectile-view`, `trap-view`, `ground-aoe-view`, `interactable-view`). The e2e suite (`tests/e2e/boot.spec.ts`) was rewritten to boot the **online** client against a live server (playwright starts both Vite + `server:dev`). Verified each phase: client+server typecheck ✓, **368/368** unit ✓, `server:test` ✓, `build` ✓, `server:build` ✓, live headless-browser smokes (HUD + all panels, zero console errors) ✓, **online e2e 2/2 ✓**. *Note: audio/music are gone (never wired online) — re-adding sound is a follow-up.*
+  - **▶ Next: M8 "Friends Beta → Online Gate"** (the **final** phase) — real humans, real internet: playtest with friends, tune, and clear the objective **Online Gate** (3+ players complete a multi-hour session with no crash/rollback/dupe/data-loss; reconnect mid-session works; movement/combat feel acceptable at real EU latencies; a shared world-boss kill is fair + fun; backups + restart drill pass on the live box). Mostly owner+friends playtesting on the real VPS, not new code. Confirm with the owner before starting.
 - **Branching:** the owner reviews via PR. Build each checkpoint on a feature branch (`claude/oathbound-<topic>`) → open a PR into `claude/game-design-docs-70dim2`. The owner merges + deletes the branch. (History: `0.4.0`–`0.5.0` landed via PRs #10–#20.)
 - **Live progress log:** [`CHANGELOG.md`](./CHANGELOG.md) (every phase, each ending with "Next phase →").
 - **The full plan:** [`docs/production/VERSION_ROADMAP.md`](./docs/production/VERSION_ROADMAP.md) (`0.0.1-INDEV` → `1.0-BETA`).
@@ -36,15 +37,23 @@ Entry point for **any coding agent or LLM** working in this repository (Claude C
 - Develop on the branch the owner specifies (currently `claude/oathbound-phase-0-0-4-to8alw`). One commit per phase, including its verification results. Do **not** open a PR unless asked.
 
 ## How to run & verify
+Oathbound is **online-only**, so playing locally needs the game server **and** the Vite client running together:
 ```bash
 npm install
-npm run dev        # dev server → http://localhost:5173
-npm test           # unit tests (Vitest)
-npm run test:e2e   # browser smoke/behaviour tests (Playwright)
-npm run build      # typecheck (tsc --noEmit) + production build → dist/
-npm run typecheck  # types only
+npm run server:dev # authoritative game server → ws://127.0.0.1:8080/ws  (run this first)
+npm run dev        # Vite client → http://localhost:5173  (auto-connects to :8080 in dev)
 ```
-**Keep `typecheck` + `test` + `build` green before committing.** Add tests with each new system (unit for logic, e2e for behaviour).
+Verification (keep all green before committing):
+```bash
+npm test              # client unit tests (Vitest)
+npm run typecheck     # client types
+npm run typecheck:server  # server types
+npm run server:test   # server persistence/auth/restart test
+npm run build         # typecheck + production client build → dist/
+npm run server:build  # esbuild server bundle → dist-server/
+npm run test:e2e      # browser online-boot smoke (Playwright starts Vite + server:dev)
+```
+Add tests with each new system (unit for sim logic, e2e for client behaviour).
 
 *Remote-environment note:* Chromium is pre-installed at `/opt/pw-browsers`; `playwright.config.ts` auto-resolves the binary. **Do not run `playwright install`.**
 
@@ -54,7 +63,7 @@ npm run typecheck  # types only
 - **Data-driven content** + **seedable RNG** (`src/core/rng.ts`) for anything random, so loot/spawns and tests are deterministic. See [CONTENT_DATA_STRATEGY](./docs/technical/CONTENT_DATA_STRATEGY.md).
 - **All numeric values are `v1 tuning targets`** — validated by gates/telemetry, not final law.
 - **Originality:** never copy Hordes.io content, assets, names, or balancing — it is a design reference only ([THIRD_PARTY_ASSET_POLICY](./docs/assets/THIRD_PARTY_ASSET_POLICY.md)).
-- **Don't build [deferred features](./docs/production/DEFERRED_FEATURES.md)** (multiplayer, accounts, dungeons, raids, PvP, trading…) before the solo loop is polished.
+- **Don't build [deferred features](./docs/production/DEFERRED_FEATURES.md)** — multiplayer/accounts/chat are now **built** (MMO track), but dungeons, raids, PvP, trading, guilds are still deferred until the core online loop is proven with friends (M8).
 - **TypeScript is strict** (`verbatimModuleSyntax`, `noUnusedLocals/Parameters`). Use `import type` for type-only imports.
 
 ## Repo map
@@ -69,10 +78,9 @@ npm run typecheck  # types only
 /src/world       pure world data (heightfield…)                          [no three, no node]
 /src/net         isomorphic netcode: protocol (zod), snapshot, net-input,
                    prediction, rate-limit — runs in BOTH browser & Node   [no three, no node]
-/src/render      renderer, camera-rig, terrain-mesh, player-view         [three]
-/src/platform    input, audio, save/account stores (browser)
-/src/devtools    perf overlay (and future spawn/level/teleport tools)
-/src/game        bootstrap (offline composition root), online.ts (online client), states
+/src/render      renderer, camera-rig, world-scene, player-view, HUD/panels  [three]
+/src/platform    input, null-input, save-store (offline-save import)       (browser)
+/src/game        online.ts (the online client), settings, keybinds, quests (client quest mirror)
 /server          authoritative Node server: game, net (ws), db (sqlite), auth, clock, config  [node]
 /deploy          VPS ops kit: setup/deploy/backup/restore scripts, Caddyfile, systemd units
 /tests/unit      Vitest (pure logic)      /tests/e2e  Playwright (behaviour)

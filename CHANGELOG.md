@@ -5,6 +5,24 @@ Each entry is an **independently testable build**. After each phase, work pauses
 
 ---
 
+## Online Migration (P1–P6) — online becomes the sole game, offline removed
+**Goal (owner-requested):** "abandon the local game and work fully on the online client." Bring the online client (`src/game/online.ts`) to **full parity** with the old solo game, then delete the single-player path so there's one client to maintain. The offline `bootstrap.ts` stayed as the reference to port *from* until P6. Six verified phases.
+
+- **P1 — world visuals:** extracted the offline world build into a shared `src/render/world-scene.ts` (Cube-World voxel terrain, scenery, village, map NPCs/critters, ambient life, sky) and mounted it in the online client, so the online world looks identical to the offline one (same map/heightfield, deterministic).
+- **P2 — character models:** players render with the animated `PlayerView` (class weapons + walk/idle/attack), enemies/bosses with `enemy-models` (family/archetype from the snapshot), each with overhead nameplates — replacing the earlier stand-in meshes.
+- **P3 — inventory + equipment:** the server sends an **`inventory`** message (bag + equipped gear + gold/materials/capacity) on enter and after any change; the reused `InventoryPanel` (B) + `ItemTooltip` drive equip/salvage as **server commands** (`equip`/`salvage`/`salvageCommons`), applied to the shadow world.
+- **P4 — vendor / reinforce / character sheet:** `VendorPanel` (F near a stall, proximity-gated server-side; sell / sell-all-Commons), item **reinforce**, and the `CharacterPanel` (C: equipped gear, live derived stats, choice-node **talents**) — all via commands (`sell`/`sellCommons`/`reinforce`/`talent`).
+- **P5 — fast travel / quests / dialog / settings:** snapshots carry each Oathstone's stable `oid`; the self block carries this player's unlocked `wp` set and quest state `q`. The reused `TravelPanel` (T) lists the discovered network and a Travel click sends `{travel, stoneId}` (server enforces toll / out-of-combat / not-here). The server keeps a **per-player `QuestLog`** (rehydrated from the save, kill objectives advanced from Death events crediting the killer, rewards granted server-side); the client mirrors it into the reused `QuestTracker` + floating !/? NPC markers + `DialogPanel`, with `questAccept`/`questTalk`/`questTurnIn` commands. NPCs are click- and F-interactable. The client-only `SettingsPanel` (O) drives graphics/UI-scale/accessibility/keybinds. Esc closes the topmost panel.
+- **P6 — online is the sole entry, offline removed:** `src/main.ts` now **always** boots `bootOnline` (server target = same-origin `/ws` in prod, `:8080` in dev; `?server=` overrides). Deleted **17 offline-only files** — `game/bootstrap.ts`, `game/app.ts`, `game/states.ts`, `devtools/perf-overlay.ts`, `platform/audio.ts` + `music.ts` + `account-store.ts`, and the offline-only render views `character-select`, `login-screen`, `class-select`, `micro-bar`, `enemy-view`, `loot-view`, `projectile-view`, `trap-view`, `ground-aoe-view`, `interactable-view`. The e2e suite was rewritten from an offline `?autostart` boot to an **online** boot spec (`tests/e2e/boot.spec.ts`) — Playwright now starts both Vite and `server:dev`, connects, auto-enters a fresh warrior, and asserts the HUD + all panels come up with zero console errors.
+
+**Removed (noted):** in-game **audio/music** (the offline `Sfx`/music engine was never wired into the online client — re-adding sound is a follow-up); the offline single-player save-slot flow (browser-local characters). The one-time **offline-save import** (`loadSave`) is kept so an existing browser character can still be imported into an account.
+
+**Verified (each phase):** client + server `typecheck` ✓ · **368/368** unit ✓ · `server:test` ✓ · `build` + `server:build` ✓ · **live headless-browser smokes** (HUD + inventory/character/vendor/travel/settings panels, zero console errors; the Travel panel shows the spawn-attuned Home Oathstone — screenshots captured) ✓ · **online e2e 2/2** (connect→world→HUD, and open all core panels) ✓.
+
+**Next phase →** M8 "Friends Beta → Online Gate": playtest with friends on the real VPS and clear the Online Gate. (Optional follow-ups: re-add audio online; prune now-dead offline exports in `save-store.ts`.)
+
+---
+
 ## Online Feature Parity (pre-VPS) — the online client becomes a real MMO client
 **Goal:** close the biggest gap before friends play — the online client was a bare renderer (positions + chat + a health bar). It now runs the **entire offline HUD** and modern-MMO furniture, without reimplementing any of it. Done in four verified phases.
 
